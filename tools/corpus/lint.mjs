@@ -62,19 +62,36 @@ export function findBareValues(text, index) {
   const { bodyOffset } = parseFrontmatter(text);
   const ranges = coveredRanges(findBlocks(text));
   const inBlock = (i) => ranges.some(([s, e]) => i >= s && i < e);
-  const issues = [];
+  const matches = [];
   for (const [literal, keys] of index) {
     let at = text.indexOf(literal, bodyOffset);
     while (at !== -1) {
       if (!inBlock(at) && isBoundedMatch(text, at, literal)) {
-        issues.push({
-          rule: "bare-value",
-          message: `value "${literal}" belongs to record(s) ${keys.join(", ")}; wrap it in a marker block`,
-          line: text.slice(0, at).split("\n").length,
-        });
+        matches.push({ start: at, end: at + literal.length, literal, keys });
       }
       at = text.indexOf(literal, at + literal.length);
     }
   }
-  return issues.sort((a, b) => a.line - b.line);
+  // Longest-match suppression: when one matched literal is a hyphen/other
+  // non-word-bounded prefix (or substring) of another, the shorter match's
+  // span lies entirely within the longer match's span. Drop it so a value
+  // like "example-model-4-1-20260101" does not also get misattributed to a
+  // shorter record like "example-model-4-1".
+  const surviving = matches.filter(
+    (m) =>
+      !matches.some(
+        (o) =>
+          o !== m &&
+          o.literal.length > m.literal.length &&
+          o.start <= m.start &&
+          m.end <= o.end,
+      ),
+  );
+  return surviving
+    .map((m) => ({
+      rule: "bare-value",
+      message: `value "${m.literal}" belongs to record(s) ${m.keys.join(", ")}; wrap it in a marker block`,
+      line: text.slice(0, m.start).split("\n").length,
+    }))
+    .sort((a, b) => a.line - b.line);
 }

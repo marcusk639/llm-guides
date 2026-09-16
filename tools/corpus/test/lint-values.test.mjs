@@ -45,3 +45,30 @@ test("flags a bare value inside a fenced code block outside any marker", () => {
     "---\ntitle: t\n---\n```bash\ncall --model example-model-4-5-20260101\n```\n";
   assert.equal(findBareValues(text, index).length, 1);
 });
+
+const overlappingIndex = new Map([
+  ["example-model-4-1", ["m.alias"]],
+  ["example-model-4-1-20260101", ["m.snapshot"]],
+  ["200K", ["m.context"]],
+]);
+
+test("does not misattribute a longer literal's match to a shorter contained literal", () => {
+  const text = "---\ntitle: t\n---\nThe id is example-model-4-1-20260101.\n";
+  const issues = findBareValues(text, overlappingIndex);
+  assert.equal(issues.length, 1);
+  assert.match(issues[0].message, /m\.snapshot/);
+  assert.doesNotMatch(issues[0].message, /m\.alias/);
+});
+
+test("flags the shorter literal on its own when the longer literal is absent", () => {
+  const text = "---\ntitle: t\n---\nThe id is example-model-4-1 here.\n";
+  const issues = findBareValues(text, overlappingIndex);
+  assert.equal(issues.length, 1);
+  assert.match(issues[0].message, /m\.alias/);
+});
+
+test("still flags a value followed by '-' or '.' since those are not word characters", () => {
+  const text =
+    "---\ntitle: t\n---\na 200K-token context. The window is 200K.\n";
+  assert.equal(findBareValues(text, overlappingIndex).length, 2);
+});
