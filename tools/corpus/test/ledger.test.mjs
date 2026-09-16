@@ -105,6 +105,51 @@ test("table volatility is the max across matching rows regardless of record orde
   assert.equal(derivePageVolatility(text, mixedOrderRecords), "high");
 });
 
+// Task 15d: a record with an invalid volatility (missing, or not one of
+// low/medium/high) must never crash derivePageVolatility/expiryFor, and must
+// be ignored for cadence purposes as if the page never referenced it.
+test("derivePageVolatility ignores a record with an invalid volatility and does not throw", () => {
+  const bad = [{ key: "bad.one", volatility: "hi" }];
+  const text = "<!-- corpus:data key=bad.one -->x<!-- /corpus:data -->";
+  let volatility;
+  assert.doesNotThrow(() => {
+    volatility = derivePageVolatility(text, bad);
+  });
+  assert.equal(volatility, null);
+  assert.equal(expiryFor("2026-09-16", volatility), expiryFor("2026-09-16", null));
+});
+
+test("derivePageVolatility ignores a record with no volatility field and does not throw", () => {
+  const bad = [{ key: "bad.none" }];
+  const text = "<!-- corpus:data key=bad.none -->x<!-- /corpus:data -->";
+  let volatility;
+  assert.doesNotThrow(() => {
+    volatility = derivePageVolatility(text, bad);
+  });
+  assert.equal(volatility, null);
+});
+
+test("an invalid-volatility record does not throw whether it is referenced first or last", () => {
+  const mixed = [
+    { key: "bad.first", volatility: "hi" },
+    { key: "good.last", volatility: "medium" },
+  ];
+  const firstBad =
+    "<!-- corpus:data key=bad.first -->x<!-- /corpus:data --><!-- corpus:data key=good.last -->y<!-- /corpus:data -->";
+  const lastBad =
+    "<!-- corpus:data key=good.last -->y<!-- /corpus:data --><!-- corpus:data key=bad.first -->x<!-- /corpus:data -->";
+  let a, b;
+  assert.doesNotThrow(() => {
+    a = derivePageVolatility(firstBad, mixed);
+  });
+  assert.doesNotThrow(() => {
+    b = derivePageVolatility(lastBad, mixed);
+  });
+  assert.equal(a, "medium");
+  assert.equal(b, "medium");
+  assert.doesNotThrow(() => expiryFor("2026-09-16", a));
+});
+
 test("expiry boundary is exact: fails the day after a full extra cadence, not on it", () => {
   const entry = {
     path: "p.md",

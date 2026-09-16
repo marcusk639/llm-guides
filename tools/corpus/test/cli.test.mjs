@@ -265,6 +265,151 @@ test("lintCorpus reports a lint_fields field whose value cannot be indexed", () 
   );
 });
 
+// --- record-volatility-invalid (Task 15d) ---
+// Reproduces the crash: a record with an invalid (or missing) volatility used
+// to make lintCorpus/ledgerCorpus throw RangeError: Invalid time value when it
+// was the first volatility a page referenced, and was silently ignored
+// otherwise. Now it must be reported and never crash either command.
+function volatilityCorpus(dataLines, guideBody) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "corpus-volatility-test-"));
+  fs.mkdirSync(path.join(tmp, "data"));
+  fs.mkdirSync(path.join(tmp, "meta"));
+  fs.mkdirSync(path.join(tmp, "guides"));
+  fs.writeFileSync(
+    path.join(tmp, "data", "rows.yaml"),
+    ["records:", ...dataLines, ""].join("\n"),
+  );
+  fs.writeFileSync(
+    path.join(tmp, "meta", "taxonomy.yaml"),
+    "topics: [claude-code, models]\n",
+  );
+  fs.writeFileSync(path.join(tmp, "guides", "p.md"), page("models", guideBody));
+  return tmp;
+}
+
+const badVolatilityRecord = (key) => [
+  `  - key: ${key}`,
+  `    value: "${key}-value"`,
+  "    volatility: hi",
+  "    source: https://example.invalid/docs",
+  '    verified: "2026-09-16"',
+];
+
+const noVolatilityRecord = (key) => [
+  `  - key: ${key}`,
+  `    value: "${key}-value"`,
+  "    source: https://example.invalid/docs",
+  '    verified: "2026-09-16"',
+];
+
+const goodRecord = (key, volatility) => [
+  `  - key: ${key}`,
+  `    value: "${key}-value"`,
+  `    volatility: ${volatility}`,
+  "    source: https://example.invalid/docs",
+  '    verified: "2026-09-16"',
+];
+
+test("lintCorpus reports record-volatility-invalid for a bad value and does not throw", () => {
+  const tmp = volatilityCorpus(
+    badVolatilityRecord("bad.one"),
+    "<!-- corpus:data key=bad.one -->x<!-- /corpus:data -->",
+  );
+  try {
+    let issues;
+    assert.doesNotThrow(() => {
+      issues = lintCorpus(tmp, "2026-09-20");
+    });
+    const hits = issues.filter((i) => i.rule === "record-volatility-invalid");
+    assert.equal(hits.length, 1, JSON.stringify(issues));
+    assert.equal(hits[0].path, path.join("data", "rows.yaml"));
+    assert.match(hits[0].message, /bad\.one/);
+    assert.match(hits[0].message, /hi/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("lintCorpus reports record-volatility-invalid for a missing volatility field", () => {
+  const tmp = volatilityCorpus(
+    noVolatilityRecord("bad.missing"),
+    "<!-- corpus:data key=bad.missing -->x<!-- /corpus:data -->",
+  );
+  try {
+    const issues = lintCorpus(tmp, "2026-09-20");
+    const hits = issues.filter((i) => i.rule === "record-volatility-invalid");
+    assert.equal(hits.length, 1, JSON.stringify(issues));
+    assert.match(hits[0].message, /bad\.missing/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("lintCorpus does not throw when the bad record is the only referenced record", () => {
+  const tmp = volatilityCorpus(
+    badVolatilityRecord("bad.only"),
+    "<!-- corpus:data key=bad.only -->x<!-- /corpus:data -->",
+  );
+  try {
+    assert.doesNotThrow(() => lintCorpus(tmp, "2026-09-20"));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("lintCorpus does not throw when the bad record is the first of two referenced records", () => {
+  const tmp = volatilityCorpus(
+    [...badVolatilityRecord("bad.first"), ...goodRecord("good.second", "medium")],
+    "<!-- corpus:data key=bad.first -->x<!-- /corpus:data --><!-- corpus:data key=good.second -->y<!-- /corpus:data -->",
+  );
+  try {
+    let issues;
+    assert.doesNotThrow(() => {
+      issues = lintCorpus(tmp, "2026-09-20");
+    });
+    assert.equal(
+      issues.filter((i) => i.rule === "record-volatility-invalid").length,
+      1,
+    );
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("ledgerCorpus completes on a corpus with a bad record and uses only valid referenced records", () => {
+  const tmp = volatilityCorpus(
+    [...badVolatilityRecord("bad.first"), ...goodRecord("good.second", "medium")],
+    "<!-- corpus:data key=bad.first -->x<!-- /corpus:data --><!-- corpus:data key=good.second -->y<!-- /corpus:data -->",
+  );
+  try {
+    let ledger;
+    assert.doesNotThrow(() => {
+      ledger = ledgerCorpus(tmp, { write: false });
+    });
+    const entry = ledger.entries.find((e) => e.path.endsWith("p.md"));
+    assert.equal(entry.volatility, "medium");
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("CLI lint exits 1 on an invalid volatility, reports the rule, and never a RangeError", () => {
+  const tmp = volatilityCorpus(
+    badVolatilityRecord("bad.cli"),
+    "<!-- corpus:data key=bad.cli -->x<!-- /corpus:data -->",
+  );
+  try {
+    const result = spawnSync(process.execPath, [CLI, "lint", tmp], {
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /record-volatility-invalid/);
+    assert.doesNotMatch(result.stderr, /RangeError/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 // --- formatter-stable change detection (finding F9) ---
 
 const CMP_DATA = [

@@ -12,8 +12,12 @@ export function addDays(iso, days) {
 export function derivePageVolatility(text, records) {
   const byKey = new Map(records.map((r) => [r.key, r]));
   let best = null;
+  // A record whose volatility is missing or not one of low/medium/high is
+  // ignored here, as if the page never referenced it — record-volatility-
+  // invalid (lint.mjs) is what flags the bad record itself.
   const bump = (v) => {
-    if (v && (best === null || RANK[v] > RANK[best])) best = v;
+    if (!Object.prototype.hasOwnProperty.call(RANK, v)) return;
+    if (best === null || RANK[v] > RANK[best]) best = v;
   };
   for (const block of findBlocks(text)) {
     if (block.unterminated) continue;

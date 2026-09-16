@@ -122,9 +122,17 @@ export function findBareValues(text, index) {
     .sort((a, b) => a.line - b.line);
 }
 
+const VALID_VOLATILITIES = Object.keys(CADENCE_DAYS);
+
 // Record-level lint configuration checks: names that silently lose coverage.
 export function checkRecordLintConfig(record, topics) {
   const issues = [];
+  if (!VALID_VOLATILITIES.includes(record.volatility)) {
+    issues.push({
+      rule: "record-volatility-invalid",
+      message: `record ${record.key}: volatility must be one of ${VALID_VOLATILITIES.join(", ")}; got ${record.volatility == null ? "(missing)" : JSON.stringify(record.volatility)}`,
+    });
+  }
   const fields = [].concat(record.lint_fields ?? []);
   const unknown = fields.filter((f) => !(f in record));
   if (unknown.length > 0) {
