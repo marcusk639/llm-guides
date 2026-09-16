@@ -62,7 +62,7 @@ If the table and the [models overview](https://platform.claude.com/docs/en/model
 
 **Model ID, alias, snapshot.** Anthropic's overview states that every Claude model ID is a pinned snapshot, including the dateless IDs used from the 4.6 generation on. For models before that generation, the alias is a convenience pointer that resolves to the dated ID. That is why the Haiku row has two different strings and the others repeat one: from the 4.6 generation on, the dateless ID is itself the snapshot ([models overview](https://platform.claude.com/docs/en/models/overview)).
 
-**Context window vs. max output.** The context window is the total the model can see in one request: input plus the response. Max output is a separate cap on the response alone, and the overview defines it as the _synchronous Messages API_ limit. The Models API exposes the same pair as `max_input_tokens` and `max_tokens`. See [Context management](../context/context-management.md) for why a big window is a budget, not a target.
+**Context window vs. max output.** These are two separate limits. The Models API reports the input limit as `max_input_tokens` ("Maximum input context window size in tokens for this model") and the maximum output as `max_tokens` ("Maximum value for the `max_tokens` parameter when using this model"). The overview defines max output as the _synchronous Messages API_ limit. See [Context management](../context/context-management.md) for why a big window is a budget, not a target.
 
 **Tokens are not words, and the ratio changed.** The overview notes that the current tokenizer, introduced with Claude Opus 4.7, fits noticeably fewer words into the same window than models before it did. A token budget measured on an older model does not carry over; count tokens on the model you will actually run.
 
@@ -82,9 +82,11 @@ Evidence: **Documented** — [models overview](https://platform.claude.com/docs/
 
 ### 4.2 Read limits from the Models API, not from a doc page (including this one)
 
-Code that hard-codes a context window or output cap breaks silently when a model changes. The Models API returns `max_input_tokens`, `max_tokens`, and a `capabilities` object for every available model, so a harness can size requests from live data (section 2 shows how).
+The Models API returns `max_input_tokens`, `max_tokens`, and a `capabilities` object for every available model (section 2 shows how to read them).
 
-Evidence: **Documented** — [models overview: Using the Models API](https://platform.claude.com/docs/en/models/overview), read 2026-09-16.
+Evidence: **Documented** — [models overview: Using the Models API](https://platform.claude.com/docs/en/models/overview) and [List models API](https://platform.claude.com/docs/en/api/models/list), read 2026-09-16.
+
+Why prefer it: a limit copied from a doc page can go stale when a model changes, with nothing in your code to flag it; reading limits at runtime lets a harness size requests from live data. Evidence: **Plausible** — this is inference from the documented fields, not a vendor statement.
 
 ### 4.3 Put the model ID in configuration, in exactly one place
 
@@ -144,7 +146,7 @@ Deliberately absent: cache, batch, fast-mode, data-residency, and tool-use price
 
 ## 7. Proofs
 
-None yet. A useful proof would call the Models API and assert that each record's `api_id`, `context_window`, and `max_output` match the live `id`, `max_input_tokens`, and `max_tokens`, turning the limits (not the prices, which the API does not expose) into a mechanically checked claim.
+None yet. A useful proof would call the Models API and assert that each record's `api_id` matches the live `id`, and check `context_window` against the input limit (`max_input_tokens`) and `max_output` against the output limit (`max_tokens`). It would first have to establish that the overview's context-window figure and the API's input limit are meant to be the same number, which neither page states. That would turn the limits (not the prices, which the API does not expose) into a mechanically checked claim.
 
 ## 8. Sources
 
