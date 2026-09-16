@@ -46,25 +46,34 @@ The one habit that matters: **measure what you are putting in before you put it 
 
 ```bash
 #!/usr/bin/env bash
-# Requires: bash, curl, jq, and ANTHROPIC_API_KEY in the environment.
+# Requires: bash, curl, jq 1.6+, and ANTHROPIC_API_KEY in the environment.
 # Usage: ./measure.sh path/to/any/large/text/file
 set -euo pipefail
 API=https://api.anthropic.com/v1
 H=(-H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01")
 
 # The Models API lists the most recent models first; each carries its input limit.
-curl -s "$API/models" "${H[@]}" | jq '.data[0] | {id, max_input_tokens}'
-MODEL=$(curl -s "$API/models" "${H[@]}" | jq -r '.data[0].id')
+# -f makes curl exit non-zero on an HTTP error instead of passing the error body on.
+curl -sSf "$API/models" "${H[@]}" | jq '.data[0] | {id, max_input_tokens}'
+MODEL=$(curl -sSf "$API/models" "${H[@]}" | jq -r '.data[0].id')
 
+# Reads the system prompt from a FILE (--rawfile), never from argv,
+# so large files don't hit the OS argument-size limit.
 count() {
-  jq -n --arg m "$MODEL" --arg s "$1" \
+  jq -n --arg m "$MODEL" --rawfile s "$1" \
     '{model: $m, system: $s, messages: [{role: "user", content: "Summarize this."}]}' |
-    curl -s "$API/messages/count_tokens" "${H[@]}" \
-      -H 'content-type: application/json' -d @- | jq .input_tokens
+    curl -sSf "$API/messages/count_tokens" "${H[@]}" \
+      -H 'content-type: application/json' -d @- | jq -e .input_tokens
 }
 
-echo "short system prompt: $(count 'You are a helpful assistant.') tokens"
-echo "with $1 pasted in:    $(count "$(cat "$1")") tokens"
+short=$(mktemp)
+trap 'rm -f "$short"' EXIT
+printf '%s' 'You are a helpful assistant.' > "$short"
+
+short_tokens=$(count "$short")
+file_tokens=$(count "$1")
+echo "short system prompt: $short_tokens tokens"
+echo "with $1 pasted in:    $file_tokens tokens"
 ```
 
 Run it on a log file or a big source file and compare the second number to `max_input_tokens`. That ratio — how much of the window one careless paste consumes — is the whole subject of this page.
@@ -83,7 +92,7 @@ Run it on a log file or a big source file and compare the second number to `max_
 | System prompt / durable instructions | Also on every request. In Claude Code, CLAUDE.md files above the working directory load at launch, and `@path` imports load with them ([memory](https://code.claude.com/docs/en/memory)).                                                                                                                                                   |
 | Conversation history                 | Every prior turn, verbatim, unless cleared or compacted.                                                                                                                                                                                                                                                                                    |
 | Retrieved content                    | Documents, search results, file contents you chose to include.                                                                                                                                                                                                                                                                              |
-| Tool results                         | Can dwarf everything else: Claude Code's docs single out test runs, documentation fetches, and log files as operations that consume significant context.                                                                                                                                                                                    |
+| Tool results                         | Can dwarf everything else: Claude Code's docs single out test runs, documentation fetches, and log files as operations that consume significant context ([subagents: isolate high-volume operations](https://code.claude.com/docs/en/sub-agents#isolate-high-volume-operations)).                                                           |
 | Reasoning tokens                     | With thinking enabled, thinking tokens count toward the window. Whether _previous_ turns' thinking stays in context is model-dependent: newer Claude models keep it by default, earlier ones strip it ([context windows](https://docs.claude.com/en/docs/build-with-claude/context-windows)). Check the per-model table rather than assume. |
 | The response being generated         | Output counts too, so a nearly full window also limits how much the model can say.                                                                                                                                                                                                                                                          |
 
@@ -152,7 +161,7 @@ Evidence: **Plausible** — follows from the documented accumulation and context
 
 ## 5. Edge cases and failure modes
 
-- **Silent cache invalidators.** A timestamp in the system prompt, nondeterministic JSON key order, or a varying tool set makes every request a cache miss with no error. Anthropic's troubleshooting list names key-order randomization in some languages explicitly. Symptom: `cache_read_input_tokens` stays zero ([prompt caching](https://docs.claude.com/en/docs/build-with-claude/prompt-caching)).
+- **Silent cache invalidators.** A timestamp in the system prompt, a varying tool set, or unstable key order in `tool_use` content blocks makes every request a cache miss with no error. Anthropic's troubleshooting list notes that some languages (Swift and Go are its examples) randomize key order during JSON conversion. Symptom: `cache_read_input_tokens` stays zero ([prompt caching](https://docs.claude.com/en/docs/build-with-claude/prompt-caching)).
 - **Clearing and caching fight each other.** Every context edit or compaction rewrites the prefix, so the next request pays a cache write. Frequent small clears can cost more than they save.
 - **Compaction loses what the summary omits.** A summary is lossy by construction; Anthropic warns that overly aggressive compaction can drop subtle context whose importance only shows up later ([effective context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)). Instructions given only in conversation can vanish; Claude Code re-injects project-root CLAUDE.md after `/compact`, but nested CLAUDE.md files and path-scoped rules reload only when matching files are read again ([memory](https://code.claude.com/docs/en/memory)). Durable instructions belong in files, not chat.
 - **Compaction can itself fail.** The Claude API documents cases where no summary comes back (for example, no room left for the summarization prompt), returning empty content with the reason in `stop_reason` ([compaction](https://docs.claude.com/en/docs/build-with-claude/compaction)). Compact before the window is completely full, not at the last moment.
