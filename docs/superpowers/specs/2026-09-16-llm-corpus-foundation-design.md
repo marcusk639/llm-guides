@@ -251,8 +251,8 @@ from the ledger, and are never silently deleted.
    worth building a proof for.
 
    **Harvest is local-only and never a citation.** Its output is written to the
-   gitignored `local/` tree and never committed. Session transcripts span healthcare,
-   firm-confidential, and veterans'-claims work; running them toward a public site is a
+   gitignored `local/` tree and never committed. Session transcripts include confidential client
+   and regulated-industry work; running them toward a public site is a
    disclosure risk, and evidence a reader cannot inspect cannot support a public label
    anyway. Harvest therefore _points at what to prove_ — it does not itself license a
    Verified label. Anything it surfaces that is worth publishing must be re-established
@@ -358,7 +358,7 @@ built in sub-project 2 against a contract that five real documents have stress-t
 | Closed-world lint against known data values                             | Old lint required semantic detection of volatility, not mechanically decidable                                 |
 | Marker comments sit outside fenced code                                 | Old spec required a runnable example on every page while forbidding the values one contains                    |
 | Renderer added as a first-class deliverable                             | Old spec made marker blocks load-bearing and shipped no generator                                              |
-| Harvest demoted to gap-finder; local-only, gitignored; never a citation | Old spec ran private healthcare/CPA/veterans transcripts toward a public site with no redaction stage          |
+| Harvest demoted to gap-finder; local-only, gitignored; never a citation | Old spec ran private transcripts of confidential client and regulated-industry work toward a public site with no redaction stage          |
 | Public labels require public evidence                                   | A Verified label citing a private transcript is uncitable in public                                            |
 | `volatility` derived, not declared                                      | Page-level field duplicated and could contradict per-record dates                                              |
 | Instruction-file rewrite moved to phase 1a                              | It is the only artifact binding future sessions; writing it last left sessions bound by superseded conventions |

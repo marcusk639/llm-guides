@@ -5,7 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import yaml from "js-yaml";
 import { parseFrontmatter } from "./frontmatter.mjs";
-import { loadRecords, literalIndexForTopic } from "./data.mjs";
+import { loadRecords, literalIndexForTopic, checkDataFiles } from "./data.mjs";
 import {
   validateFrontmatter,
   findBareValues,
@@ -14,7 +14,12 @@ import {
 } from "./lint.mjs";
 import { renderText, normaliseForComparison } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
-import { derivePageVolatility, buildLedger, expiryFor } from "./ledger.mjs";
+import {
+  derivePageVolatility,
+  buildLedger,
+  expiryFor,
+  isValidIsoDate,
+} from "./ledger.mjs";
 
 function guidePaths(root) {
   const dir = path.join(root, "guides");
@@ -56,6 +61,8 @@ export function lintCorpus(
   };
   const topics = loadTopics(root);
   const issues = [];
+  for (const { file, ...i } of checkDataFiles(path.join(root, "data")))
+    issues.push({ ...i, path: path.join("data", file) });
   for (const record of records) {
     for (const i of checkRecordLintConfig(record, topics))
       issues.push({ ...i, path: path.join("data", record.file) });
@@ -79,7 +86,7 @@ export function lintCorpus(
       });
     }
     if (data?.status === "deprecated") continue;
-    if (data?.verified && /^\d{4}-\d{2}-\d{2}$/.test(String(data.verified))) {
+    if (data?.verified && isValidIsoDate(String(data.verified))) {
       const volatility = derivePageVolatility(text, records);
       const entry = {
         path: rel,
@@ -118,7 +125,7 @@ export function ledgerCorpus(root, { write = false } = {}) {
   for (const file of guidePaths(root)) {
     const text = fs.readFileSync(file, "utf8");
     const { data } = parseFrontmatter(text);
-    if (!data?.verified || !/^\d{4}-\d{2}-\d{2}$/.test(String(data.verified)))
+    if (!data?.verified || !isValidIsoDate(String(data.verified)))
       continue;
     pages.push({
       path: path.relative(root, file),
@@ -136,7 +143,14 @@ export function ledgerCorpus(root, { write = false } = {}) {
 function main(argv) {
   const [command, ...rest] = argv;
   const write = rest.includes("--write");
+  const check = rest.includes("--check");
   const root = rest.find((a) => !a.startsWith("--")) ?? process.cwd();
+  const usage = () => {
+    console.error("usage: corpus <render|lint|ledger> [--write] [dir]");
+    console.error("       corpus render --check [dir]");
+    process.exit(2);
+  };
+  if (check && (command !== "render" || write)) usage();
   if (command === "lint") {
     const issues = lintCorpus(root);
     for (const i of issues)
@@ -149,23 +163,27 @@ function main(argv) {
     process.exit(issues.length === 0 ? 0 : 1);
   } else if (command === "render") {
     let hasIssues = false;
+    let pending = false;
     for (const r of renderCorpus(root, { write })) {
       for (const i of r.issues) {
         console.error(`${r.path} [${i.rule}] ${i.message}`);
         hasIssues = true;
       }
-      if (r.changed)
+      if (r.changed) {
         console.log(`${write ? "rendered" : "would render"}: ${r.path}`);
+        pending = true;
+      }
     }
-    process.exit(hasIssues ? 1 : 0);
+    // --check is the gate: a page whose marker blocks are out of date (for
+    // example a refreshed record that was never re-rendered) fails it.
+    process.exit(hasIssues || (check && pending) ? 1 : 0);
   } else if (command === "ledger") {
     const ledger = ledgerCorpus(root, { write });
     console.log(
       `ledger: ${ledger.entries.length} entries${write ? " written" : ""}`,
     );
   } else {
-    console.error("usage: corpus <render|lint|ledger> [--write] [dir]");
-    process.exit(2);
+    usage();
   }
 }
 

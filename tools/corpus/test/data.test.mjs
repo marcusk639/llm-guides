@@ -200,3 +200,11 @@ test("lint_fields indexes only string and number field values", () => {
   ]);
   assert.deepEqual([...index.keys()].sort(), ["65536", "typed-value"]);
 });
+
+// Final review (m1): a malformed lint_literals never crashes indexing.
+test("literalIndex does not throw on a non-array lint_literals and falls back to value and display", () => {
+  const index = literalIndex([
+    { key: "k.str", value: "value-string", display: "display-string", lint_literals: "a-string" },
+  ]);
+  assert.deepEqual([...index.keys()].sort(), ["display-string", "value-string"]);
+});

@@ -1,6 +1,6 @@
 import { parseFrontmatter } from "./frontmatter.mjs";
 import { findBlocks, coveredRanges } from "./markers.mjs";
-import { CADENCE_DAYS, addDays } from "./ledger.mjs";
+import { CADENCE_DAYS, addDays, isValidIsoDate } from "./ledger.mjs";
 import { isIndexableFieldValue } from "./data.mjs";
 
 export const REQUIRED_FIELDS = [
@@ -12,8 +12,6 @@ export const REQUIRED_FIELDS = [
   "sources",
   "related",
 ];
-
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function validateFrontmatter(data, topics) {
   if (data == null) {
@@ -36,10 +34,10 @@ export function validateFrontmatter(data, topics) {
       message: `unknown topic: ${data.topic}`,
     });
   }
-  if ("verified" in data && !DATE.test(String(data.verified))) {
+  if ("verified" in data && !isValidIsoDate(String(data.verified))) {
     issues.push({
       rule: "frontmatter-date",
-      message: `verified must be YYYY-MM-DD, got: ${data.verified}`,
+      message: `verified must be a real date written YYYY-MM-DD, got: ${data.verified}`,
     });
   }
   if ("volatility" in data) {
@@ -65,17 +63,34 @@ function isBoundedMatch(text, at, literal) {
 // link TITLE ("..." or '...') are still scanned, and a ](...) whose contents
 // are not a single URL-like token (a code call, bracket-paren prose) is not a
 // link destination at all.
+const LINK_DESTINATION =
+  /\]\([ \t]*(<[^>\n]*>|[^\s()<>"'`]+)(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'))?[ \t]*\)/dg;
 const URL_SPANS = [
-  // inline link destination: ](url) / ](<url>) / ](url "title")
-  /\]\([ \t]*(<[^>\n]*>|[^\s()<>"'`]+)(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'))?[ \t]*\)/dg,
   // angle-bracket autolink
   /<(https?:\/\/[^>\s]*)>/dg,
-  // bare URL, up to whitespace or ) > ] " ' ` , | < *
-  /(https?:\/\/[^\s)>\]"'`,|<*]+)/dg,
+  // bare URL, up to whitespace or ) > ] " ' ` , | < * or an em dash
+  /(https?:\/\/[^\s)>\]"'`,|<*\u2014]+)/dg,
 ];
+
+// A link destination (with or without angle brackets) is excluded only when
+// it is URL-like. A bare token such as `handlers[i](some-id)` in code, or an
+// `#anchor` target, is scanned like prose.
+function isUrlLikeDestination(destination) {
+  const d = destination.replace(/^<|>$/g, "");
+  return (
+    d.includes("://") ||
+    d.startsWith("/") ||
+    d.startsWith("./") ||
+    d.startsWith("../") ||
+    d.startsWith("mailto:")
+  );
+}
 
 function urlRanges(text) {
   const ranges = [];
+  for (const m of text.matchAll(LINK_DESTINATION)) {
+    if (isUrlLikeDestination(m[1])) ranges.push(m.indices[1]);
+  }
   for (const re of URL_SPANS) {
     for (const m of text.matchAll(re)) {
       ranges.push(m.indices[1]);
@@ -132,6 +147,22 @@ export function checkRecordLintConfig(record, topics) {
       rule: "record-volatility-invalid",
       message: `record ${record.key}: volatility must be one of ${VALID_VOLATILITIES.join(", ")}; got ${record.volatility == null ? "(missing)" : JSON.stringify(record.volatility)}`,
     });
+  }
+  if (record.lint_literals != null) {
+    const ll = record.lint_literals;
+    const problem = !Array.isArray(ll)
+      ? "must be a list"
+      : ll.length === 0
+        ? "is empty, which unguards every value of the record (use lint: false to opt out deliberately)"
+        : ll.some((l) => !isIndexableFieldValue(l))
+          ? "must contain only strings or numbers"
+          : null;
+    if (problem) {
+      issues.push({
+        rule: "lint-literals-invalid",
+        message: `record ${record.key}: lint_literals ${problem}`,
+      });
+    }
   }
   const fields = [].concat(record.lint_fields ?? []);
   const unknown = fields.filter((f) => !(f in record));

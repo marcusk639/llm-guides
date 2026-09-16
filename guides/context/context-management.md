@@ -105,7 +105,7 @@ The mental model: **the window is a budget, the goal is the smallest set of high
 
 ## 4. Patterns that hold up
 
-Each recipe carries one evidence label. **Documented** means a vendor states it in canonical documentation (linked). **Plausible** means it is inferred or community-reported; treat it as a reasonable default to test, not a guarantee. Nothing on this page is **Verified** — no proof in this repository backs these claims yet.
+Each recipe carries one evidence label, applied as defined in the corpus contract's [evidence labels](../../CLAUDE.md#evidence-labels) and [source tiers](../../CLAUDE.md#source-tiers). Nothing on this page is **Verified** — no proof in this repository backs these claims yet.
 
 ### 4.1 Retrieve just in time; keep references, not payloads
 

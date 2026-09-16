@@ -68,7 +68,7 @@ adversarial fixtures (Tasks 2–9), the seeds are written against the working to
 - [ ] **Step 1: Create the directory skeleton**
 
 ```bash
-cd /Users/marcusklein/dev/llm-guides
+# from the repository root
 mkdir -p guides data research examples meta local tools/corpus/test/fixtures
 for d in guides data research examples meta; do touch "$d/.gitkeep"; done
 ```

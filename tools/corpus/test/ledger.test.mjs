@@ -5,6 +5,7 @@ import {
   derivePageVolatility,
   expiryFor,
   buildLedger,
+  isValidIsoDate,
 } from "../ledger.mjs";
 import { checkExpiry } from "../lint.mjs";
 
@@ -161,4 +162,13 @@ test("expiry boundary is exact: fails the day after a full extra cadence, not on
   const failed = checkExpiry(entry, "2026-11-16");
   assert.equal(failed.length, 1);
   assert.equal(failed[0].rule, "expired");
+});
+
+// Final review (I3): one shared calendar-date check.
+
+test("isValidIsoDate accepts real dates and rejects impossible or malformed ones", () => {
+  for (const s of ["2026-09-16", "2028-02-29", "2026-12-31"])
+    assert.equal(isValidIsoDate(s), true, s);
+  for (const s of ["2026-13-45", "2026-02-30", "2027-02-29", "2026-9-16", "September 2026", "", null, undefined, 20260916])
+    assert.equal(isValidIsoDate(s), false, String(s));
 });

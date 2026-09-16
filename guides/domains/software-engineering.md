@@ -118,7 +118,7 @@ Every part of this is doing a job: the clean branch makes the change reviewable 
 
 ## 4. Patterns that hold up
 
-Each recipe carries evidence labels as defined by this corpus's contract, applied with its source tiers: **Documented** claims here rest on Tier 1 vendor documentation or Tier 2 papers (linked, read 2026-09-16; each paper's scope stated where it is cited); **Plausible** claims are practitioner judgment or inference, so treat them as defaults to test. Nothing on this page is **Verified**: no proof in this repository exercises these workflows.
+Each recipe carries evidence labels, applied as defined in the corpus contract's [evidence labels](../../CLAUDE.md#evidence-labels) and [source tiers](../../CLAUDE.md#source-tiers); the sources behind the Documented parts were read 2026-09-16, and each paper's scope is stated where it is cited. Nothing on this page is **Verified**: no proof in this repository exercises these workflows.
 
 Every task below uses the same four parts, so you can find the one you need: **Where it helps**, **Set it up**, **How it fails**, **How to verify**.
 

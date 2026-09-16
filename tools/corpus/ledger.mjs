@@ -3,6 +3,15 @@ import { findBlocks } from "./markers.mjs";
 export const CADENCE_DAYS = { high: 30, medium: 90, low: 270 };
 const RANK = { low: 0, medium: 1, high: 2 };
 
+// A real calendar date written YYYY-MM-DD. The pattern alone accepts
+// impossible dates such as 2026-13-45, which make addDays throw RangeError;
+// the round trip rejects them (and 2026-02-30, which Date would roll over).
+export function isValidIsoDate(s) {
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
 export function addDays(iso, days) {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);

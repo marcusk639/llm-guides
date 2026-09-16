@@ -55,3 +55,19 @@ test("reports entirely missing front-matter", () => {
   assert.equal(issues.length, 1);
   assert.equal(issues[0].rule, "frontmatter-missing");
 });
+
+// Final review (I3): a pattern-valid but impossible date is rejected.
+test("rejects a verified date that matches YYYY-MM-DD but does not exist", () => {
+  for (const verified of ["2026-13-45", "2026-02-30"]) {
+    const issues = validateFrontmatter({ ...ok, verified }, TOPICS);
+    assert.equal(
+      issues.some((i) => i.rule === "frontmatter-date"),
+      true,
+      verified,
+    );
+  }
+});
+
+test("accepts a leap-day verified date", () => {
+  assert.deepEqual(validateFrontmatter({ ...ok, verified: "2028-02-29" }, TOPICS), []);
+});

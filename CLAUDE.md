@@ -27,7 +27,9 @@ This supersedes the previous convention of root-level topic directories
 - `guides/` — prose, one Markdown page per subject, under a topic directory
   (`guides/<topic>/<subject>.md`). Name files by subject.
 - `data/` — volatile values as structured YAML records. Every `data/*.yaml` file is
-  loaded; each holds a top-level `records:` list.
+  loaded; each holds a top-level `records:` list. A `data/*.yml` file, or a `.yaml` file
+  without a top-level `records:` list, is not loaded and lint reports it
+  (`data-file-ignored`).
 - `research/` — raw research output per topic, dated. The grounding layer.
 - `examples/` — runnable artifacts. A directory whose `proof.yaml` has `kind: proof` is
   a proof; anything else is a teaching example.
@@ -62,12 +64,15 @@ renderer, and ledger generator are required, because the freshness guarantee is 
 property of the corpus as a whole, not of any single document.
 
 Node 22 or later. The CLI is `tools/corpus/cli.mjs`:
-`node tools/corpus/cli.mjs <render|lint|ledger> [--write] [dir]` (`dir` defaults to the
-current directory; any other command prints usage and exits 2).
+`node tools/corpus/cli.mjs <render|lint|ledger> [--write] [dir]` or
+`node tools/corpus/cli.mjs render --check [dir]` (`dir` defaults to the current
+directory; any other command, `--check` on a command other than `render`, or `--check`
+together with `--write` prints usage and exits 2).
 
 | Command                                      | npm form                    | Does                                                                             | Exit                                                                                  |
 | -------------------------------------------- | --------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | `node tools/corpus/cli.mjs render .`         | `npm run render`            | Reports each guide whose marker blocks are out of date as `would render: <path>` | 1 if any render issue; otherwise 0, **even when pages are pending** — read the output |
+| `node tools/corpus/cli.mjs render --check .` | `npm run render:check`      | **The render gate.** Writes nothing; prints `would render: <path>` for each page that would change | 1 if any render issue **or any page would change**, else 0                     |
 | `node tools/corpus/cli.mjs render --write .` | `npm run render -- --write` | Rewrites marker-block content in place; prints `rendered: <path>`                | 1 if any render issue, else 0                                                         |
 | `node tools/corpus/cli.mjs lint .`           | `npm run lint`              | Record lint config, front-matter, bare values, unterminated markers, expiry      | 1 if any issue (`<path>:<line> [<rule>] <message>`), 0 with `lint: clean`             |
 | `node tools/corpus/cli.mjs ledger --write .` | `npm run ledger -- --write` | Rebuilds `meta/ledger.yaml`; without `--write` only prints `ledger: N entries`   | 0                                                                                     |
@@ -88,8 +93,11 @@ them.
 2. `node tools/corpus/cli.mjs render --write . && node tools/corpus/cli.mjs lint .`
 3. A Prettier hook reformats Markdown after every write. That is expected; render
    compares formatter-stable forms, so Prettier's table padding and blank lines are not
-   a pending change. Re-run `render .` (expect no `would render:` line and exit 0) and
-   `lint .` (expect `lint: clean`).
+   a pending change. Then run the two gates, which are also the CI gates:
+   `node tools/corpus/cli.mjs render --check .` (expect exit 0 and no `would render:`
+   line) and `node tools/corpus/cli.mjs lint .` (expect `lint: clean`, exit 0). Lint
+   treats marker-block content as covered, so only `render --check` catches a block
+   whose record was refreshed but whose page was never re-rendered.
 4. If a page was added, removed or deprecated, or its `verified` date or referenced
    records changed, run `node tools/corpus/cli.mjs ledger --write .` and commit
    `meta/ledger.yaml`.
@@ -300,11 +308,13 @@ Scope of the bare-value scan:
 - **Not scanned:** content inside terminated marker blocks; **front-matter** (so
   per-model URLs containing ids may sit in `sources`; do not use front-matter to carry
   values anywhere else); **URLs** — inline link destinations `](url)`, `](<url>)` and
-  `](url "title")` (the title is still scanned), angle-bracket autolinks `<https://…>`,
-  and bare `http(s)://` URLs up to whitespace or one of `) > ] " ' , | < *` and backtick.
-  A `](...)` whose contents are not a single URL-like token (a code call) is still
-  scanned. Link a vendor's per-model page freely; the id inside the URL is not a bare
-  value.
+  `](url "title")` (the title is still scanned) whose destination is URL-like: it
+  contains `://`, or starts with `/`, `./`, `../` or `mailto:` (the same test applies
+  inside angle brackets); angle-bracket autolinks `<https://…>`; and bare `http(s)://`
+  URLs up to whitespace, an em dash, or one of `) > ] " ' , | < *` and backtick. Any
+  other `](...)` is scanned: a code call such as `handlers[i](some-id)`, a bare-token
+  destination such as `](page.md)`, and an `#anchor` target. Link a vendor's per-model
+  page freely; the id inside the URL is not a bare value.
 - A record contributes to a page only if it is unscoped or its `lint_scope` lists that
   page's `topic`.
 
@@ -329,7 +339,7 @@ Every rule name the tools emit, and what to do.
 | `frontmatter-missing`            | lint   | The page has no `---` front-matter.                                                            | Add front-matter.                                                                                                                                                                   |
 | `frontmatter-required`           | lint   | A required front-matter field is absent.                                                       | Add the named field.                                                                                                                                                                |
 | `frontmatter-topic`              | lint   | `topic` is not in `meta/taxonomy.yaml`.                                                        | Use a taxonomy topic; adding a topic is a contract change.                                                                                                                          |
-| `frontmatter-date`               | lint   | `verified` is not `YYYY-MM-DD`. The page is also skipped by expiry and the ledger.             | Fix the date.                                                                                                                                                                       |
+| `frontmatter-date`               | lint   | `verified` is not a real calendar date written `YYYY-MM-DD` (so `2026-02-30` fails too). The page is also skipped by expiry and the ledger. | Fix the date.                                                                                                                                                                       |
 | `frontmatter-derived-volatility` | lint   | Front-matter declares `volatility`.                                                            | Remove it; volatility is derived from records.                                                                                                                                      |
 | `marker-unterminated`            | lint   | A marker block has no closer before the next opening marker or end of file.                    | Add `<!-- /corpus:data -->` or `<!-- /corpus:table -->`.                                                                                                                            |
 | `expired`                        | lint   | The page is more than one full cadence past its expiry date.                                   | Refresh it (re-verify, bump `verified`) or mark `status: deprecated`.                                                                                                               |
@@ -337,10 +347,13 @@ Every rule name the tools emit, and what to do.
 | `lint-fields-unindexable`        | lint   | `lint_fields` names a field whose value is not a string or number.                             | Point at scalar fields, or use `lint_literals`.                                                                                                                                     |
 | `record-volatility-invalid`      | lint   | A record's `volatility` is missing or not one of `low`, `medium`, `high`. Reported once per record, whether or not any page references it. | Fix the value to `low`, `medium` or `high`.                                                                                                                                         |
 | `lint-scope-unknown`             | lint   | `lint_scope` names a topic not in `meta/taxonomy.yaml`.                                        | Fix the topic name.                                                                                                                                                                 |
+| `lint-literals-invalid`          | lint   | `lint_literals` is not a list, is an empty list (which would silently unguard the record), or holds an entry that is not a string or number. A non-list is ignored and the record's default literals are indexed. | Make it a non-empty list of strings; to opt a record out deliberately, use `lint: false`.                                                                                        |
+| `data-file-ignored`              | lint   | A `data/*.yml` file, or a `data/*.yaml` file with no top-level `records:` list; the loader skips it, so none of its records exist. | Rename it to `.yaml`, or put its records under a top-level `records:` list.                                                                                                      |
 | `render-unknown-key`             | render | A `corpus:data` block names a key no record has.                                               | Fix the key or add the record.                                                                                                                                                      |
 | `render-empty-table`             | render | A `corpus:table` selects no records (tag matches nothing).                                     | Fix the tag or tag the records.                                                                                                                                                     |
 | `render-headers-mismatch`        | render | `headers` has a different number of labels from `fields`.                                      | Make the lists parallel.                                                                                                                                                            |
 | `render-sort-unknown`            | render | `sort` is malformed (empty, bare `-`) or names a field no selected row has.                    | Fix the field name. A field present on only some rows is fine.                                                                                                                      |
+| `render-missing-value`           | render | A `corpus:data` block's record has neither `display` nor `value`; the block keeps its content. | Add `value` (and `display` if needed) to the record.                                                                                                                                |
 
 Lint issues from records carry the `data/<file>.yaml` path; lint never runs render, so
 run both.
@@ -515,8 +528,8 @@ shape, taken from `guides/domains/software-engineering.md`:
 ## Privacy: `local/` and transcripts
 
 `local/` is gitignored. It holds harvest output and anything derived from session
-transcripts — those transcripts span healthcare, firm-confidential, and veterans'
-claims work, so nothing derived from them may enter a committed document. Harvest
+transcripts — those transcripts include confidential client and regulated-industry
+work, so nothing derived from them may enter a committed document. Harvest
 output points at what to prove; it does not itself license a Verified (or any public)
 label. Anything it surfaces that is worth publishing must be re-established by a proof
 or a citable public source before it reaches `guides/`.
@@ -527,15 +540,28 @@ Examples are synthetic and sourced from public documentation.
 
 ## Known lint gaps
 
-Found in review of the URL exclusion (Task 15a); not fixed. Each hides a known value
-from the bare-value scan (confirmed with `findBareValues`):
+Not fixed. The first two hide a known value from the bare-value scan (confirmed with
+`findBareValues`):
 
-- A link destination in angle brackets containing spaces, e.g.
-  `[x](<text with a value>)`: the whole bracketed text is treated as a URL.
-- A bare URL that runs into following text through `.`, `;` or an em dash with no space
+- A URL-like link destination in angle brackets containing spaces, e.g.
+  `[x](<./text with a value>)`: the whole bracketed text is treated as a URL.
+- A bare URL that runs into following text through `.` or `;` with no space
   (`https://example.com/x;value`): the value is swallowed into the URL span.
 
 Do not write either form. Reviewers check for them by eye.
+
+The lint is also exact-string by design, so two further kinds of text escape it:
+
+- **Formatting variants of a recorded value are not matched.** A record whose value is
+  `200000` does not catch `200,000` or `200K` unless those spellings are themselves
+  indexed (as `display` or `lint_literals`). The same holds for alternate currency or
+  unit spellings, a markdown-escaped id (`claude\_opus`), and a multi-word `display`
+  value that Prettier or an author wraps across two lines. Catching variants is the
+  Verify stage's job.
+- **Text inside marker-comment attributes is not scanned.** A value written into
+  `headers="…"` or any other attribute of a terminated `corpus:data` or `corpus:table` opener lies
+  inside the marker block's covered range. Keep attributes to field names, tags and
+  column labels.
 
 ## Known limitations (deferred to sub-project 2)
 

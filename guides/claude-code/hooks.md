@@ -127,7 +127,7 @@ Start `claude` in that repository, accept the workspace trust dialog, and type `
 
 ## 4. Patterns that hold up
 
-Each recipe carries one evidence label. **Documented** means the Claude Code hooks reference or guide states it (linked, read 2026-09-16). **Plausible** means it is inferred or practitioner judgment; test it yourself. Nothing on this page is **Verified**: no proof in this repository exercises a live Claude Code session.
+Each recipe carries one evidence label, applied as defined in the corpus contract's [evidence labels](../../CLAUDE.md#evidence-labels) and [source tiers](../../CLAUDE.md#source-tiers); the Claude Code hooks reference and guide behind the Documented recipes were read 2026-09-16. Nothing on this page is **Verified**: no proof in this repository exercises a live Claude Code session.
 
 ### 4.1 Format every file Claude edits
 

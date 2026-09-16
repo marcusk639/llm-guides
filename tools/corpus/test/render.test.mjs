@@ -209,3 +209,13 @@ test("sort= on a field present on only some records renders normally", () => {
   // k3 lacks `name`; that is missing-last ordering, not an error.
   assert.deepEqual(rowKeys(" sort=name"), ["k2", "k5", "k1", "k4", "k3"]);
 });
+
+// Final review (m3): a data block whose record has neither display nor value
+// must not render the string "undefined".
+test("a data block whose record has no display or value raises render-missing-value and preserves content", () => {
+  const text = "A <!-- corpus:data key=k.none -->old<!-- /corpus:data --> B";
+  const out = renderText(text, [{ key: "k.none", volatility: "low" }]);
+  assert.equal(out.text, text);
+  assert.deepEqual(out.issues.map((i) => i.rule), ["render-missing-value"]);
+  assert.match(out.issues[0].message, /k\.none/);
+});

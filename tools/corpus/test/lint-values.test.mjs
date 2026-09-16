@@ -186,3 +186,38 @@ test("flags a literal run on after a bare URL through a comma or quote", () => {
     assert.equal(findBareValues(doc(body), urlIndex).length, 1, body);
   }
 });
+
+// Final review (I1): a link destination is excluded only when it is URL-like
+// (contains "://", or starts with "/", "./", "../" or "mailto:"). Bare tokens
+// and "#anchor" targets are scanned.
+test("flags a literal in a non-URL link destination", () => {
+  for (const body of [
+    "```js\nhandlers[i](claude-opus-5)\n```",
+    "See [see](claude-opus-5) here.",
+    "See [see](#claude-opus-5) here.",
+    "See [see](<claude-opus-5>) here.",
+    "See [see](<#claude-opus-5>) here.",
+  ]) {
+    assert.equal(findBareValues(doc(body), urlIndex).length, 1, body);
+  }
+});
+
+test("does not flag a literal in a URL-like link destination", () => {
+  for (const dest of [
+    "https://docs.example.invalid/claude-opus-5",
+    "/models/claude-opus-5",
+    "./claude-opus-5.md",
+    "../models/claude-opus-5.md",
+    "mailto:claude-opus-5@example.invalid",
+    "<./models/claude-opus-5>",
+    "<mailto:claude-opus-5@example.invalid>",
+  ]) {
+    assert.deepEqual(findBareValues(doc(`See [see](${dest}) here.`), urlIndex), [], dest);
+  }
+});
+
+// Final review (m4): a bare URL also stops at an em dash.
+test("flags a literal run on after a bare URL through an em dash", () => {
+  const body = "See https://a.example.invalid/x—claude-opus-5 here.";
+  assert.equal(findBareValues(doc(body), urlIndex).length, 1);
+});

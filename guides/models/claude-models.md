@@ -74,7 +74,7 @@ If the table and the [models overview](https://platform.claude.com/docs/en/model
 
 ## 4. Patterns that hold up
 
-Each recipe carries one evidence label. **Documented** means Anthropic states it in canonical documentation (linked). **Plausible** means it is inferred or practitioner wisdom; test it on your workload. Nothing on this page is **Verified**: no proof in this repository backs these claims.
+Each recipe carries one evidence label, applied as defined in the corpus contract's [evidence labels](../../CLAUDE.md#evidence-labels) and [source tiers](../../CLAUDE.md#source-tiers). Nothing on this page is **Verified**: no proof in this repository backs these claims.
 
 ### 4.1 Start with Opus 5; move up or down only on evidence
 

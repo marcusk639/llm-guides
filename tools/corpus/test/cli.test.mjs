@@ -612,3 +612,156 @@ test("a dash-placeholder data row changing '-' to '--' is a pending change", () 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+// Final review (I3): an impossible verified date is reported, never crashes
+// lint or ledger, and the page is left out of the ledger.
+function datePage(verified) {
+  return page("models", "Body.").replace("verified: 2026-09-16", `verified: ${verified}`);
+}
+
+test("an impossible verified date is a frontmatter-date issue; lint and ledger do not throw; ledger omits the page", () => {
+  for (const verified of ["2026-13-45", "2026-02-30"]) {
+    const tmp = volatilityCorpus(goodRecord("ok.one", "low"), "Body.");
+    try {
+      fs.writeFileSync(path.join(tmp, "guides", "p.md"), datePage(verified));
+      fs.writeFileSync(path.join(tmp, "guides", "q.md"), datePage("2028-02-29"));
+      let issues;
+      assert.doesNotThrow(() => {
+        issues = lintCorpus(tmp, "2026-09-20");
+      }, verified);
+      const hits = issues.filter((i) => i.rule === "frontmatter-date");
+      assert.equal(hits.length, 1, JSON.stringify(issues));
+      assert.equal(hits[0].path, path.join("guides", "p.md"));
+      let ledger;
+      assert.doesNotThrow(() => {
+        ledger = ledgerCorpus(tmp, { write: false });
+      }, verified);
+      assert.deepEqual(
+        ledger.entries.map((e) => e.path),
+        [path.join("guides", "q.md")],
+      );
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+});
+
+// Final review (I2): `render --check` is the gate for stale marker-block
+// content: it never writes, and exits 1 when any page would change.
+function runCli(args) {
+  return spawnSync(process.execPath, [CLI, ...args], { encoding: "utf8" });
+}
+
+test("render --check exits 1, prints the path and writes nothing when a block is stale", () => {
+  const body = "Value: <!-- corpus:data key=ok.one -->stale<!-- /corpus:data -->";
+  const tmp = volatilityCorpus(goodRecord("ok.one", "low"), body);
+  try {
+    const file = path.join(tmp, "guides", "p.md");
+    const before = fs.readFileSync(file, "utf8");
+    const result = runCli(["render", "--check", tmp]);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout + result.stderr, /guides\/p\.md/);
+    assert.equal(fs.readFileSync(file, "utf8"), before);
+    // Plain render keeps its report-only exit code.
+    assert.equal(runCli(["render", tmp]).status, 0);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("render --check exits 0 on a corpus with no pending change", () => {
+  const body = "Value: <!-- corpus:data key=ok.one -->ok.one-value<!-- /corpus:data -->";
+  const tmp = volatilityCorpus(goodRecord("ok.one", "low"), body);
+  try {
+    const result = runCli(["render", "--check", tmp]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.doesNotMatch(result.stdout, /guides\/p\.md/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("render --check with --write is a usage error", () => {
+  const body = "Value: <!-- corpus:data key=ok.one -->stale<!-- /corpus:data -->";
+  const tmp = volatilityCorpus(goodRecord("ok.one", "low"), body);
+  try {
+    const file = path.join(tmp, "guides", "p.md");
+    const before = fs.readFileSync(file, "utf8");
+    const result = runCli(["render", "--check", "--write", tmp]);
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /usage/);
+    assert.equal(fs.readFileSync(file, "utf8"), before);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// Final review (m1): lint_literals must be a non-empty list of strings or
+// numbers; anything else is reported and never crashes lint.
+test("lintCorpus reports lint-literals-invalid for a non-list, empty or malformed lint_literals", () => {
+  withDataCorpus(
+    [
+      ...recordHead("row.str"),
+      "    lint_literals: just-a-string",
+      ...recordHead("row.empty"),
+      "    lint_literals: []",
+      ...recordHead("row.obj"),
+      "    lint_literals: [ok-literal, { a: 1 }]",
+      ...recordHead("row.ok"),
+      "    lint_literals: [fine-literal, 12345]",
+    ],
+    (issues) => {
+      const hits = issues.filter((i) => i.rule === "lint-literals-invalid");
+      assert.deepEqual(
+        hits.map((h) => h.message.match(/record (\S+):/)[1]),
+        ["row.str", "row.empty", "row.obj"],
+        JSON.stringify(issues),
+      );
+      assert.equal(hits[0].path, path.join("data", "rows.yaml"));
+    },
+  );
+});
+
+// Final review (m2): data files the loader would skip are reported.
+function dataFilesCorpus(files) {
+  const tmp = volatilityCorpus(goodRecord("ok.one", "low"), "Body.");
+  for (const [name, content] of Object.entries(files))
+    fs.writeFileSync(path.join(tmp, "data", name), content);
+  return tmp;
+}
+
+test("lintCorpus reports data-file-ignored for a .yml file and a .yaml file without records", () => {
+  const tmp = dataFilesCorpus({
+    "extra.yml": "records:\n  - key: yml.one\n    value: yml-one-value\n",
+    "norecords.yaml": "items:\n  - key: nr.one\n",
+    "notalist.yaml": "records: 5\n",
+    "empty-list.yaml": "records: []\n",
+  });
+  try {
+    let issues;
+    assert.doesNotThrow(() => {
+      issues = lintCorpus(tmp, "2026-09-20");
+    });
+    const hits = issues.filter((i) => i.rule === "data-file-ignored");
+    assert.deepEqual(
+      hits.map((h) => h.path).sort(),
+      ["data/extra.yml", "data/norecords.yaml", "data/notalist.yaml"].map((p) =>
+        path.join(...p.split("/")),
+      ),
+      JSON.stringify(issues),
+    );
+    assert.doesNotThrow(() => ledgerCorpus(tmp, { write: false }));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("lintCorpus reports no data-file-ignored for well-formed data files", () => {
+  const tmp = dataFilesCorpus({});
+  try {
+    const hits = lintCorpus(tmp, "2026-09-20").filter((i) => i.rule === "data-file-ignored");
+    assert.deepEqual(hits, []);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

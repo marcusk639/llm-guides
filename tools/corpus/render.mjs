@@ -78,6 +78,12 @@ export function renderText(text, records) {
           message: `unknown record key: ${block.attrs.key}`,
         });
         out += block.content;
+      } else if (record.display == null && record.value == null) {
+        issues.push({
+          rule: "render-missing-value",
+          message: `record ${block.attrs.key} has neither display nor value`,
+        });
+        out += block.content;
       } else {
         out += String(record.display ?? record.value);
       }

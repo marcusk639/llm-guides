@@ -10,6 +10,7 @@
     "test": "node --test \"tools/corpus/test/**/*.test.mjs\"",
     "lint": "node tools/corpus/cli.mjs lint",
     "render": "node tools/corpus/cli.mjs render",
+    "render:check": "node tools/corpus/cli.mjs render --check",
     "ledger": "node tools/corpus/cli.mjs ledger"
   },
   "dependencies": {
