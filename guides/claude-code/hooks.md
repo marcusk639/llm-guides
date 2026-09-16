@@ -99,7 +99,7 @@ Start `claude` in that repository, accept the workspace trust dialog, and type `
 | `Notification`               | when Claude Code sends a notification           | notification type, e.g. `permission_prompt`, `idle_prompt` | no                         |
 | `SessionEnd`                 | when a session terminates                       | reason, e.g. `clear`, `logout`, `prompt_input_exit`        | no                         |
 
-**Matchers.** `"*"`, `""`, or no matcher matches everything. A matcher made only of letters, digits, `_`, `-`, spaces, `,` and `|` is an exact string or a list of exact strings (`Edit|Write`). Anything else is an unanchored JavaScript regular expression, so `Edit.*` also matches `NotebookEdit`; anchor with `^…$` for a whole-name match. MCP tools are named `mcp__<server>__<tool>`, so matching every tool from a server needs `mcp__memory__.*` — a bare `mcp__memory` is an exact string and matches nothing ([hooks reference: Matcher patterns](https://code.claude.com/docs/en/hooks)).
+**Matchers.** `"*"`, `""`, or no matcher matches everything. A matcher made only of letters, digits, `_`, `-`, spaces, `,` and `|` is an exact string or a list of exact strings (`Edit|Write`). Anything else is an unanchored JavaScript regular expression, so `Edit.*` also matches `NotebookEdit`; anchor with `^…$` for a whole-name match. `FileChanged` and `StopFailure` use a narrower exact-match set — letters, digits, `_`, and `|` only — so a hyphen, space, or comma in their matchers puts it on the regular-expression path. MCP tools are named `mcp__<server>__<tool>`, so matching every tool from a server needs `mcp__memory__.*` — a bare `mcp__memory` is an exact string and matches nothing ([hooks reference: Matcher patterns](https://code.claude.com/docs/en/hooks)).
 
 **The `if` field** narrows a single handler further using permission-rule syntax, such as `"Bash(git *)"` or `"Edit(*.ts)"`, so the process is never spawned for non-matching calls. It is evaluated only on tool events and holds exactly one rule ([hooks reference: Common fields](https://code.claude.com/docs/en/hooks)).
 
@@ -110,7 +110,7 @@ Start `claude` in that repository, accept the workspace trust dialog, and type `
 **The contract: stdin in; exit code, stdout, and stderr out.**
 
 - **Exit 0** — success. For most events stdout goes only to the debug log; for `SessionStart`, `UserPromptSubmit`, `UserPromptExpansion`, and `PostModelSwitch`, plain-text stdout is added to Claude's context.
-- **Exit 2** — blocking error, on events that can block. Stderr becomes the message (to Claude for `PreToolUse`; to the user for `UserPromptSubmit`). JSON cannot override an exit-2 block.
+- **Exit 2** — blocking error, on events that can block. The blocking message is the reason from your JSON's blocking decision if it makes one, and your stderr text otherwise; it goes to Claude for `PreToolUse` and to the user for `UserPromptSubmit`. JSON cannot override an exit-2 block.
 - **Any other exit code** — for most events a _non-blocking_ error: the action proceeds and the transcript shows a hook error notice. **This includes exit 1.**
 
 ([hooks reference: Exit code output](https://code.claude.com/docs/en/hooks))
@@ -239,9 +239,9 @@ fi
 exit 0
 ```
 
-Claude Code overrides the hook and ends the turn after <!-- corpus:data key=claude_code.hooks.stop_block_cap -->8 consecutive blocks<!-- /corpus:data -->; the cap is adjustable with `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`. `Stop` fires whenever Claude finishes responding, not only when a task is complete, and not on user interrupts. For guidance that isn't an error, return `hookSpecificOutput.additionalContext` instead of `decision: "block"`.
+Claude Code overrides the hook and ends the turn after <!-- corpus:data key=claude_code.hooks.stop_block_cap -->8 consecutive blocks<!-- /corpus:data -->; the cap is adjustable with `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`. `Stop` fires whenever Claude finishes responding, not only when a task is complete, and not on user interrupts. For guidance that isn't an error, return `hookSpecificOutput.additionalContext` instead of `decision: "block"`. If you write the gate as a prompt-based hook (`type: "prompt"`) instead of a command, its `ok: false` response may also set `"impossible": true` when the condition can never be satisfied; on `Stop` and `SubagentStop` Claude Code then lets the turn end instead of feeding the reason back. Command and agent hooks don't support that field.
 
-Evidence: **Documented** — [hooks reference: Stop](https://code.claude.com/docs/en/hooks); [hooks guide: Stop hook hits the block cap](https://code.claude.com/docs/en/hooks-guide).
+Evidence: **Documented** — [hooks reference: Stop, Prompt-based hooks: Response schema](https://code.claude.com/docs/en/hooks); [hooks guide: Stop hook hits the block cap, Prompt-based hooks](https://code.claude.com/docs/en/hooks-guide).
 
 ### 4.6 Test the script with piped JSON before you register it
 
@@ -302,7 +302,7 @@ The values, each backed by a record:
 Re-check on refresh, against the [hooks reference](https://code.claude.com/docs/en/hooks) and [hooks guide](https://code.claude.com/docs/en/hooks-guide) — **those pages are the authority whenever they and this page disagree**:
 
 - the event table in section 3 (new events appear often; renamed or removed ones would break recipes);
-- exact-match vs. regular-expression matcher rules, which have changed across recent versions;
+- exact-match vs. regular-expression matcher rules, which the reference qualifies with version notes (comma separators and hyphens in the exact-match set each require a minimum Claude Code version);
 - exit-code and JSON-parsing behavior, including which events add plain stdout to context;
 - the `PreToolUse` decision values and precedence, and the permission-mode interaction in 4.8;
 - workspace-trust behavior for `-p` runs;
