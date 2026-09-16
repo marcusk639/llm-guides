@@ -77,3 +77,15 @@ records:
     source: https://code.claude.com/docs/en/hooks
     verified: "2026-09-16"
     tags: [claude-code, hooks]
+  # Sandbox default backing guides/domains/software-engineering.md.
+  # lint: false — the only literal form of this value is "true", which would
+  # match every JSON `true` corpus-wide; any distinctive phrase would have to be
+  # the identifier text around the marker block and would flag the page itself.
+  - key: claude_code.sandbox.auto_allow_bash_default
+    value: "true"
+    display: "`true`"
+    lint: false
+    volatility: medium
+    source: https://code.claude.com/docs/en/settings-reference
+    verified: "2026-09-16"
+    tags: [claude-code, sandbox]
