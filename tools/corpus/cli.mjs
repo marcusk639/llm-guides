@@ -129,12 +129,16 @@ function main(argv) {
     );
     process.exit(issues.length === 0 ? 0 : 1);
   } else if (command === "render") {
+    let hasIssues = false;
     for (const r of renderCorpus(root, { write })) {
-      for (const i of r.issues)
+      for (const i of r.issues) {
         console.error(`${r.path} [${i.rule}] ${i.message}`);
+        hasIssues = true;
+      }
       if (r.changed)
         console.log(`${write ? "rendered" : "would render"}: ${r.path}`);
     }
+    process.exit(hasIssues ? 1 : 0);
   } else if (command === "ledger") {
     const ledger = ledgerCorpus(root, { write });
     console.log(
