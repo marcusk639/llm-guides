@@ -1,3 +1,6 @@
+import { parseFrontmatter } from "./frontmatter.mjs";
+import { findBlocks, coveredRanges } from "./markers.mjs";
+
 export const REQUIRED_FIELDS = [
   "title",
   "summary",
@@ -45,4 +48,33 @@ export function validateFrontmatter(data, topics) {
     });
   }
   return issues;
+}
+
+const WORD = /[A-Za-z0-9]/;
+
+function isBoundedMatch(text, at, literal) {
+  const before = text[at - 1];
+  const after = text[at + literal.length];
+  return !(before && WORD.test(before)) && !(after && WORD.test(after));
+}
+
+export function findBareValues(text, index) {
+  const { bodyOffset } = parseFrontmatter(text);
+  const ranges = coveredRanges(findBlocks(text));
+  const inBlock = (i) => ranges.some(([s, e]) => i >= s && i < e);
+  const issues = [];
+  for (const [literal, keys] of index) {
+    let at = text.indexOf(literal, bodyOffset);
+    while (at !== -1) {
+      if (!inBlock(at) && isBoundedMatch(text, at, literal)) {
+        issues.push({
+          rule: "bare-value",
+          message: `value "${literal}" belongs to record(s) ${keys.join(", ")}; wrap it in a marker block`,
+          line: text.slice(0, at).split("\n").length,
+        });
+      }
+      at = text.indexOf(literal, at + literal.length);
+    }
+  }
+  return issues.sort((a, b) => a.line - b.line);
 }
