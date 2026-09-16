@@ -78,6 +78,7 @@ for d in guides data research examples meta; do touch "$d/.gitkeep"; done
 ```
 node_modules/
 local/
+.superpowers/
 .DS_Store
 ```
 
@@ -1140,7 +1141,7 @@ export function checkExpiry(entry, today) {
 - [ ] **Step 5: Run the test to verify it passes**
 
 Run: `node --test tools/corpus/test/ledger.test.mjs`
-Expected: PASS — 7 tests
+Expected: PASS — 8 tests
 
 - [ ] **Step 6: Commit**
 
