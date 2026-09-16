@@ -107,6 +107,8 @@ model ids, prices, context and rate limits, parameter defaults, availability dat
 The test: _would a reader paste this into their own config or spreadsheet?_ If yes, it is
 a value. If it is only the name of the thing being discussed, it is an identifier.
 
+> Amended — see Amendments from seeds, F4, F13, F17.
+
 ### Making the lint decidable
 
 Revision 1's lint tried to detect volatile numbers semantically, which is not
@@ -117,6 +119,8 @@ The lint is therefore **closed-world**: it does not attempt to recognize volatil
 in the abstract. It checks prose against the values the corpus _already knows about_ —
 every value string in `data/` — and flags any occurrence outside a marker block. This is
 lexical, decidable, and produces no false positives on ordinary numbers.
+
+> Amended — see Amendments from seeds, F7, F11, F15, F17.
 
 Catching values the corpus does _not_ yet know about is a semantic problem, and is
 assigned to the Verify stage, where model judgment belongs. Division of labor:
@@ -137,6 +141,8 @@ runnable example while runnable examples necessarily contain values. A snippet c
 a model id is generated into the page from its data record like any other value-bearing
 region.
 
+> Amended — see Amendments from seeds, F3 (not implemented; deferred).
+
 A code block outside a marker block must contain no known values, or the lint fails it.
 
 ## The document contract
@@ -156,12 +162,16 @@ per-record dates the ledger is built from. Page-level volatility is now _derived
 maximum volatility of the records the page references, so there is exactly one source of
 truth.
 
+> Amended — see Amendments from seeds, F2 (limitation recorded; deferred), F18.
+
 ### Page template
 
 1. **What this covers / who it's for** — two lines.
 2. **The 60-second version** — one concrete example that runs. Beginner rung, before theory.
+   _Amended — see Amendments from seeds, F1._
 3. **How it actually works** — mechanics and the mental model.
 4. **Patterns that hold up** — recipes, each carrying an evidence label.
+   _Amended — see Amendments from seeds, F10._
 5. **Edge cases and failure modes** — advanced rung.
 6. **Where this rots** — which claims are volatile, which records back them, what to re-check.
 7. **Proofs** — optional; present only where claims are backed by a runnable proof.
@@ -171,6 +181,7 @@ truth.
 
 - **Verified** — established by a passing proof that ships with the corpus.
 - **Documented** — vendor-stated in canonical documentation, with link and date.
+  _Amended — see Amendments from seeds, F12._
 - **Plausible** — community-reported, anecdotal, or inferred. Flagged as such; never
   written as confident prose.
 
@@ -335,7 +346,7 @@ built in sub-project 2 against a contract that five real documents have stress-t
   real or decorative.
 - Does the identifier/value split hold for pricing tables and model-capability matrices,
   where nearly every cell is a value and the prose is scaffolding? The comparison seed in
-  1b exists to answer this.
+  1b exists to answer this. _Answered — see Amendments from seeds, Open questions answered._
 
 ## Revision history
 
@@ -357,3 +368,66 @@ built in sub-project 2 against a contract that five real documents have stress-t
 | Ledger consumers and deprecation path defined                           | A generated ledger with no consumer rots; un-refreshable docs had no end state                                 |
 | Proof coverage limitation stated plainly                                | Promotion loop was presented as general when it applies to a minority of claims                                |
 | Cadence numbers marked provisional                                      | A spec whose thesis is "never write a number from memory" asserted three unsourced ones                        |
+
+## Amendments from seeds
+
+Phase 1c. Five seed guides were written under the provisional contract — Task 11
+`guides/context/context-management.md` (evergreen concept), Task 12
+`guides/models/claude-models.md` (model facts), Task 13 `guides/claude-code/hooks.md`
+(tool reference), Task 14a `guides/domains/software-engineering.md` (domain playbook),
+Task 14b `guides/models/comparison.md` (cross-model comparison). They surfaced eighteen
+findings. The Task 15 triage split them three ways: **(a)** implemented in the tool (Task
+15a lint: commits `d73756a`, `aa22f57`; Task 15b render: commits `96d214b`, `bd7d3c6`),
+**(b)** resolved by contract text in `CLAUDE.md` (Task 15c), **(c)** deferred to
+sub-project 2. `CLAUDE.md` is the binding text; this section records why.
+
+| #   | Finding                                                                                                                                                                                                                                                 | Seed(s)           | Disposition                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F1  | "One concrete example that runs" is ambiguous for an API-key-gated `curl` example and for a prompt sequence run against "your repository".                                                                                                              | 11; recurred 14a  | **(b)** `CLAUDE.md` "What 'runs' means": executable verbatim with only named substitutions; key-gated examples are syntax-checked, fail loudly and fetch volatile values at runtime; prompt sequences give exact prompts, a safe start state, a synthetic task, a human check and a discard path; running an example never makes a claim Verified.                                                                |
+| F2  | Page volatility as the maximum of referenced records lets one incidental beta default force the shortest cadence on an evergreen page; the author deleted a useful value to avoid it.                                                                   | 11                | **(c)** Open: an aggregation or per-reference override. Interim, stated in `CLAUDE.md`: keep high-volatility values off concept pages and link the page that owns them.                                                                                                                                                                                                                                           |
+| F3  | Spec claim not implemented: render cannot generate a code block that interpolates a value, so values inside code examples cannot be data-backed.                                                                                                        | 11; applied in 12 | **(c)** Open: templated snippets (placeholders inside fences that render substitutes and lint treats as covered). Interim: fetch values at runtime (the Models API in `claude-models.md` §2) or take them as input; fences must hold no known value.                                                                                                                                                              |
+| F4  | The identifier/value boundary is unclear for version-like identifiers (`anthropic-version` header value, beta headers, dated tool type names) and for version gates; "would a reader paste this" is ambiguous for matcher values and decision keywords. | 11; 13            | **(b)** `CLAUDE.md` "Borderline kinds, decided": protocol version constants and dated names are identifiers; product versions go in `applies_to` and per-feature version gates are not enumerated; the tie-break test "is it a name or a magnitude?" is added.                                                                                                                                                    |
+| F5  | A `corpus:data` block cannot select one field of a row record, so an inline figure from a table row needs a second single-value record — a drift risk.                                                                                                  | 12                | **(c)** Open: a field-selecting `corpus:data` attribute. Interim: point prose at the table column or describe the relation without the figure; if essential, add a single-value record and list both under "Where this rots".                                                                                                                                                                                     |
+| F6  | Row records repeated every volatile string in `lint_literals`; nothing checked they agreed, so a refreshed field could silently drop out of lint.                                                                                                       | 12                | **(a)** Task 15a `lint_fields` (`d73756a`): the literal index includes the named fields' values; row records in `data/models.yaml` and `data/models-other.yaml` migrated with a proven-identical index. `aa22f57` adds `lint-fields-unknown` and `lint-fields-unindexable` so a misnamed or non-scalar field cannot silently lose coverage. `lint_literals` remains for fragments and identifier-embedded values. |
+| F7  | The closed-world lint is corpus-global: generic display strings (`1M tokens`) recorded for one vendor false-positive on any page stating the same figure for another, attributed to the wrong record.                                                   | 12; recurred 14a  | **(a)** Task 15a `lint_scope` (`d73756a`): a scoped record is linted only on pages whose `topic` it lists; unscoped records stay global. `aa22f57` adds `lint-scope-unknown`. Existing seed records were not rescoped. `CLAUDE.md` states when to scope and the cost (an uncaught bare value on unlisted topics).                                                                                                 |
+| F8  | `corpus:table` rendered raw field names (`api_id`, `input_price`) as column headers.                                                                                                                                                                    | 12                | **(a)** Task 15b `headers=` (`96d214b`) with `render-headers-mismatch` when label and field counts differ. Both table seeds now use it.                                                                                                                                                                                                                                                                           |
+| F9  | Render and the Prettier post-write hook disagreed about table padding and blank lines, so `render --write` followed by Prettier was not a fixed point.                                                                                                  | 12                | **(a)** Task 15b formatter-stable change detection (`96d214b`): `renderCorpus` compares normalised forms of terminated `corpus:table` content only. `bd7d3c6` pins that scope with a test and makes divider detection strict so an all-dash data row is not equated.                                                                                                                                              |
+| F10 | "Each recipe carries an evidence label" gave no form for a recipe combining a documented fact with the author's inference; authors split labels ad hoc, and one inference sat under Documented.                                                         | 12; recurred 14a  | **(b)** `CLAUDE.md` "Evidence labels": one `Evidence:` line per recipe that labels each part separately; an inference never sits under Documented because the fact it follows from is documented.                                                                                                                                                                                                                 |
+| F11 | Under global lint, generic figures ("30 seconds", "600") could only be recorded as long context-bound phrases, so the bare form on the same page is not caught: coverage or precision, not both.                                                        | 13                | **(a)** Same tool change as F7 (`lint_scope`, `d73756a`, `aa22f57`), which removes the forced trade-off for new records. **(b)** `CLAUDE.md` documents when to choose context-bound `lint_literals` versus scoping. The hooks records keep their phrases.                                                                                                                                                         |
+| F12 | `CLAUDE.md` defined Documented as vendor canonical documentation only, while the tier table lets tier 2 reach Documented; a guide redefined the label locally.                                                                                          | 14a               | **(b)** `CLAUDE.md` "Evidence labels": Documented = stated by a tier 1 or tier 2 source, linked and dated, with a tier 2 study's scope stated where cited; guides never redefine a label. The software-engineering page's local redefinition was already replaced in its fix round.                                                                                                                               |
+| F13 | Dated empirical results (a measured slowdown percentage) are neither identifiers nor values; the contract had no category.                                                                                                                              | 14a               | **(b)** `CLAUDE.md` "Borderline kinds, decided": inline citation with scope and date, no data record, and a dated-studies paragraph in "Where this rots".                                                                                                                                                                                                                                                         |
+| F14 | Safety-relevant identifiers (which commands a mode auto-approves) cannot be flagged for priority re-checking; they share the page-level refresh of cosmetic identifiers.                                                                                | 14a               | **(c)** Open: a priority marker the refresh stage reads. Interim: list them first in "Where this rots" with why they matter.                                                                                                                                                                                                                                                                                      |
+| F15 | Model ids are values, so prose links to per-model vendor pages (URLs contain the id) and record keys embedding an id tripped bare-value lint.                                                                                                           | 14b               | **(a)** Task 15a URL exclusion (`d73756a`; narrowed in `aa22f57` to real link destinations, autolinks and bare URLs, keeping link text, titles and code calls scanned). **(b)** Key spelling rule in `CLAUDE.md`: record keys must not embed a value verbatim.                                                                                                                                                    |
+| F16 | Table rows followed data-file load order with no ordering control, so Anthropic rows rendered last in the cross-vendor table.                                                                                                                           | 14b               | **(a)** Task 15b `sort=field` / `sort=-field` (`96d214b`); `bd7d3c6` adds `render-sort-unknown` for a malformed sort or one naming a field no selected row has.                                                                                                                                                                                                                                                   |
+| F17 | Some values are unlintable: under `MIN_LITERAL_LENGTH` (a two-character context length), or embedded in an identifier (a parameter count inside a model name).                                                                                          | 14b               | **(b)** `CLAUDE.md` "Values lint cannot guard": still values (record plus marker); single-value records use `lint: false`, row records omit just that literal from `lint_literals`; each is named in "Where this rots" for manual re-check.                                                                                                                                                                       |
+| F18 | Shared row records cannot hold page-specific annotations (reused Claude rows have empty notes); and lint does not scan front-matter, so value-bearing URLs in `sources` pass by accident of implementation.                                             | 14b               | **(b)** `CLAUDE.md` makes the front-matter exemption a rule (URLs in `sources` may contain ids; front-matter must not carry values otherwise) and states that page-specific annotations go in prose beside the table, with reused rows gaining fields or tags only.                                                                                                                                               |
+
+### Other contract text changed in Task 15c
+
+Not findings, but corrections made while codifying against the code:
+
+- The provisional `npm test` line (`node --test tools/corpus/test/`) did not match
+  `package.json`; the real script is `node --test "tools/corpus/test/**/*.test.mjs"`.
+- `render` without `--write` exits 0 while pages are pending; the output, not the exit
+  code, shows pending renders. Now stated.
+- Every lint and render rule name, the record field set, the table attributes, the proof
+  manifest fields and the domain-playbook inner shape (from Task 14a) are now written
+  into `CLAUDE.md`.
+- Record `volatility` is not validated; a misspelling can crash `lint` and `ledger`.
+  Documented as a limitation; not changed (Task 15c changes no tool code).
+
+### Open questions answered
+
+- **Does the identifier/value split hold?** Yes. The hooks seed (Task 13), the densest
+  identifier page, raised no lint issue on any hook event, field or identifier; the
+  borderline calls it needed are now the "Borderline kinds" table.
+- **Does it survive a mostly-table page?** Mostly yes (Task 14b, analysed in
+  `comparison.md` §6). Row records carried a five-vendor table with shared Claude rows
+  and no tooling change; model names stayed identifiers and ids, limits, prices,
+  parameter counts and licences stayed values. It fought in eight places, each now
+  dispositioned: field semantics across record files (contract text: aligned fields,
+  separate columns, blanks), values in conceptual prose (F5, deferred), short and
+  identifier-embedded values (F17), licence names straddling identifier/value (treated
+  as values; scope if they collide, F7), row order (F16), unit conventions and blank
+  cells (record-file comment convention), keys and URLs carrying values (F15), and
+  front-matter not scanned (F18).

@@ -1,0 +1,22 @@
+generated: '2026-09-16'
+entries:
+  - path: guides/claude-code/hooks.md
+    verified: '2026-09-16'
+    volatility: medium
+    expires: '2026-12-15'
+  - path: guides/context/context-management.md
+    verified: '2026-09-16'
+    volatility: medium
+    expires: '2026-12-15'
+  - path: guides/domains/software-engineering.md
+    verified: '2026-09-16'
+    volatility: medium
+    expires: '2026-12-15'
+  - path: guides/models/claude-models.md
+    verified: '2026-09-16'
+    volatility: high
+    expires: '2026-10-16'
+  - path: guides/models/comparison.md
+    verified: '2026-09-16'
+    volatility: high
+    expires: '2026-10-16'
