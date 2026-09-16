@@ -109,12 +109,12 @@ If a table and the vendor page it came from disagree, the vendor page wins. Sect
 
 **Prices are tiered in different ways.** All three hosted vendors bill input and output tokens separately, and output costs more than input on every row in the table. Beyond that the rules diverge: OpenAI's model pages bill the whole request at higher rates once the prompt crosses a stated size; Google's Pro Preview row has a prompt-size price step and Gemini 3.8 Flash has a dated price change; Anthropic's pricing page states that its current large-window models have no long-context surcharge. Google's pricing page also states that output prices include thinking tokens. The `notes` column carries the thresholds; the vendor pricing pages carry batch, cache and priority-tier rates, which this page deliberately does not copy.
 
-**Open-weight cards describe weights, not a service.** Llama 4's card gives activated and total parameter counts because both models are mixture-of-experts; so does the larger Qwen card, while the Qwen dense model gives one count. Qwen's cards distinguish a native context length from an extended one reached with RoPE scaling (YaRN), and say the hosted Qwen Cloud versions have different defaults and features than the open weights. A host serving these weights may configure a shorter context than the card's maximum.
+**Open-weight cards describe weights, not a service.** Llama 4's card gives activated and total parameter counts because both models are mixture-of-experts; so does the larger Qwen card, while the Qwen dense model gives one count. Both Qwen cards distinguish a native context length from an extended one; the Qwen3.8-27B card says the extension is reached with RoPE scaling techniques such as YaRN. Both cards also say the hosted Qwen Cloud versions have different defaults and features than the open weights. A host serving these weights may configure a shorter context than the card's maximum.
 
 **The vendors describe their own tiers.** In their own words, on the verification date:
 
 - OpenAI: GPT-6 Astra is "our flagship model for complex reasoning and coding"; choose GPT-5.6 Terra "to balance intelligence and cost", or GPT-5.6 Luna "for cost-sensitive, high-volume workloads" ([OpenAI models](https://developers.openai.com/api/docs/models)).
-- Google: Gemini 3.8 Flash is "our most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and complex enterprise workflows"; Gemini 3.1 Pro Preview is "optimized for software engineering behavior and usability, as well as agentic workflows"; Gemini 3.5 Flash-Lite is "optimized for high-throughput, low-cost execution for subagent tasks and document parsing" ([Gemini models](https://ai.google.dev/gemini-api/docs/models)).
+- Google: Gemini 3.8 Flash is "our most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and complex enterprise workflows"; Gemini 3.1 Pro (listed as Preview) offers "Advanced intelligence, complex problem-solving skills, and powerful agentic and vibe coding capabilities"; Gemini 3.5 Flash-Lite is "Our fastest, most cost-effective 3.5 model for high-throughput execution" ([Gemini models](https://ai.google.dev/gemini-api/docs/models)).
 - Anthropic: see [Claude models, section 3](claude-models.md#3-how-it-actually-works) for the overview's tier descriptions.
 - Meta: the Llama 4 card introduces Scout and Maverick as "two efficient models in the Llama 4 series", both mixture-of-experts.
 - Qwen: the Qwen3.8 cards describe the generation as "the most capable generation in the Qwen open-model family to date", and the largest card says it "brings a Qwen-Max-class model to open release".
@@ -149,7 +149,7 @@ Evidence: **Plausible** — follows from the documented API differences linked i
 
 ### 4.5 For open weights, read the licence before the parameter count
 
-The two families ship under different terms: the Llama 4 models under Meta's own community licence, the larger Qwen model under its own Qwen licence with conditions on large-scale commercial use, and the smaller Qwen model under a standard permissive licence (see the licence column). Licence terms can rule a model out regardless of quality.
+The two families ship under different terms: the Llama 4 models under Meta's own community licence, the larger Qwen model under its own Qwen licence, which permits commercial use but adds two conditions: products above stated user or revenue thresholds must display the model name, and Model-as-a-Service or AI Work Assistant businesses above a stated revenue threshold need a separate licence from Qwen for commercial use (internal use excepted), and the smaller Qwen model under a standard permissive licence (see the licence column). Licence terms can rule a model out regardless of quality.
 
 Evidence: **Documented** — licence names from each card's metadata and linked licence file (the Llama 4 cards in the [meta-llama organisation](https://huggingface.co/meta-llama) and the Qwen3.8 cards in the [Qwen organisation](https://huggingface.co/Qwen)), read 2026-09-16. This page summarises, not interprets, the licences; read them in full.
 
@@ -199,7 +199,7 @@ What should not rot: comparing cost per completed task, keeping separate columns
 
 ### Did the contract hold for a multi-vendor, mostly-table page?
 
-**Mostly yes: the identifier/value split and row records carried a five-vendor table without any tooling change. It fought back in seven specific places.**
+**Mostly yes: the identifier/value split and row records carried a five-vendor table without any tooling change. It fought back in eight specific places.**
 
 What held:
 
@@ -218,7 +218,9 @@ Where it fought:
 
 7. **Record keys and URLs carry values.** A record key that embeds a model id verbatim (the first OpenAI key was written that way) is flagged when the key is named in this section's table, so the key had to be respelled. Every per-model vendor URL also contains the model id, so the sources section cannot link a model page from prose without tripping the lint; it links index pages instead and leaves per-model URLs in the records' `source` fields.
 
-Nothing here needed a tool change to ship; items 1, 3, 4, 6 and 7 are candidates for the contract amendment.
+8. **Front-matter sources pass only because front-matter is not scanned.** The page's `sources` list keeps the real per-model Hugging Face URLs, each containing a model id. They pass lint only because the lint starts after the front-matter; the same URLs in the body fail. The contract does not say whether front-matter is meant to be exempt, so this is an accident of the implementation, not a rule.
+
+Nothing here needed a tool change to ship; items 1, 3, 4, 6, 7 and 8 are candidates for the contract amendment.
 
 ## 7. Proofs
 
