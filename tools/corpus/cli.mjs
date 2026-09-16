@@ -12,7 +12,7 @@ import {
   checkExpiry,
   checkRecordLintConfig,
 } from "./lint.mjs";
-import { renderText } from "./render.mjs";
+import { renderText, normaliseForComparison } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
 import { derivePageVolatility, buildLedger, expiryFor } from "./ledger.mjs";
 
@@ -99,10 +99,14 @@ export function renderCorpus(root, { write = false } = {}) {
   return guidePaths(root).map((file) => {
     const before = fs.readFileSync(file, "utf8");
     const { text, issues } = renderText(before, records);
-    if (write && text !== before) fs.writeFileSync(file, text);
+    // Compare formatter-stable forms so a formatter's table padding and blank
+    // lines are not reported (or rewritten) as a pending render change.
+    const changed =
+      normaliseForComparison(text) !== normaliseForComparison(before);
+    if (write && changed) fs.writeFileSync(file, text);
     return {
       path: path.relative(root, file),
-      changed: text !== before,
+      changed,
       issues,
     };
   });

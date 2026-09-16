@@ -47,13 +47,15 @@ The output includes legacy models that are still served, not just the four below
 
 The current lineup, as published on the verification date. Prices are base USD per million tokens (MTok) on the Claude API:
 
-<!-- corpus:table fields=name,api_id,api_alias,context_window,max_output,input_price,output_price tag=claude-current -->
-| name | api_id | api_alias | context_window | max_output | input_price | output_price |
-| --- | --- | --- | --- | --- | --- | --- |
-| Claude Fable 5.1 | claude-fable-5-1 | claude-fable-5-1 | 1M tokens | 128K tokens | $10 / MTok | $50 / MTok |
-| Claude Opus 5 | claude-opus-5 | claude-opus-5 | 1M tokens | 128K tokens | $5 / MTok | $25 / MTok |
-| Claude Sonnet 5 | claude-sonnet-5 | claude-sonnet-5 | 1M tokens | 128K tokens | $2 / MTok | $10 / MTok |
-| Claude Haiku 4.5 | claude-haiku-4-5-20251001 | claude-haiku-4-5 | 200K tokens | 64K tokens | $1 / MTok | $5 / MTok |
+<!-- corpus:table fields=name,api_id,api_alias,context_window,max_output,input_price,output_price headers="Model,API ID,API alias,Context window,Max output,Input price,Output price" tag=claude-current -->
+
+| Model            | API ID                    | API alias        | Context window | Max output  | Input price | Output price |
+| ---------------- | ------------------------- | ---------------- | -------------- | ----------- | ----------- | ------------ |
+| Claude Fable 5.1 | claude-fable-5-1          | claude-fable-5-1 | 1M tokens      | 128K tokens | $10 / MTok  | $50 / MTok   |
+| Claude Opus 5    | claude-opus-5             | claude-opus-5    | 1M tokens      | 128K tokens | $5 / MTok   | $25 / MTok   |
+| Claude Sonnet 5  | claude-sonnet-5           | claude-sonnet-5  | 1M tokens      | 128K tokens | $2 / MTok   | $10 / MTok   |
+| Claude Haiku 4.5 | claude-haiku-4-5-20251001 | claude-haiku-4-5 | 200K tokens    | 64K tokens  | $1 / MTok   | $5 / MTok    |
+
 <!-- /corpus:table -->
 
 If the table and the [models overview](https://platform.claude.com/docs/en/models/overview) or [pricing page](https://platform.claude.com/docs/en/about-claude/pricing) disagree, those pages win.
@@ -130,7 +132,7 @@ Evidence: **Documented** — [pricing: long context pricing](https://platform.cl
 | Claim                                      | Record                       | Volatility | Why it moves                                                          |
 | ------------------------------------------ | ---------------------------- | ---------- | --------------------------------------------------------------------- |
 | Claude Fable 5.1 ID, alias, limits, prices | `anthropic.models.fable-5-1` | high       | New releases, repricing, and lineup changes                           |
-| Claude Opus 5 ID, alias, limits, prices    | `anthropic.models.opus-5`    | high       | Same |
+| Claude Opus 5 ID, alias, limits, prices    | `anthropic.models.opus-5`    | high       | Same                                                                  |
 | Claude Sonnet 5 ID, alias, limits, prices  | `anthropic.models.sonnet-5`  | high       | Same; its price already changed status once (introductory → standard) |
 | Claude Haiku 4.5 ID, alias, limits, prices | `anthropic.models.haiku-4-5` | high       | Oldest model in the lineup, with the nearest retirement commitment    |
 

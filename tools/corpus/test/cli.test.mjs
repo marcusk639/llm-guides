@@ -264,3 +264,130 @@ test("lintCorpus reports a lint_fields field whose value cannot be indexed", () 
     },
   );
 });
+
+// --- formatter-stable change detection (finding F9) ---
+
+const CMP_DATA = [
+  "records:",
+  "  - key: cmp.alpha",
+  '    value: "Alpha"',
+  '    name: "Alpha"',
+  '    price: "$1 / MTok"',
+  '    note: "x|y"',
+  "    volatility: high",
+  "    source: https://example.invalid/docs",
+  "    verified: 2026-09-16",
+  "    tags: [cmp]",
+  "  - key: cmp.beta",
+  '    value: "Beta Model"',
+  '    name: "Beta Model"',
+  '    price: "$10 / MTok"',
+  "    volatility: high",
+  "    source: https://example.invalid/docs",
+  "    verified: 2026-09-16",
+  "    tags: [cmp]",
+  "  - key: cmp.gamma",
+  '    value: "Gamma"',
+  '    name: "Gamma"',
+  '    price: "$0.25 / MTok"',
+  '    note: "plain"',
+  "    volatility: high",
+  "    source: https://example.invalid/docs",
+  "    verified: 2026-09-16",
+  "    tags: [cmp]",
+  "",
+].join("\n");
+
+// What render.mjs emits for the block below: unpadded cells, no blank lines.
+const CMP_UNPADDED = [
+  "# Cmp",
+  "",
+  "Intro.",
+  "",
+  '<!-- corpus:table fields=name,price,note headers="Model,Input price,Note" tag=cmp -->',
+  "| Model | Input price | Note |",
+  "| --- | --- | --- |",
+  "| Alpha | $1 / MTok | x\\|y |",
+  "| Beta Model | $10 / MTok |  |",
+  "| Gamma | $0.25 / MTok | plain |",
+  "<!-- /corpus:table -->",
+  "",
+  "After.",
+  "",
+].join("\n");
+
+// Captured verbatim from Prettier 3.9.7 output (`npx prettier --write`) run on
+// CMP_UNPADDED: cells padded to column width, divider dashes stretched to
+// column width, and a blank line added after the opener and before the closer.
+const CMP_PRETTIER = [
+  "# Cmp",
+  "",
+  "Intro.",
+  "",
+  '<!-- corpus:table fields=name,price,note headers="Model,Input price,Note" tag=cmp -->',
+  "",
+  "| Model      | Input price  | Note  |",
+  "| ---------- | ------------ | ----- |",
+  "| Alpha      | $1 / MTok    | x\\|y  |",
+  "| Beta Model | $10 / MTok   |       |",
+  "| Gamma      | $0.25 / MTok | plain |",
+  "",
+  "<!-- /corpus:table -->",
+  "",
+  "After.",
+  "",
+].join("\n");
+
+function withCmpCorpus(guideText, fn) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "corpus-stable-test-"));
+  try {
+    fs.mkdirSync(path.join(tmp, "data"));
+    fs.mkdirSync(path.join(tmp, "guides"));
+    fs.writeFileSync(path.join(tmp, "data", "cmp.yaml"), CMP_DATA);
+    const guide = path.join(tmp, "guides", "cmp.md");
+    fs.writeFileSync(guide, guideText);
+    return fn(tmp, guide);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+test("the unpadded render is a no-op", () => {
+  withCmpCorpus(CMP_UNPADDED, (root) => {
+    const [r] = renderCorpus(root, { write: false });
+    assert.deepEqual(r.issues, []);
+    assert.equal(r.changed, false);
+  });
+});
+
+test("Prettier's formatting of a rendered table is not a pending change and is not rewritten", () => {
+  withCmpCorpus(CMP_PRETTIER, (root, guide) => {
+    assert.equal(renderCorpus(root, { write: false })[0].changed, false);
+    const [r] = renderCorpus(root, { write: true });
+    assert.equal(r.changed, false);
+    assert.equal(fs.readFileSync(guide, "utf8"), CMP_PRETTIER);
+  });
+});
+
+const genuineChanges = {
+  "a cell value": (t) => t.replace("| $1 / MTok    |", "| $2 / MTok    |"),
+  "row order": (t) =>
+    t
+      .replace("| Alpha      | $1 / MTok    | x\\|y  |", "@@ALPHA@@")
+      .replace("| Gamma      | $0.25 / MTok | plain |", "| Alpha      | $1 / MTok    | x\\|y  |")
+      .replace("@@ALPHA@@", "| Gamma      | $0.25 / MTok | plain |"),
+  "row count": (t) => t.replace("| Beta Model | $10 / MTok   |       |\n", ""),
+  "header text": (t) => t.replace("| Model      |", "| Name       |"),
+};
+
+for (const [what, mutate] of Object.entries(genuineChanges)) {
+  test(`a genuine ${what} difference against Prettier-formatted text is a pending change`, () => {
+    const stale = mutate(CMP_PRETTIER);
+    assert.notEqual(stale, CMP_PRETTIER, "mutation must alter the fixture");
+    withCmpCorpus(stale, (root, guide) => {
+      assert.equal(renderCorpus(root, { write: false })[0].changed, true);
+      assert.equal(renderCorpus(root, { write: true })[0].changed, true);
+      assert.equal(fs.readFileSync(guide, "utf8"), CMP_UNPADDED);
+    });
+  });
+}

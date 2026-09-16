@@ -6,13 +6,41 @@ function escapeCell(value) {
   return s.replace(/\|/g, "\\|").replace(/\r\n/g, "<br>").replace(/\n/g, "<br>");
 }
 
+function splitList(value) {
+  return value.split(",").map((f) => f.trim());
+}
+
+function tableFields(attrs) {
+  return splitList(attrs.fields ?? "key,value");
+}
+
+// sort=field ascending, sort=-field descending. Values compare as strings with
+// localeCompare; records missing the field sort last in both directions; ties
+// keep load order (Array.prototype.sort is stable).
+function sortRows(rows, sort) {
+  if (!sort) return rows;
+  const descending = sort.startsWith("-");
+  const field = descending ? sort.slice(1) : sort;
+  return [...rows].sort((a, b) => {
+    const aMissing = a[field] == null;
+    const bMissing = b[field] == null;
+    if (aMissing || bMissing) return Number(aMissing) - Number(bMissing);
+    const cmp = String(a[field]).localeCompare(String(b[field]));
+    return descending ? -cmp : cmp;
+  });
+}
+
 function buildTable(records, attrs) {
-  const fields = (attrs.fields ?? "key,value").split(",").map((f) => f.trim());
-  const rows = attrs.tag
-    ? records.filter((r) => (r.tags ?? []).includes(attrs.tag))
-    : records;
+  const fields = tableFields(attrs);
+  const labels = attrs.headers == null ? fields : splitList(attrs.headers);
+  const rows = sortRows(
+    attrs.tag
+      ? records.filter((r) => (r.tags ?? []).includes(attrs.tag))
+      : records,
+    attrs.sort,
+  );
   if (rows.length === 0) return null;
-  const header = `| ${fields.join(" | ")} |`;
+  const header = `| ${labels.map(escapeCell).join(" | ")} |`;
   const divider = `| ${fields.map(() => "---").join(" | ")} |`;
   const body = rows.map(
     (r) => `| ${fields.map((f) => escapeCell(r[f])).join(" | ")} |`,
@@ -39,6 +67,15 @@ export function renderText(text, records) {
       } else {
         out += String(record.display ?? record.value);
       }
+    } else if (
+      block.attrs.headers != null &&
+      splitList(block.attrs.headers).length !== tableFields(block.attrs).length
+    ) {
+      issues.push({
+        rule: "render-headers-mismatch",
+        message: `headers has ${splitList(block.attrs.headers).length} label(s) but fields has ${tableFields(block.attrs).length}`,
+      });
+      out += block.content;
     } else {
       const table = buildTable(records, block.attrs);
       if (table === null) {
@@ -57,4 +94,45 @@ export function renderText(text, records) {
   }
   out += text.slice(cursor);
   return { text: out, issues };
+}
+
+// Formatter-stable comparison form (finding F9). Markdown formatters such as
+// Prettier pad table cells to column width, stretch divider dashes to match,
+// and add a blank line after a corpus:table opener and before its closer.
+// Inside each terminated table block this: drops leading/trailing blank lines,
+// trims whitespace around every cell, and writes divider cells as `---`
+// (keeping alignment colons). Cell text, row order, row count, header labels,
+// interior blank lines and everything outside table blocks are left exact.
+function normaliseRow(line) {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("|")) return line;
+  const cells = trimmed
+    .replace(/^\|/, "")
+    .replace(/(?<!\\)\|$/, "")
+    .split(/(?<!\\)\|/)
+    .map((c) => c.trim());
+  const isDivider = cells.every((c) => /^:?-+:?$/.test(c));
+  const out = isDivider
+    ? cells.map((c) => c.replace(/-+/, "---"))
+    : cells;
+  return `| ${out.join(" | ")} |`;
+}
+
+function normaliseTableContent(content) {
+  const lines = content.split("\n");
+  while (lines.length && lines[0].trim() === "") lines.shift();
+  while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+  return lines.map(normaliseRow).join("\n");
+}
+
+export function normaliseForComparison(text) {
+  let out = "";
+  let cursor = 0;
+  for (const block of findBlocks(text)) {
+    if (block.unterminated || block.kind !== "table") continue;
+    out += text.slice(cursor, block.contentStart);
+    out += normaliseTableContent(block.content);
+    cursor = block.contentStart + block.content.length;
+  }
+  return out + text.slice(cursor);
 }

@@ -118,3 +118,72 @@ test("table block is idempotent", () => {
   const once = renderText(src, records).text;
   assert.equal(renderText(once, records).text, once);
 });
+
+// --- headers= (finding F8) ---
+
+test("headers= labels replace field names in the header row", () => {
+  const src =
+    '<!-- corpus:table fields=key,display,value headers="Record key,Shown as,Raw value" tag=frontier -->\nold\n<!-- /corpus:table -->';
+  const { text, issues } = renderText(src, records);
+  assert.deepEqual(issues, []);
+  assert.equal(text.includes("| Record key | Shown as | Raw value |"), true);
+  assert.equal(text.includes("| key | display | value |"), false);
+  assert.equal(text.includes("| --- | --- | --- |"), true);
+  assert.equal(text.includes("| m.context | 200K | 200000 |"), true);
+});
+
+test("absent headers= keeps field names as header cells", () => {
+  const src =
+    "<!-- corpus:table fields=key,value tag=frontier -->\nold\n<!-- /corpus:table -->";
+  const { text } = renderText(src, records);
+  assert.equal(text.includes("| key | value |"), true);
+});
+
+test("headers= count mismatch raises render-headers-mismatch and preserves content", () => {
+  const src =
+    '<!-- corpus:table fields=key,display,value headers="Record key,Shown as" tag=frontier -->\nold\n<!-- /corpus:table -->';
+  const { text, issues } = renderText(src, records);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "render-headers-mismatch");
+  assert.equal(text, src);
+});
+
+test("header labels are escaped like cells", () => {
+  const src =
+    '<!-- corpus:table fields=key,value headers="Key,In|Out" tag=frontier -->\nold\n<!-- /corpus:table -->';
+  const { text } = renderText(src, records);
+  assert.equal(text.includes("| Key | In\\|Out |"), true);
+});
+
+// --- sort= (finding F16) ---
+
+const sortRecords = [
+  { key: "k1", name: "Bravo", tags: ["s"] },
+  { key: "k2", name: "Alpha", tags: ["s"] },
+  { key: "k3", tags: ["s"] },
+  { key: "k4", name: "Zulu", tags: ["s"] }, // sorts after the string "undefined"
+  { key: "k5", name: "Alpha", tags: ["s"] },
+].map((r) => ({ volatility: "low", source: "s", verified: "2026-09-16", ...r }));
+
+function rowKeys(sortAttr) {
+  const src = `<!-- corpus:table fields=key,name tag=s${sortAttr} -->\nold\n<!-- /corpus:table -->`;
+  const { text, issues } = renderText(src, sortRecords);
+  assert.deepEqual(issues, []);
+  return text
+    .split("\n")
+    .filter((line) => line.startsWith("| "))
+    .slice(2)
+    .map((line) => line.split(" | ")[0].slice(2));
+}
+
+test("absent sort= keeps data load order", () => {
+  assert.deepEqual(rowKeys(""), ["k1", "k2", "k3", "k4", "k5"]);
+});
+
+test("sort=field orders rows ascending, ties stable, missing field last", () => {
+  assert.deepEqual(rowKeys(" sort=name"), ["k2", "k5", "k1", "k4", "k3"]);
+});
+
+test("sort=-field orders rows descending, ties stable, missing field last", () => {
+  assert.deepEqual(rowKeys(" sort=-name"), ["k4", "k1", "k2", "k5", "k3"]);
+});
