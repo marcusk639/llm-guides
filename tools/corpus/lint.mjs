@@ -59,9 +59,27 @@ function isBoundedMatch(text, at, literal) {
   return !(before && WORD.test(before)) && !(after && WORD.test(after));
 }
 
+// URL spans are excluded from the bare-value scan so prose can link a model's
+// own page. Link TEXT (inside [ ... ]) is not a URL span and is still scanned.
+const URL_SPANS = [
+  /\]\(([^)\n]*)\)/dg, // inline link destination: ](...)
+  /<(https?:\/\/[^>\s]*)>/dg, // angle-bracket autolink
+  /(https?:\/\/[^\s)>\]]+)/dg, // bare URL, up to whitespace or ) > ]
+];
+
+function urlRanges(text) {
+  const ranges = [];
+  for (const re of URL_SPANS) {
+    for (const m of text.matchAll(re)) {
+      ranges.push(m.indices[1]);
+    }
+  }
+  return ranges;
+}
+
 export function findBareValues(text, index) {
   const { bodyOffset } = parseFrontmatter(text);
-  const ranges = coveredRanges(findBlocks(text));
+  const ranges = [...coveredRanges(findBlocks(text)), ...urlRanges(text)];
   const inBlock = (i) => ranges.some(([s, e]) => i >= s && i < e);
   const matches = [];
   for (const [literal, keys] of index) {

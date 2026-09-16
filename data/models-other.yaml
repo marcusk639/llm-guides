@@ -4,7 +4,11 @@
 #
 # Row-record design mirrors data/models.yaml: one record per model, `value` is
 # the API model id (hosted) or the Hugging Face repository id (open-weight),
-# and `lint_literals` lists every volatile string of 3+ characters in the row.
+# and `lint_fields` names every volatile field so the lint indexes its current
+# value (3+ characters). Records keep explicit `lint_literals` instead where a
+# volatile string is only a fragment of a field (phrases inside `notes`) or where
+# a field value must not be indexed on its own (Qwen3.8-27B's `parameters: 27B`,
+# which is embedded in the model id).
 #
 # Field alignment across vendors (hosted table):
 #   context_window  - only where the vendor states a context window
@@ -157,12 +161,7 @@ records:
     input_price: $0.30 / MTok
     output_price: $2.50 / MTok
     notes: Input price covers text, image, video and audio. Output price includes thinking tokens.
-    lint_literals:
-      - gemini-3.5-flash-lite
-      - 1,048,576 tokens
-      - 65,536 tokens
-      - $0.30 / MTok
-      - $2.50 / MTok
+    lint_fields: [api_id, max_input, max_output, input_price, output_price]
     volatility: high
     source: https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite
     price_source: https://ai.google.dev/gemini-api/docs/pricing
@@ -177,10 +176,7 @@ records:
     parameters: 17B (Activated), 400B (Total)
     context_length: 1M
     licence: Llama 4 Community License Agreement
-    lint_literals:
-      - meta-llama/Llama-4-Maverick-17B-128E-Instruct
-      - 17B (Activated), 400B (Total)
-      - Llama 4 Community License Agreement
+    lint_fields: [model_id, parameters, context_length, licence]
     volatility: high
     source: https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct
     verified: "2026-09-16"
@@ -193,11 +189,7 @@ records:
     parameters: 17B (Activated), 109B (Total)
     context_length: 10M
     licence: Llama 4 Community License Agreement
-    lint_literals:
-      - meta-llama/Llama-4-Scout-17B-16E-Instruct
-      - 17B (Activated), 109B (Total)
-      - 10M
-      - Llama 4 Community License Agreement
+    lint_fields: [model_id, parameters, context_length, licence]
     volatility: high
     source: https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct
     verified: "2026-09-16"
@@ -211,11 +203,7 @@ records:
     parameters: 2.4T in total and 95B activated
     context_length: 262,144 natively and extensible up to 1,010,000 tokens
     licence: Qwen3.8-Max License
-    lint_literals:
-      - Qwen/Qwen3.8-2.4T-A95B
-      - 2.4T in total and 95B activated
-      - 262,144 natively and extensible up to 1,010,000 tokens
-      - Qwen3.8-Max License
+    lint_fields: [model_id, parameters, context_length, licence]
     volatility: high
     source: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B
     verified: "2026-09-16"

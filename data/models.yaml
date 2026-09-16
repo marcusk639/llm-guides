@@ -1,8 +1,8 @@
 # Volatile values backing guides/models/claude-models.md.
 # One record per current Claude model (a table row), per controller ruling R3.
-# `value` is the Claude API ID so the record is well-formed; `lint_literals`
-# lists every volatile string in the row (>= 3 chars) so the closed-world lint
-# covers the named fields, not just `value`.
+# `value` is the Claude API ID so the record is well-formed; `lint_fields`
+# names every volatile field in the row so the closed-world lint indexes the
+# current field values (>= 3 chars), not just `value`.
 # Model facts: https://platform.claude.com/docs/en/models/overview
 # Prices:      https://platform.claude.com/docs/en/about-claude/pricing
 records:
@@ -16,12 +16,7 @@ records:
     max_output: 128K tokens
     input_price: $10 / MTok
     output_price: $50 / MTok
-    lint_literals:
-      - claude-fable-5-1
-      - 1M tokens
-      - 128K tokens
-      - $10 / MTok
-      - $50 / MTok
+    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price]
     volatility: high
     source: https://platform.claude.com/docs/en/models/overview
     price_source: https://platform.claude.com/docs/en/about-claude/pricing
@@ -37,12 +32,7 @@ records:
     max_output: 128K tokens
     input_price: $5 / MTok
     output_price: $25 / MTok
-    lint_literals:
-      - claude-opus-5
-      - 1M tokens
-      - 128K tokens
-      - $5 / MTok
-      - $25 / MTok
+    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price]
     volatility: high
     source: https://platform.claude.com/docs/en/models/overview
     price_source: https://platform.claude.com/docs/en/about-claude/pricing
@@ -57,12 +47,7 @@ records:
     max_output: 128K tokens
     input_price: $2 / MTok
     output_price: $10 / MTok
-    lint_literals:
-      - claude-sonnet-5
-      - 1M tokens
-      - 128K tokens
-      - $2 / MTok
-      - $10 / MTok
+    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price]
     volatility: high
     source: https://platform.claude.com/docs/en/models/overview
     price_source: https://platform.claude.com/docs/en/about-claude/pricing
@@ -78,13 +63,7 @@ records:
     max_output: 64K tokens
     input_price: $1 / MTok
     output_price: $5 / MTok
-    lint_literals:
-      - claude-haiku-4-5-20251001
-      - claude-haiku-4-5
-      - 200K tokens
-      - 64K tokens
-      - $1 / MTok
-      - $5 / MTok
+    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price]
     volatility: high
     source: https://platform.claude.com/docs/en/models/overview
     price_source: https://platform.claude.com/docs/en/about-claude/pricing

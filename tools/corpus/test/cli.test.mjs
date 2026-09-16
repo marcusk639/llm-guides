@@ -106,3 +106,71 @@ test("corpus render exits 1 and reports render-unknown-key for a bad reference",
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+function page(topic, body) {
+  return [
+    "---",
+    `title: ${topic} page`,
+    "summary: s",
+    `topic: ${topic}`,
+    "verified: 2026-09-16",
+    'applies_to: { api: "2026-09" }',
+    "sources: [https://example.invalid/docs]",
+    "related: []",
+    "---",
+    "",
+    body,
+    "",
+  ].join("\n");
+}
+
+test("lintCorpus applies a lint_scope record only to pages of the listed topics", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "corpus-scope-test-"));
+  try {
+    fs.mkdirSync(path.join(tmp, "data"));
+    fs.mkdirSync(path.join(tmp, "meta"));
+    fs.mkdirSync(path.join(tmp, "guides"));
+    fs.writeFileSync(
+      path.join(tmp, "data", "hooks.yaml"),
+      [
+        "records:",
+        "  - key: hooks.timeout",
+        '    value: "thirty seconds"',
+        "    lint_scope: [claude-code]",
+        "    volatility: low",
+        "    source: https://example.invalid/docs",
+        '    verified: "2026-09-16"',
+        "  - key: global.id",
+        '    value: "global-model-id"',
+        "    volatility: low",
+        "    source: https://example.invalid/docs",
+        '    verified: "2026-09-16"',
+        "",
+      ].join("\n"),
+    );
+    fs.writeFileSync(
+      path.join(tmp, "meta", "taxonomy.yaml"),
+      "topics: [claude-code, models]\n",
+    );
+    const body = "It waits thirty seconds and calls global-model-id.";
+    fs.writeFileSync(path.join(tmp, "guides", "hooks.md"), page("claude-code", body));
+    fs.writeFileSync(path.join(tmp, "guides", "models.md"), page("models", body));
+
+    const issues = lintCorpus(tmp, "2026-09-20");
+    const bare = (file) =>
+      issues
+        .filter((i) => i.path.endsWith(file) && i.rule === "bare-value")
+        .map((i) => i.message);
+    assert.equal(issues.every((i) => i.rule === "bare-value"), true, JSON.stringify(issues));
+
+    const onTopic = bare("hooks.md");
+    assert.equal(onTopic.length, 2);
+    assert.equal(onTopic.some((m) => /hooks\.timeout/.test(m)), true);
+
+    const offTopic = bare("models.md");
+    assert.equal(offTopic.length, 1);
+    assert.match(offTopic[0], /global\.id/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

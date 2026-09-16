@@ -5,7 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import yaml from "js-yaml";
 import { parseFrontmatter } from "./frontmatter.mjs";
-import { loadRecords, literalIndex } from "./data.mjs";
+import { loadRecords, literalIndexForTopic } from "./data.mjs";
 import { validateFrontmatter, findBareValues, checkExpiry } from "./lint.mjs";
 import { renderText } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
@@ -42,7 +42,13 @@ export function lintCorpus(
   today = new Date().toISOString().slice(0, 10),
 ) {
   const records = loadRecords(path.join(root, "data"));
-  const index = literalIndex(records);
+  const indexByTopic = new Map();
+  const indexFor = (topic) => {
+    const k = typeof topic === "string" ? topic : null;
+    if (!indexByTopic.has(k))
+      indexByTopic.set(k, literalIndexForTopic(records, k));
+    return indexByTopic.get(k);
+  };
   const topics = loadTopics(root);
   const issues = [];
   for (const file of guidePaths(root)) {
@@ -51,7 +57,7 @@ export function lintCorpus(
     const rel = path.relative(root, file);
     for (const i of validateFrontmatter(data, topics))
       issues.push({ ...i, path: rel });
-    for (const i of findBareValues(text, index))
+    for (const i of findBareValues(text, indexFor(data?.topic)))
       issues.push({ ...i, path: rel });
     for (const block of findBlocks(text)) {
       if (!block.unterminated) continue;

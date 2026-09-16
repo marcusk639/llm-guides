@@ -72,3 +72,69 @@ test("still flags a value followed by '-' or '.' since those are not word charac
     "---\ntitle: t\n---\na 200K-token context. The window is 200K.\n";
   assert.equal(findBareValues(text, overlappingIndex).length, 2);
 });
+
+const urlIndex = new Map([["claude-opus-5", ["anthropic.models.opus-5"]]]);
+const doc = (body) => `---\ntitle: t\n---\n${body}\n`;
+
+test("does not flag a known literal inside a Markdown inline link destination", () => {
+  const text = doc("See [the model page](https://docs.example.invalid/models/claude-opus-5).");
+  assert.deepEqual(findBareValues(text, urlIndex), []);
+});
+
+test("does not flag a known literal inside a link destination that carries a title", () => {
+  const text = doc('See [the page](/models/claude-opus-5 "Model page").');
+  assert.deepEqual(findBareValues(text, urlIndex), []);
+});
+
+test("does not flag a known literal inside an angle-bracket autolink", () => {
+  for (const scheme of ["http", "https"]) {
+    const text = doc(`Docs: <${scheme}://docs.example.invalid/claude-opus-5>.`);
+    assert.deepEqual(findBareValues(text, urlIndex), [], scheme);
+  }
+});
+
+test("an autolink covers its whole URL, including ) and ] that end a bare URL", () => {
+  const text = doc("Docs: <https://wiki.example.invalid/Model_(opus)/claude-opus-5>.");
+  assert.deepEqual(findBareValues(text, urlIndex), []);
+});
+
+test("does not flag a known literal inside a bare URL", () => {
+  for (const url of [
+    "http://docs.example.invalid/claude-opus-5",
+    "https://docs.example.invalid/claude-opus-5?tab=pricing",
+    "https://docs.example.invalid/m/claude-opus-5/overview",
+  ]) {
+    assert.deepEqual(findBareValues(doc(`Docs live at ${url} today.`), urlIndex), [], url);
+  }
+});
+
+test("still flags a known literal in the link text", () => {
+  const issues = findBareValues(
+    doc("See [claude-opus-5](https://docs.example.invalid/models/claude-opus-5)."),
+    urlIndex,
+  );
+  assert.equal(issues.length, 1);
+  assert.match(issues[0].message, /anthropic\.models\.opus-5/);
+});
+
+test("still flags a known literal in prose right after a URL", () => {
+  for (const body of [
+    "At https://docs.example.invalid/x claude-opus-5 is listed.",
+    "(see https://docs.example.invalid/x)claude-opus-5 is listed.",
+    "[docs](https://docs.example.invalid/x) claude-opus-5 is listed.",
+    "<https://docs.example.invalid/x> claude-opus-5 is listed.",
+    "[https://docs.example.invalid/x]claude-opus-5 is listed.",
+  ]) {
+    assert.equal(findBareValues(doc(body), urlIndex).length, 1, body);
+  }
+});
+
+test("a URL-like word without a scheme is still scanned", () => {
+  const text = doc("Call docs.example.invalid/claude-opus-5 directly.");
+  assert.equal(findBareValues(text, urlIndex).length, 1);
+});
+
+test("a '](' with no ')' on the same line does not hide later prose", () => {
+  const text = doc("Index with arr[i](\nthen claude-opus-5 is listed (really).");
+  assert.equal(findBareValues(text, urlIndex).length, 1);
+});
