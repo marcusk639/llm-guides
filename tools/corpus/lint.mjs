@@ -1,5 +1,6 @@
 import { parseFrontmatter } from "./frontmatter.mjs";
 import { findBlocks, coveredRanges } from "./markers.mjs";
+import { CADENCE_DAYS, addDays } from "./ledger.mjs";
 
 export const REQUIRED_FIELDS = [
   "title",
@@ -94,4 +95,21 @@ export function findBareValues(text, index) {
       line: text.slice(0, m.start).split("\n").length,
     }))
     .sort((a, b) => a.line - b.line);
+}
+
+export function checkExpiry(entry, today) {
+  if (entry.status === "deprecated") return [];
+  const hardFail = addDays(
+    entry.expires,
+    CADENCE_DAYS[entry.volatility ?? "low"],
+  );
+  if (today > hardFail) {
+    return [
+      {
+        rule: "expired",
+        message: `${entry.path} expired ${entry.expires} and is more than one full cadence overdue; refresh it or mark status: deprecated`,
+      },
+    ];
+  }
+  return [];
 }
