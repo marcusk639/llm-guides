@@ -1,19 +1,23 @@
 ---
 title: LLM Corpus — Foundation Design
 date: 2026-09-16
+revision: 2
 status: approved
 scope: sub-project 1 of 5 (corpus foundation)
 ---
 
 # LLM Corpus — Foundation Design
 
+> Revision 2 follows an adversarial review of revision 1. The diagnosis and the
+> fact/prose separation survived; the enforcement mechanism did not and has been
+> redesigned. See "Revision history" at the end for what changed and why.
+
 ## Purpose
 
 Establish the structural contract for a long-lived reference corpus on effective LLM
 use: how a document is shaped, how a claim earns its confidence level, where volatile
 facts live, and how staleness is detected. Content breadth and the authoring toolchain
-are deliberately out of scope here — they depend on this contract and get their own
-specs.
+are out of scope here — they depend on this contract and get their own specs.
 
 ## Context and constraints
 
@@ -22,24 +26,27 @@ API parameters, CLI flags, and SDK signatures change on a timescale of weeks. A
 wrong-but-plausible number is worse than no number. Every decision below follows from
 that single hazard.
 
+Maintenance reality: one person, working through Claude Code sessions, with no team. Any
+mechanism requiring sustained manual effort will be abandoned within months and leave the
+corpus worse than if it never existed. Mechanisms are therefore judged on whether they
+survive neglect, not on whether they are thorough.
+
 Decisions already settled with the project owner:
 
-| Decision | Choice |
-| --- | --- |
-| Coverage model | Claude-first depth, plus a documented recipe for expanding to other models and domains on demand. Exhaustiveness lives in the recipe, not in pre-written pages. |
-| Primary consumer | Human practitioner first; structured front-matter makes pages agent-consumable as a side effect. |
-| Freshness mechanism | Generated freshness ledger, scheduled audit, and a refresh skill accepting a topic, directory, file, or single data key. |
-| Authoring | A research-then-draft-then-verify pipeline, seeded by harvesting existing session history and memory, with parallel cluster runs for breadth. |
-| Distribution | Eventually a published static site; sequenced as a separate sub-project downstream of this contract. |
-| Tiering | Beginner/intermediate/advanced expressed as laddered sections within one document per topic. |
-| Foundation approach | Seed exemplar documents first, then codify the contract from what worked. Harvested session evidence is an input, not the organizing principle. |
+| Decision            | Choice                                                                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Coverage model      | Claude-first depth, plus a documented recipe for expanding to other models and domains on demand. Exhaustiveness lives in the recipe, not in pre-written pages. |
+| Primary consumer    | Human practitioner first; structured front-matter makes pages agent-consumable as a side effect.                                                                |
+| Freshness mechanism | Generated freshness ledger, scheduled audit, and a refresh skill accepting a topic, directory, file, or single data key.                                        |
+| Authoring           | A research-then-draft-then-verify pipeline, with harvested session history as a gap-finding input.                                                              |
+| Distribution        | Eventually a published static site; sequenced as a separate sub-project downstream of this contract.                                                            |
+| Tiering             | Beginner/intermediate/advanced expressed as laddered sections within one document per topic.                                                                    |
+| Foundation approach | Seed exemplar documents first, then codify the contract from what worked.                                                                                       |
 
 ## Decomposition
 
-This corpus is too large for one spec. Five sub-projects:
-
 1. **Corpus foundation** — this document.
-2. **Authoring and refresh toolchain** — harvest, research prompt library, write-guide, verify gate, refresh.
+2. **Authoring and refresh toolchain** — harvest, research prompt library, write-guide, verify gate, refresh, scheduled audit.
 3. **Claude spine content** — the deep Claude, Claude Code, Cowork, and agentic-engineering core.
 4. **Expansion** — cross-model comparison, Codex and other harnesses, domain playbooks.
 5. **Static site** — renders front-matter, freshness banners, tier navigation, search.
@@ -49,73 +56,127 @@ This corpus is too large for one spec. Five sub-projects:
 ### Directory layout
 
 - `guides/` — prose, organized by topic.
-- `data/` — volatile facts as structured YAML records, one per claim.
+- `data/` — volatile values as structured YAML records, one per fact.
 - `research/` — raw research output per topic, dated. The grounding layer.
 - `examples/` — runnable artifacts: teaching examples and proofs, distinguished by a manifest field.
 - `meta/` — taxonomy, generated freshness ledger, research prompt library.
+- `local/` — gitignored. Harvest output and anything derived from session transcripts.
 
-This supersedes the current convention of root-level topic directories. Data, research,
-and meta are peers of the content, not topics within it.
+This supersedes the current convention of root-level topic directories.
+
+**Root-level tooling decision.** The inherited instruction file states there are
+deliberately no repo-wide build, lint, or test commands, and requires an explicit ask
+before adding root-level tooling. This spec makes that ask and answers it: a corpus-wide
+lint, renderer, and ledger generator are required, because the freshness guarantee is a
+property of the corpus rather than of any single document. Individual examples keep their
+own self-contained manifests and remain independently runnable; the root tool orchestrates
+them but does not replace them.
 
 ### Topic map
 
 Under `guides/`: foundations, prompting, context, agents, claude-code, cowork, harness,
 models, tools, building, domains.
 
-`claude-code` is intentionally the largest (skills, hooks, subagents, slash commands,
-MCP, settings, plugins, worktrees, instruction files). `harness` carries guardrails,
-long-running automation, trust, and observability. `domains` ships with one exemplar
-playbook and the generation recipe rather than many thin pages.
+`claude-code` is intentionally the largest. `harness` carries guardrails, long-running
+automation, trust, and observability. `domains` ships with one exemplar playbook and the
+generation recipe rather than many thin pages.
 
-### The central rule: volatile facts never live in prose
+## The central rule, restated
 
-A volatile fact is a model id, price, rate or context limit, parameter name or default,
-CLI flag, or feature-availability statement.
+Revision 1 said "volatile facts never live in prose" and defined volatile to include
+parameter names. That rule is both unenforceable and wrong: you cannot write a guide
+about hooks without naming the hook events. The rule now distinguishes two kinds of
+volatile fact.
 
-Each such fact is a record in `data/` carrying its own source URL and verification date.
-Prose pulls records in through a regenerable marker block, so a document still reads
-correctly as standalone Markdown while remaining mechanically refreshable.
+**Identifiers** — names you must say in order to discuss the subject at all: hook event
+names, tool names, parameter names, flag names, skill names, file names.
 
-This yields a lintable invariant:
+- Allowed freely in prose. No marker block, no data record.
+- Governed by `applies_to` at the document level: the page states which product version
+  it describes, and identifier drift is handled by refreshing the page against that
+  version, not by tracking each name individually.
 
-> A bare volatile number in prose is an error unless it sits inside a marker block or
-> carries an inline verification date and source link.
+**Values** — data a reader would copy into their own configuration, or budget against:
+model ids, prices, context and rate limits, parameter defaults, availability dates.
 
-The payoff is that refresh operates mostly on small, reviewable data diffs rather than
-asking a model to rewrite paragraphs, where a silent regression is easy to miss.
+- Must exist as a record in `data/`, carrying its source URL, verification date, and
+  `volatility` (low/medium/high). Record-level volatility is the single source of
+  truth from which page cadence is derived.
+- May appear in prose only inside a marker block.
+
+The test: _would a reader paste this into their own config or spreadsheet?_ If yes, it is
+a value. If it is only the name of the thing being discussed, it is an identifier.
+
+### Making the lint decidable
+
+Revision 1's lint tried to detect volatile numbers semantically, which is not
+mechanically possible — no rule separates a context limit from an HTTP status code, an
+RFC number, or "three evidence labels."
+
+The lint is therefore **closed-world**: it does not attempt to recognize volatile values
+in the abstract. It checks prose against the values the corpus _already knows about_ —
+every value string in `data/` — and flags any occurrence outside a marker block. This is
+lexical, decidable, and produces no false positives on ordinary numbers.
+
+Catching values the corpus does _not_ yet know about is a semantic problem, and is
+assigned to the Verify stage, where model judgment belongs. Division of labor:
+
+- **Lint** — mechanical, closed-world, zero false positives, runs on every change.
+- **Verify** — semantic, open-world, runs when a document is authored or refreshed.
+
+This is the load-bearing correction in revision 2. It makes the invariant enforceable
+without the suppression comments that would otherwise kill it.
+
+### Marker blocks and code
+
+Marker comments sit _outside_ fenced code blocks, so a generated region may contain a
+complete fence, fences and all. The renderer replaces everything between the markers.
+
+This resolves revision 1's contradiction, in which every page was required to carry a
+runnable example while runnable examples necessarily contain values. A snippet containing
+a model id is generated into the page from its data record like any other value-bearing
+region.
+
+A code block outside a marker block must contain no known values, or the lint fails it.
 
 ## The document contract
 
 ### Front-matter
 
-Required on every guide and enforced by lint: `title`, `summary`, `topic`,
-`volatility` (low/medium/high), `verified` (date), `applies_to` (version
-applicability), `sources`, `research` (pointer to the grounding artifact), `related`.
+Required and lint-enforced: `title`, `summary`, `topic`, `verified` (date), `applies_to`
+(version applicability), `sources`, `related`.
+
+Optional: `research` (pointer to the grounding artifact) — required once the research
+stage exists, omitted on hand-authored seeds; `seed: true` marks a document authored
+before the pipeline existed.
+
+**`volatility` is not a front-matter field.** Volatility is a property of a claim, not a
+page. Revision 1 declared it per document, which both duplicated and could contradict the
+per-record dates the ledger is built from. Page-level volatility is now _derived_ as the
+maximum volatility of the records the page references, so there is exactly one source of
+truth.
 
 ### Page template
 
-One document per topic, laddered so a beginner stops early and an expert skims to the
-bottom:
-
 1. **What this covers / who it's for** — two lines.
-2. **The 60-second version** — one concrete example that runs. Beginner rung, placed
-   before any theory.
+2. **The 60-second version** — one concrete example that runs. Beginner rung, before theory.
 3. **How it actually works** — mechanics and the mental model.
 4. **Patterns that hold up** — recipes, each carrying an evidence label.
 5. **Edge cases and failure modes** — advanced rung.
-6. **Where this rots** — which claims are volatile, which data records back them, what
-   to re-check. Makes the freshness contract legible to the reader and gives refresh a
-   precise target.
+6. **Where this rots** — which claims are volatile, which records back them, what to re-check.
 7. **Proofs** — optional; present only where claims are backed by a runnable proof.
 8. **Sources**
 
 ### Evidence labels
 
-- **Verified** — reproduced in a real session or established by a passing proof, with
-  the evidence cited.
+- **Verified** — established by a passing proof that ships with the corpus.
 - **Documented** — vendor-stated in canonical documentation, with link and date.
 - **Plausible** — community-reported, anecdotal, or inferred. Flagged as such; never
   written as confident prose.
+
+**Public labels require public evidence.** A claim may only carry a label a reader can
+check. This is why harvested session history cannot itself be a citation (see Harvest,
+below).
 
 ### Source tiers
 
@@ -123,12 +184,12 @@ Research is breadth-first and latest-biased. Obscure sources are explicitly in s
 because valuable practice often appears in a gist or forum thread long before any vendor
 documents it. Tiering governs not what may be read but what a claim may become.
 
-| Tier | Source | Ceiling without a proof |
-| --- | --- | --- |
-| 1 | Vendor canonical documentation | Documented |
-| 2 | Papers, changelogs, official cookbooks, engineering blogs | Documented |
-| 3 | Reputable practitioners, talks, well-documented open source | Plausible |
-| 4 | Gists, forums, threads, one-off repositories | Plausible |
+| Tier | Source                                                      | Ceiling without a proof |
+| ---- | ----------------------------------------------------------- | ----------------------- |
+| 1    | Vendor canonical documentation                              | Documented              |
+| 2    | Papers, changelogs, official cookbooks, engineering blogs   | Documented              |
+| 3    | Reputable practitioners, talks, well-documented open source | Plausible               |
+| 4    | Gists, forums, threads, one-off repositories                | Plausible               |
 
 Tier 1 reaches Documented, never Verified. Vendor documentation lags the product and is
 sometimes wrong. No claim earns Verified merely by being written down.
@@ -139,74 +200,160 @@ A proof is the smallest runnable program that could falsify one claim. Its manif
 records the claim, its origin, its source tier, the command, the passing condition, and
 the last run's result and date.
 
-Proofs serve two purposes:
-
-1. **Promotion** — a tier-3 or tier-4 claim enters as Plausible and can be elevated to
+1. **Promotion** — a tier-3 or tier-4 claim enters as Plausible and is elevated to
    Verified by a passing proof, which is then cited in place of the original source.
 2. **Executable freshness** — re-running a proof is deterministic and free of model
-   judgment. It answers "does this still hold?" more reliably than re-reading
-   documentation. Refresh therefore re-runs proofs for a target, re-stamps the ones that
-   still pass, and escalates only failures for human attention.
+   judgment. Refresh re-runs proofs for a target, re-stamps those that still pass, and
+   escalates only failures.
 
-Examples and proofs share one tree and are distinguished by a manifest field: examples
-teach a reader how to do something; proofs establish whether a claim is true.
+**Known limitation, accepted.** Proofs cover claims about mechanism — a flag exists, a
+hook fires, an API rejects an input. They do not cover the corpus's most valuable claims,
+which are comparative and qualitative: that a prompting pattern produces better results,
+that a context strategy scales, that one model is stronger at a task than another. Those
+claims stay at Documented or Plausible indefinitely, and the corpus should say so plainly
+rather than manufacture false confidence. The promotion loop is expected to fire on a
+minority of claims; it is worth having for that minority because those are exactly the
+claims a reader would otherwise have to test themselves.
 
 ### Freshness ledger
 
-Generated, never hand-maintained. Rebuilt from front-matter verification dates and
-volatility plus data-record dates, so there is no second source of truth to drift.
-Cadence by volatility: high 30 days, medium 90 days, low 270 days.
+Generated, never hand-maintained. Rebuilt from front-matter verification dates and data
+record dates. Cadence by derived volatility: high 30 days, medium 90 days, low 270 days —
+**initial guesses, to be tuned once real refresh cycles produce evidence.**
+
+**Consumers of the ledger**, without which it is a file that rots:
+
+1. The scheduled audit (sub-project 2) reads it to decide what to re-verify.
+2. The static site (sub-project 5) renders per-page freshness banners from it.
+3. The lint fails the build if any page is more than one full cadence past expiry, which
+   forces expired content to be either refreshed or explicitly deprecated.
+
+**Deprecation path.** A document that cannot be refreshed — the product changed beyond
+recognition, the practice is obsolete — is marked `status: deprecated` with a one-line
+reason and a pointer to its replacement. Deprecated pages stay readable, are excluded
+from the ledger, and are never silently deleted.
 
 ## Pipeline (specified here, built in sub-project 2)
 
-1. **Harvest** — mine installed skills and agents, session transcripts, memory stores,
-   and prior wiki state into a per-topic evidence inventory plus a gap list. The only
-   stage that can license a Verified label from observation.
+1. **Harvest** — mines installed skills and agents, session transcripts, and memory
+   stores into a per-topic gap list: what the corpus should cover, and which claims are
+   worth building a proof for.
+
+   **Harvest is local-only and never a citation.** Its output is written to the
+   gitignored `local/` tree and never committed. Session transcripts span healthcare,
+   firm-confidential, and veterans'-claims work; running them toward a public site is a
+   disclosure risk, and evidence a reader cannot inspect cannot support a public label
+   anyway. Harvest therefore _points at what to prove_ — it does not itself license a
+   Verified label. Anything it surfaces that is worth publishing must be re-established
+   by a proof or a citable source.
+
 2. **Research** — engineered prompts driving the dynamic-workflow deep-research skill,
-   one run per topic. Prompts are per-archetype, not per-topic: tool reference, concept
-   or technique, model facts, comparison, domain playbook. Each template specifies
-   preferred and distrusted sources, citation format, an instruction to surface
-   contradictions between sources rather than silently resolving them, and a mandate to
-   flag uncertainty. Each run returns two artifacts: a narrative synthesis and a
-   separate structured block of volatile facts already shaped as data records.
-3. **Write** — drafts against the page template using the harvest inventory and research
-   artifact, routing volatile facts into data records and leaving marker blocks in prose.
-4. **Verify** — an adversarial gate that can block a draft. Confirms every volatile
-   claim carries source and date; every evidence label is justified by actual
-   provenance; no bare volatile numbers sit outside marker blocks; tier-3 and tier-4
-   claims have not been laundered into confident prose; contradictions are surfaced
-   rather than hidden; no Verified label lacks harvested evidence or a passing proof;
-   every snippet either runs or is promoted to a runnable artifact.
+   one run per topic. Prompts are per-archetype: tool reference, concept or technique,
+   model facts, comparison, domain playbook. Each template specifies preferred and
+   distrusted sources, citation format, an instruction to surface contradictions between
+   sources rather than silently resolving them, and a mandate to flag uncertainty. Each
+   run returns two artifacts: a narrative synthesis, and a structured block of values
+   already shaped as data records.
+
+3. **Write** — drafts against the page template, routing values into data records and
+   leaving marker blocks in prose.
+
+4. **Verify** — an adversarial gate that can block a draft. Confirms: every value carries
+   source and date; every evidence label is justified by actual provenance; **no value
+   the corpus does not yet track has been written bare into prose** (the open-world half
+   of the lint); tier-3 and tier-4 claims have not been laundered into confident prose;
+   contradictions are surfaced rather than hidden; no Verified label lacks a passing
+   proof; **no content derived from private transcripts has entered a publishable
+   document**; every snippet either runs or is promoted to a runnable artifact.
+
 5. **Refresh** — accepts a topic, directory, file, or single data key. Re-runs proofs
    first, then re-verifies remaining expiring claims against recorded sources, producing
    a reviewable diff. Regenerates the ledger afterward.
 
 ## Deliverables for this sub-project
 
-**Phase 1a — Seeds.** Four exemplar guides spanning volatility profiles: one evergreen
-concept guide, one high-volatility model-facts page, one Claude Code tool reference, one
-domain playbook. Plus one proof carried end to end, demonstrating the promotion loop
-rather than assuming it.
+**Phase 1a — Provisional contract.** Rewrite the corpus instruction file _first_, marked
+provisional, so that every session working in phases 1b onward is bound by this spec
+rather than by the superseded conventions. Create the directory skeleton.
 
-**Phase 1b — Codify.** Lock the front-matter schema, page template, evidence-label and
-source-tier policy, data-record schema, marker-block convention, proof manifest, and
-ledger rule — amended by whatever the seeds proved wrong.
+_Done when:_ the instruction file describes the layout, the identifier/value split, the
+template, and the labels; and a session started cold follows it without being handed this
+spec.
 
-**Phase 1c — Enforce.** Two small scripts with tests: the lint and the ledger generator.
-Then rewrite the corpus instruction file so every convention above binds future sessions.
+**Phase 1b — Seeds.** Five exemplar guides, one per research archetype, chosen to span
+volatility profiles: an evergreen concept guide, a high-volatility model-facts page, a
+Claude Code tool reference, a domain playbook, and a cross-model comparison. The
+comparison seed is included specifically because it is the hardest and most volatile
+archetype, and revision 1 would have left it unvalidated until sub-project 4. Plus one
+proof carried end to end, demonstrating the promotion loop.
+
+_Done when:_ five documents exist under the provisional contract, each with a populated
+"Where this rots" section; every value in them has a data record; and the one proof runs
+and passes from a clean checkout.
+
+**Phase 1c — Codify.** Amend the contract with whatever the seeds proved wrong. Lock the
+front-matter schema, page template, label and tier policy, data-record schema,
+marker-block convention, proof manifest, and ledger rule.
+
+_Done when:_ every amendment is recorded with the seed that motivated it.
+
+**Phase 1d — Enforce.** One small CLI with three commands — `render` (expand marker
+blocks), `lint` (closed-world value check, front-matter validation, expiry check), and
+`ledger` (regenerate) — each with tests. The renderer is listed first because revision 1
+omitted it entirely while making it load-bearing.
+
+_Done when:_ all three commands run clean on the five seeds, and the test suite covers at
+least one deliberate violation of each lint rule.
+
+**Phase 1e — Reconcile.** Fix the seeds against the now-enforced contract. This phase
+exists because the lint is guaranteed to find violations in documents written before it,
+and revision 1 left that work unlisted.
+
+_Done when:_ the full tool runs clean, and the instruction file loses its provisional
+marker.
 
 ## Non-goals
 
-No static site. No pipeline skills. No breadth. The toolchain is built in sub-project 2
-against a contract that four real documents have already stress-tested.
+No static site. No pipeline skills. No breadth beyond the five seeds. The toolchain is
+built in sub-project 2 against a contract that five real documents have stress-tested.
 
 ## Risks
 
-- **The contract is wrong in ways four seeds do not reveal.** Mitigated by treating
-  phase 1b as an amendment step rather than a formality, and by keeping the lint rules
-  few enough to change cheaply.
+- **The contract is wrong in ways five seeds do not reveal.** Mitigated by treating 1c as
+  a genuine amendment step and keeping lint rules few enough to change cheaply.
+- **The promotion loop rarely fires**, because most valuable claims are not mechanically
+  provable. Accepted and documented above rather than mitigated.
 - **Proof maintenance becomes its own burden.** Mitigated by keeping each proof minimal
-  and single-claim, and by the fact that a failing proof is itself the signal worth
-  having.
-- **Marker blocks degrade readability on plain Markdown hosts.** Mitigated by generating
-  real tables into the document body so the file reads correctly with no tooling.
+  and single-claim; a failing proof is itself the signal worth having.
+- **The closed-world lint misses values the corpus has never seen.** This is by design;
+  the open-world half is Verify's job, and it is model judgment rather than a guarantee.
+
+## Open questions
+
+- What runs the scheduled audit — a cron'd cloud session, a local loop, or manual
+  invocation? Decided in sub-project 2; it determines whether the freshness machinery is
+  real or decorative.
+- Does the identifier/value split hold for pricing tables and model-capability matrices,
+  where nearly every cell is a value and the prose is scaffolding? The comparison seed in
+  1b exists to answer this.
+
+## Revision history
+
+**Revision 2** — after adversarial review. Changes, each tied to a defect in revision 1:
+
+| Change                                                                  | Defect it fixes                                                                                                |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Identifier/value split replaces "volatile facts never live in prose"    | Old rule forbade naming hook events; unenforceable and wrong                                                   |
+| Closed-world lint against known data values                             | Old lint required semantic detection of volatility, not mechanically decidable                                 |
+| Marker comments sit outside fenced code                                 | Old spec required a runnable example on every page while forbidding the values one contains                    |
+| Renderer added as a first-class deliverable                             | Old spec made marker blocks load-bearing and shipped no generator                                              |
+| Harvest demoted to gap-finder; local-only, gitignored; never a citation | Old spec ran private healthcare/CPA/veterans transcripts toward a public site with no redaction stage          |
+| Public labels require public evidence                                   | A Verified label citing a private transcript is uncitable in public                                            |
+| `volatility` derived, not declared                                      | Page-level field duplicated and could contradict per-record dates                                              |
+| Instruction-file rewrite moved to phase 1a                              | It is the only artifact binding future sessions; writing it last left sessions bound by superseded conventions |
+| Root-level tooling decision made explicitly                             | Inherited instruction file requires an explicit ask before adding it                                           |
+| Fifth seed: cross-model comparison                                      | Hardest, most volatile archetype was otherwise unvalidated until sub-project 4                                 |
+| Phase 1e (reconcile) added; acceptance criteria per phase               | Lint written after seeds will fail them; that work was unlisted, and "done" was undefined                      |
+| Ledger consumers and deprecation path defined                           | A generated ledger with no consumer rots; un-refreshable docs had no end state                                 |
+| Proof coverage limitation stated plainly                                | Promotion loop was presented as general when it applies to a minority of claims                                |
+| Cadence numbers marked provisional                                      | A spec whose thesis is "never write a number from memory" asserted three unsourced ones                        |
