@@ -1,4 +1,5 @@
 const OPEN = /<!--\s*corpus:(data|table)\s+([\s\S]*?)-->/g;
+const ANY_OPEN = /<!--\s*corpus:(data|table)\s/g;
 
 export function parseAttrs(source) {
   const attrs = {};
@@ -17,7 +18,13 @@ export function findBlocks(text) {
     const close = `<!-- /corpus:${kind} -->`;
     const contentStart = m.index + m[0].length;
     const closeIndex = text.indexOf(close, contentStart);
-    if (closeIndex === -1) {
+
+    const nextOpenRe = new RegExp(ANY_OPEN.source, "g");
+    nextOpenRe.lastIndex = contentStart;
+    const nextOpenMatch = nextOpenRe.exec(text);
+    const nextOpenIndex = nextOpenMatch ? nextOpenMatch.index : -1;
+
+    if (closeIndex === -1 || (nextOpenIndex !== -1 && nextOpenIndex < closeIndex)) {
       blocks.push({
         kind,
         attrs: parseAttrs(m[2]),
