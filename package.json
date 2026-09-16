@@ -7,7 +7,7 @@
     "corpus": "./tools/corpus/cli.mjs"
   },
   "scripts": {
-    "test": "node --test tools/corpus/test/",
+    "test": "node --test \"tools/corpus/test/**/*.test.mjs\"",
     "lint": "node tools/corpus/cli.mjs lint",
     "render": "node tools/corpus/cli.mjs render",
     "ledger": "node tools/corpus/cli.mjs ledger"
