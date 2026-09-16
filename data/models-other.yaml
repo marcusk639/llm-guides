@@ -1,0 +1,238 @@
+# Volatile values backing guides/models/comparison.md (non-Anthropic rows).
+# Claude rows are NOT duplicated here: they live in data/models.yaml and join
+# the hosted table through the `comparison-hosted` tag (controller ruling R3).
+#
+# Row-record design mirrors data/models.yaml: one record per model, `value` is
+# the API model id (hosted) or the Hugging Face repository id (open-weight),
+# and `lint_literals` lists every volatile string of 3+ characters in the row.
+#
+# Field alignment across vendors (hosted table):
+#   context_window  - only where the vendor states a context window
+#   max_input       - only where the vendor states an input limit
+#   max_output      - the vendor's stated output limit
+#   input_price / output_price - base paid rate, USD per million tokens
+#   notes           - pricing tiers or status that change how to read the row
+# Cells are left blank when the vendor page does not state the value.
+#
+# Prices are rewritten into one unit form ("$N / MTok" = USD per million
+# tokens) so rows line up; token counts keep each vendor's own wording.
+#
+# OpenAI:  https://developers.openai.com/api/docs/models (and per-model pages)
+#          https://developers.openai.com/api/docs/pricing
+# Google:  https://ai.google.dev/gemini-api/docs/models (and per-model pages)
+#          https://ai.google.dev/gemini-api/docs/pricing
+# Meta:    Hugging Face model cards under https://huggingface.co/meta-llama
+# Qwen:    Hugging Face model cards under https://huggingface.co/Qwen
+records:
+  # ---- OpenAI ------------------------------------------------------------
+  - key: openai.models.gpt6-astra
+    value: gpt-6-astra
+    vendor: OpenAI
+    name: GPT-6 Astra
+    api_id: gpt-6-astra
+    context_window: 1,050,000 tokens
+    max_input: 922,000 tokens
+    max_output: 128,000 tokens
+    input_price: $10 / MTok
+    output_price: $50 / MTok
+    notes: Prompts above 272K input tokens are billed at higher rates for the whole request.
+    lint_literals:
+      - gpt-6-astra
+      - 1,050,000 tokens
+      - 922,000 tokens
+      - 128,000 tokens
+      - $10 / MTok
+      - $50 / MTok
+      - 272K input tokens
+    volatility: high
+    source: https://developers.openai.com/api/docs/models/gpt-6-astra
+    price_source: https://developers.openai.com/api/docs/pricing
+    verified: "2026-09-16"
+    tags: [comparison-hosted]
+  - key: openai.models.gpt-5-6-terra
+    value: gpt-5.6-terra
+    vendor: OpenAI
+    name: GPT-5.6 Terra
+    api_id: gpt-5.6-terra
+    context_window: 1,050,000 tokens
+    max_input: 922,000 tokens
+    max_output: 128,000 tokens
+    input_price: $2 / MTok
+    output_price: $12 / MTok
+    notes: Prompts above 272K input tokens are billed at higher rates for the whole request.
+    lint_literals:
+      - gpt-5.6-terra
+      - 1,050,000 tokens
+      - 922,000 tokens
+      - 128,000 tokens
+      - $2 / MTok
+      - $12 / MTok
+      - 272K input tokens
+    volatility: high
+    source: https://developers.openai.com/api/docs/models/gpt-5.6-terra
+    price_source: https://developers.openai.com/api/docs/pricing
+    verified: "2026-09-16"
+    tags: [comparison-hosted]
+  - key: openai.models.gpt-5-6-luna
+    value: gpt-5.6-luna
+    vendor: OpenAI
+    name: GPT-5.6 Luna
+    api_id: gpt-5.6-luna
+    context_window: 1,050,000 tokens
+    max_input: 922,000 tokens
+    max_output: 128,000 tokens
+    input_price: $0.20 / MTok
+    output_price: $1.20 / MTok
+    notes: Prompts above 272K input tokens are billed at higher rates for the whole request.
+    lint_literals:
+      - gpt-5.6-luna
+      - 1,050,000 tokens
+      - 922,000 tokens
+      - 128,000 tokens
+      - $0.20 / MTok
+      - $1.20 / MTok
+      - 272K input tokens
+    volatility: high
+    source: https://developers.openai.com/api/docs/models/gpt-5.6-luna
+    price_source: https://developers.openai.com/api/docs/pricing
+    verified: "2026-09-16"
+    tags: [comparison-hosted]
+  # ---- Google ------------------------------------------------------------
+  - key: google.models.gemini-3-8-flash
+    value: gemini-3.8-flash
+    vendor: Google
+    name: Gemini 3.8 Flash
+    api_id: gemini-3.8-flash
+    max_input: 1,048,576 tokens
+    max_output: 65,536 tokens
+    input_price: $0.75 / MTok
+    output_price: $3.75 / MTok
+    notes: Paid-tier prices shown apply through 2026-12-31; from 2027-01-01 the listed prices are $1.50 / MTok input and $7.50 / MTok output. Output price includes thinking tokens.
+    lint_literals:
+      - gemini-3.8-flash
+      - 1,048,576 tokens
+      - 65,536 tokens
+      - $0.75 / MTok
+      - $3.75 / MTok
+      - $1.50 / MTok
+      - $7.50 / MTok
+      - 2026-12-31
+      - 2027-01-01
+    volatility: high
+    source: https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash
+    price_source: https://ai.google.dev/gemini-api/docs/pricing
+    verified: "2026-09-16"
+    tags: [comparison-hosted]
+  - key: google.models.gemini-3-1-pro-preview
+    value: gemini-3.1-pro-preview
+    vendor: Google
+    name: Gemini 3.1 Pro Preview
+    api_id: gemini-3.1-pro-preview
+    max_input: 1,048,576 tokens
+    max_output: 65,536 tokens
+    input_price: $2 / MTok
+    output_price: $12 / MTok
+    notes: Preview model. Prices shown are for prompts up to 200k tokens; longer prompts are $4 / MTok input and $18 / MTok output. Output price includes thinking tokens.
+    lint_literals:
+      - gemini-3.1-pro-preview
+      - 1,048,576 tokens
+      - 65,536 tokens
+      - $2 / MTok
+      - $12 / MTok
+      - 200k tokens
+      - $4 / MTok
+      - $18 / MTok
+    volatility: high
+    source: https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview
+    price_source: https://ai.google.dev/gemini-api/docs/pricing
+    verified: "2026-09-16"
+    tags: [comparison-hosted]
+  - key: google.models.gemini-3-5-flash-lite
+    value: gemini-3.5-flash-lite
+    vendor: Google
+    name: Gemini 3.5 Flash-Lite
+    api_id: gemini-3.5-flash-lite
+    max_input: 1,048,576 tokens
+    max_output: 65,536 tokens
+    input_price: $0.30 / MTok
+    output_price: $2.50 / MTok
+    notes: Input price covers text, image, video and audio. Output price includes thinking tokens.
+    lint_literals:
+      - gemini-3.5-flash-lite
+      - 1,048,576 tokens
+      - 65,536 tokens
+      - $0.30 / MTok
+      - $2.50 / MTok
+    volatility: high
+    source: https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite
+    price_source: https://ai.google.dev/gemini-api/docs/pricing
+    verified: "2026-09-16"
+    tags: [comparison-hosted]
+  # ---- Meta Llama (open weight) -------------------------------------------
+  - key: meta.models.llama-4-maverick
+    value: meta-llama/Llama-4-Maverick-17B-128E-Instruct
+    vendor: Meta
+    name: Llama 4 Maverick
+    model_id: meta-llama/Llama-4-Maverick-17B-128E-Instruct
+    parameters: 17B (Activated), 400B (Total)
+    context_length: 1M
+    licence: Llama 4 Community License Agreement
+    lint_literals:
+      - meta-llama/Llama-4-Maverick-17B-128E-Instruct
+      - 17B (Activated), 400B (Total)
+      - Llama 4 Community License Agreement
+    volatility: high
+    source: https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct
+    verified: "2026-09-16"
+    tags: [comparison-open-weight]
+  - key: meta.models.llama-4-scout
+    value: meta-llama/Llama-4-Scout-17B-16E-Instruct
+    vendor: Meta
+    name: Llama 4 Scout
+    model_id: meta-llama/Llama-4-Scout-17B-16E-Instruct
+    parameters: 17B (Activated), 109B (Total)
+    context_length: 10M
+    licence: Llama 4 Community License Agreement
+    lint_literals:
+      - meta-llama/Llama-4-Scout-17B-16E-Instruct
+      - 17B (Activated), 109B (Total)
+      - 10M
+      - Llama 4 Community License Agreement
+    volatility: high
+    source: https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct
+    verified: "2026-09-16"
+    tags: [comparison-open-weight]
+  # ---- Alibaba Qwen (open weight) ------------------------------------------
+  - key: qwen.models.qwen3-8-2-4t-a95b
+    value: Qwen/Qwen3.8-2.4T-A95B
+    vendor: Alibaba Qwen
+    name: Qwen3.8-2.4T-A95B
+    model_id: Qwen/Qwen3.8-2.4T-A95B
+    parameters: 2.4T in total and 95B activated
+    context_length: 262,144 natively and extensible up to 1,010,000 tokens
+    licence: Qwen3.8-Max License
+    lint_literals:
+      - Qwen/Qwen3.8-2.4T-A95B
+      - 2.4T in total and 95B activated
+      - 262,144 natively and extensible up to 1,010,000 tokens
+      - Qwen3.8-Max License
+    volatility: high
+    source: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B
+    verified: "2026-09-16"
+    tags: [comparison-open-weight]
+  - key: qwen.models.qwen3-8-27b
+    value: Qwen/Qwen3.8-27B
+    vendor: Alibaba Qwen
+    name: Qwen3.8-27B
+    model_id: Qwen/Qwen3.8-27B
+    parameters: 27B
+    context_length: 262,144 natively and extensible up to 1,000,000 tokens
+    licence: Apache License 2.0
+    lint_literals:
+      - Qwen/Qwen3.8-27B
+      - 262,144 natively and extensible up to 1,000,000 tokens
+      - Apache License 2.0
+    volatility: high
+    source: https://huggingface.co/Qwen/Qwen3.8-27B
+    verified: "2026-09-16"
+    tags: [comparison-open-weight]
