@@ -357,9 +357,10 @@ Evidence: "Show evidence rather than asserting success" is **Documented** — [b
 
 Values on this page, each backed by a record:
 
-| Claim                                                     | Record                                           | Volatility | Why it moves                                           |
-| --------------------------------------------------------- | ------------------------------------------------ | ---------- | ------------------------------------------------------ |
-| Instruction-file length at which adherence may drop (4.9) | `claude_code.claude_md.adherence_line_threshold` | medium     | Product guidance that tracks model and harness changes |
+| Claim                                                                              | Record                                           | Volatility | Why it moves                                                                                                                                                                       |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Instruction-file length at which adherence may drop (4.9)                          | `claude_code.claude_md.adherence_line_threshold` | medium     | Product guidance that tracks model and harness changes                                                                                                                             |
+| Sandbox auto-allow default for Bash, `sandbox.autoAllowBashIfSandboxed` (4.8, 5.5) | `claude_code.sandbox.auto_allow_bash_default`    | medium     | Defaults are tuned between releases; the record is `lint: false`, so an unmarked mention of this default will not be caught by lint, which is why it is on the re-check list below |
 
 Identifiers tied to `applies_to` (Claude Code 2.1.267, docs as of 2026-09-16), to re-check on refresh against the linked pages:
 
