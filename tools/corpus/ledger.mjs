@@ -38,12 +38,14 @@ export function expiryFor(verified, volatility) {
 export function buildLedger(pages) {
   return {
     generated: new Date().toISOString().slice(0, 10),
-    entries: pages.map((p) => ({
-      path: p.path,
-      verified: p.verified,
-      volatility: p.volatility,
-      expires: expiryFor(p.verified, p.volatility),
-      ...(p.status ? { status: p.status } : {}),
-    })),
+    entries: pages
+      .filter((p) => p.status !== "deprecated")
+      .map((p) => ({
+        path: p.path,
+        verified: p.verified,
+        volatility: p.volatility,
+        expires: expiryFor(p.verified, p.volatility),
+        ...(p.status ? { status: p.status } : {}),
+      })),
   };
 }

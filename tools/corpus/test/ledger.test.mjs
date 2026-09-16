@@ -70,3 +70,50 @@ test("a deprecated page is never expired", () => {
   };
   assert.deepEqual(checkExpiry(entry, "2026-11-20"), []);
 });
+
+test("buildLedger excludes deprecated pages", () => {
+  const ledger = buildLedger([
+    {
+      path: "guides/old.md",
+      verified: "2020-01-01",
+      volatility: "high",
+      status: "deprecated",
+    },
+    {
+      path: "guides/current.md",
+      verified: "2026-09-16",
+      volatility: "high",
+    },
+  ]);
+  assert.equal(ledger.entries.length, 1);
+  assert.equal(ledger.entries[0].path, "guides/current.md");
+});
+
+test("page volatility is the max of referenced records regardless of block order", () => {
+  const text =
+    "<!-- corpus:data key=a.high -->x<!-- /corpus:data --><!-- corpus:data key=a.low -->y<!-- /corpus:data -->";
+  assert.equal(derivePageVolatility(text, records), "high");
+});
+
+test("table volatility is the max across matching rows regardless of record order", () => {
+  const mixedOrderRecords = [
+    { key: "b.high", volatility: "high", tags: ["mixed"] },
+    { key: "b.low", volatility: "low", tags: ["mixed"] },
+  ];
+  const text =
+    "<!-- corpus:table fields=key tag=mixed -->\nold\n<!-- /corpus:table -->";
+  assert.equal(derivePageVolatility(text, mixedOrderRecords), "high");
+});
+
+test("expiry boundary is exact: fails the day after a full extra cadence, not on it", () => {
+  const entry = {
+    path: "p.md",
+    verified: "2026-09-16",
+    volatility: "high",
+    expires: "2026-10-16",
+  };
+  assert.deepEqual(checkExpiry(entry, "2026-11-15"), []);
+  const failed = checkExpiry(entry, "2026-11-16");
+  assert.equal(failed.length, 1);
+  assert.equal(failed[0].rule, "expired");
+});
