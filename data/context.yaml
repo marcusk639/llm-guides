@@ -1,0 +1,20 @@
+# Volatile values backing guides/context/. One record per fact.
+records:
+  - key: anthropic.prompt_caching.default_ttl
+    value: 5 minutes
+    volatility: medium
+    source: https://docs.claude.com/en/docs/build-with-claude/prompt-caching
+    verified: "2026-09-16"
+    tags: [context, caching, anthropic]
+  - key: anthropic.prompt_caching.extended_ttl
+    value: 1 hour
+    volatility: medium
+    source: https://docs.claude.com/en/docs/build-with-claude/prompt-caching
+    verified: "2026-09-16"
+    tags: [context, caching, anthropic]
+  - key: claude_code.claude_md.adherence_line_threshold
+    value: 200 lines
+    volatility: medium
+    source: https://code.claude.com/docs/en/memory
+    verified: "2026-09-16"
+    tags: [context, claude-code]
