@@ -1,0 +1,21 @@
+{
+  "name": "llm-guides",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "corpus": "./tools/corpus/cli.mjs"
+  },
+  "scripts": {
+    "test": "node --test tools/corpus/test/",
+    "lint": "node tools/corpus/cli.mjs lint",
+    "render": "node tools/corpus/cli.mjs render",
+    "ledger": "node tools/corpus/cli.mjs ledger"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
