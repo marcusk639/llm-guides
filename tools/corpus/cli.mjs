@@ -6,7 +6,12 @@ import { pathToFileURL } from "node:url";
 import yaml from "js-yaml";
 import { parseFrontmatter } from "./frontmatter.mjs";
 import { loadRecords, literalIndexForTopic } from "./data.mjs";
-import { validateFrontmatter, findBareValues, checkExpiry } from "./lint.mjs";
+import {
+  validateFrontmatter,
+  findBareValues,
+  checkExpiry,
+  checkRecordLintConfig,
+} from "./lint.mjs";
 import { renderText } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
 import { derivePageVolatility, buildLedger, expiryFor } from "./ledger.mjs";
@@ -51,6 +56,10 @@ export function lintCorpus(
   };
   const topics = loadTopics(root);
   const issues = [];
+  for (const record of records) {
+    for (const i of checkRecordLintConfig(record, topics))
+      issues.push({ ...i, path: path.join("data", record.file) });
+  }
   for (const file of guidePaths(root)) {
     const text = fs.readFileSync(file, "utf8");
     const { data } = parseFrontmatter(text);

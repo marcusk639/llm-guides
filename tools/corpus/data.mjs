@@ -27,8 +27,17 @@ export function loadRecords(dataDir) {
 function recordLiterals(r) {
   if (r.lint === false) return [];
   if (r.lint_literals != null) return r.lint_literals.map(String);
-  const fields = [r.value, r.display, ...(r.lint_fields ?? []).map((f) => r[f])];
-  return [...new Set(fields.filter((v) => v != null).map(String))];
+  const fields = [].concat(r.lint_fields ?? [])
+    .map((f) => r[f])
+    .filter(isIndexableFieldValue);
+  const literals = [r.value, r.display].filter((v) => v != null);
+  return [...new Set([...literals, ...fields].map(String))];
+}
+
+// Only strings and numbers become lint_fields literals; objects, arrays and
+// booleans would stringify to noise such as "[object Object]".
+export function isIndexableFieldValue(v) {
+  return typeof v === "string" || typeof v === "number";
 }
 
 export function literalIndex(records) {

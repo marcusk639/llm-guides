@@ -138,3 +138,51 @@ test("a '](' with no ')' on the same line does not hide later prose", () => {
   const text = doc("Index with arr[i](\nthen claude-opus-5 is listed (really).");
   assert.equal(findBareValues(text, urlIndex).length, 1);
 });
+
+// Fix round 1 (I1): only a genuine link destination is excluded.
+test("flags a literal in a code call that merely looks like ](...)", () => {
+  const text = doc('Call fn[k]("claude-opus-5") here.');
+  assert.equal(findBareValues(text, urlIndex).length, 1);
+});
+
+test("flags a literal in bracket-paren prose that is not a URL destination", () => {
+  const text = doc("See [1](the claude-opus-5 model) for details.");
+  assert.equal(findBareValues(text, urlIndex).length, 1);
+});
+
+test("flags a literal inside a link title", () => {
+  for (const title of ['"claude-opus-5"', "'claude-opus-5'"]) {
+    const text = doc(`See [x](https://a.example.invalid ${title}).`);
+    assert.equal(findBareValues(text, urlIndex).length, 1, title);
+  }
+});
+
+test("flags a literal in a fenced JS call that looks like ](...)", () => {
+  const text = doc('```js\nhandlers[type]({ model: "claude-opus-5" });\n```');
+  assert.equal(findBareValues(text, urlIndex).length, 1);
+});
+
+test("does not flag a literal inside an angle-bracketed link destination", () => {
+  const text = doc("See [the page](</models/claude-opus-5>).");
+  assert.deepEqual(findBareValues(text, urlIndex), []);
+});
+
+test("does not flag a relative destination with surrounding spaces and a single-quoted title", () => {
+  const text = doc("See [the page]( /models/claude-opus-5 'Model page' ).");
+  assert.deepEqual(findBareValues(text, urlIndex), []);
+});
+
+// Fix round 1 (m3): a bare URL stops at quotes, comma, pipe, < and *.
+test("flags a literal run on after a bare URL through a comma or quote", () => {
+  for (const body of [
+    "See https://a.example.invalid/x,claude-opus-5 here.",
+    'See "https://a.example.invalid/"claude-opus-5 here.',
+    "See 'https://a.example.invalid/'claude-opus-5 here.",
+    "See `https://a.example.invalid/`claude-opus-5 here.",
+    "| https://a.example.invalid/x|claude-opus-5 |",
+    "See https://a.example.invalid/x<claude-opus-5 here.",
+    "See **https://a.example.invalid/x**claude-opus-5 here.",
+  ]) {
+    assert.equal(findBareValues(doc(body), urlIndex).length, 1, body);
+  }
+});

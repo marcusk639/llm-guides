@@ -1,6 +1,7 @@
 import { parseFrontmatter } from "./frontmatter.mjs";
 import { findBlocks, coveredRanges } from "./markers.mjs";
 import { CADENCE_DAYS, addDays } from "./ledger.mjs";
+import { isIndexableFieldValue } from "./data.mjs";
 
 export const REQUIRED_FIELDS = [
   "title",
@@ -60,11 +61,17 @@ function isBoundedMatch(text, at, literal) {
 }
 
 // URL spans are excluded from the bare-value scan so prose can link a model's
-// own page. Link TEXT (inside [ ... ]) is not a URL span and is still scanned.
+// own page. Only the URL itself is covered: link TEXT (inside [ ... ]) and a
+// link TITLE ("..." or '...') are still scanned, and a ](...) whose contents
+// are not a single URL-like token (a code call, bracket-paren prose) is not a
+// link destination at all.
 const URL_SPANS = [
-  /\]\(([^)\n]*)\)/dg, // inline link destination: ](...)
-  /<(https?:\/\/[^>\s]*)>/dg, // angle-bracket autolink
-  /(https?:\/\/[^\s)>\]]+)/dg, // bare URL, up to whitespace or ) > ]
+  // inline link destination: ](url) / ](<url>) / ](url "title")
+  /\]\([ \t]*(<[^>\n]*>|[^\s()<>"'`]+)(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'))?[ \t]*\)/dg,
+  // angle-bracket autolink
+  /<(https?:\/\/[^>\s]*)>/dg,
+  // bare URL, up to whitespace or ) > ] " ' ` , | < *
+  /(https?:\/\/[^\s)>\]"'`,|<*]+)/dg,
 ];
 
 function urlRanges(text) {
@@ -113,6 +120,38 @@ export function findBareValues(text, index) {
       line: text.slice(0, m.start).split("\n").length,
     }))
     .sort((a, b) => a.line - b.line);
+}
+
+// Record-level lint configuration checks: names that silently lose coverage.
+export function checkRecordLintConfig(record, topics) {
+  const issues = [];
+  const fields = [].concat(record.lint_fields ?? []);
+  const unknown = fields.filter((f) => !(f in record));
+  if (unknown.length > 0) {
+    issues.push({
+      rule: "lint-fields-unknown",
+      message: `record ${record.key}: lint_fields names field(s) not on the record: ${unknown.join(", ")}`,
+    });
+  }
+  const unindexable = fields.filter(
+    (f) => f in record && record[f] != null && !isIndexableFieldValue(record[f]),
+  );
+  if (unindexable.length > 0) {
+    issues.push({
+      rule: "lint-fields-unindexable",
+      message: `record ${record.key}: lint_fields names field(s) whose value is not a string or number: ${unindexable.join(", ")}`,
+    });
+  }
+  if (record.lint_scope != null) {
+    const badScope = [].concat(record.lint_scope).filter((s) => !topics.includes(s));
+    if (badScope.length > 0) {
+      issues.push({
+        rule: "lint-scope-unknown",
+        message: `record ${record.key}: lint_scope names topic(s) not in meta/taxonomy.yaml: ${badScope.join(", ")}`,
+      });
+    }
+  }
+  return issues;
 }
 
 export function checkExpiry(entry, today) {

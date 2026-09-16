@@ -184,3 +184,19 @@ test("literalIndexForTopic does not match a missing topic against a null scope e
   assert.equal(literalIndexForTopic(records, null).size, 0);
   assert.equal(literalIndexForTopic(records, undefined).size, 0);
 });
+
+test("lint_fields indexes only string and number field values", () => {
+  const index = literalIndex([
+    {
+      ...base,
+      key: "typed",
+      value: "typed-value",
+      obj: { a: 1 },
+      arr: ["array-item"],
+      flag: true,
+      num: 65536,
+      lint_fields: ["obj", "arr", "flag", "num"],
+    },
+  ]);
+  assert.deepEqual([...index.keys()].sort(), ["65536", "typed-value"]);
+});
