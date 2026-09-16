@@ -38,6 +38,20 @@ test("omits literals shorter than the minimum length", () => {
   assert.equal(MIN_LITERAL_LENGTH, 3);
 });
 
+test("omits a lint: false record even when its value is long enough to index", () => {
+  const index = literalIndex([
+    {
+      key: "k",
+      value: "long-enough-value",
+      lint: false,
+      volatility: "low",
+      source: "s",
+      verified: "2026-09-16",
+    },
+  ]);
+  assert.equal(index.size, 0);
+});
+
 test("honours explicit lint_literals over value and display", () => {
   const index = literalIndex([
     {
