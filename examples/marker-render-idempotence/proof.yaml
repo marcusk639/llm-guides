@@ -1,0 +1,8 @@
+kind: proof
+claim: Rendering a marker block twice produces the same bytes as rendering it once.
+origin: docs/superpowers/specs/2026-09-16-llm-corpus-foundation-design.md
+tier: 4
+command: node run.mjs
+passes_when: exit code 0
+last_run: 2026-09-16
+result: pass
