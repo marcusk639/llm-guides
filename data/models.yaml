@@ -1,0 +1,89 @@
+# Volatile values backing guides/models/claude-models.md.
+# One record per current Claude model (a table row), per controller ruling R3.
+# `value` is the Claude API ID so the record is well-formed; `lint_literals`
+# lists every volatile string in the row (>= 3 chars) so the closed-world lint
+# covers the named fields, not just `value`.
+# Model facts: https://platform.claude.com/docs/en/models/overview
+# Prices:      https://platform.claude.com/docs/en/about-claude/pricing
+records:
+  - key: anthropic.models.fable-5-1
+    value: claude-fable-5-1
+    name: Claude Fable 5.1
+    api_id: claude-fable-5-1
+    api_alias: claude-fable-5-1
+    context_window: 1M tokens
+    max_output: 128K tokens
+    input_price: $10 / MTok
+    output_price: $50 / MTok
+    lint_literals:
+      - claude-fable-5-1
+      - 1M tokens
+      - 128K tokens
+      - $10 / MTok
+      - $50 / MTok
+    volatility: high
+    source: https://platform.claude.com/docs/en/models/overview
+    price_source: https://platform.claude.com/docs/en/about-claude/pricing
+    verified: "2026-09-16"
+    tags: [claude-current]
+  - key: anthropic.models.opus-5
+    value: claude-opus-5
+    name: Claude Opus 5
+    api_id: claude-opus-5
+    api_alias: claude-opus-5
+    context_window: 1M tokens
+    max_output: 128K tokens
+    input_price: $5 / MTok
+    output_price: $25 / MTok
+    lint_literals:
+      - claude-opus-5
+      - 1M tokens
+      - 128K tokens
+      - $5 / MTok
+      - $25 / MTok
+    volatility: high
+    source: https://platform.claude.com/docs/en/models/overview
+    price_source: https://platform.claude.com/docs/en/about-claude/pricing
+    verified: "2026-09-16"
+    tags: [claude-current]
+  - key: anthropic.models.sonnet-5
+    value: claude-sonnet-5
+    name: Claude Sonnet 5
+    api_id: claude-sonnet-5
+    api_alias: claude-sonnet-5
+    context_window: 1M tokens
+    max_output: 128K tokens
+    input_price: $2 / MTok
+    output_price: $10 / MTok
+    lint_literals:
+      - claude-sonnet-5
+      - 1M tokens
+      - 128K tokens
+      - $2 / MTok
+      - $10 / MTok
+    volatility: high
+    source: https://platform.claude.com/docs/en/models/overview
+    price_source: https://platform.claude.com/docs/en/about-claude/pricing
+    verified: "2026-09-16"
+    tags: [claude-current]
+  - key: anthropic.models.haiku-4-5
+    value: claude-haiku-4-5-20251001
+    name: Claude Haiku 4.5
+    api_id: claude-haiku-4-5-20251001
+    api_alias: claude-haiku-4-5
+    context_window: 200K tokens
+    max_output: 64K tokens
+    input_price: $1 / MTok
+    output_price: $5 / MTok
+    lint_literals:
+      - claude-haiku-4-5-20251001
+      - claude-haiku-4-5
+      - 200K tokens
+      - 64K tokens
+      - $1 / MTok
+      - $5 / MTok
+    volatility: high
+    source: https://platform.claude.com/docs/en/models/overview
+    price_source: https://platform.claude.com/docs/en/about-claude/pricing
+    verified: "2026-09-16"
+    tags: [claude-current]
