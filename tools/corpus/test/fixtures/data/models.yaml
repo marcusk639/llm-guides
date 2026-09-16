@@ -1,0 +1,23 @@
+# tools/corpus/test/fixtures/data/models.yaml
+records:
+  - key: example.model.context_window
+    value: "200000"
+    display: "200K"
+    unit: tokens
+    volatility: high
+    source: https://example.invalid/docs/models
+    verified: 2026-09-16
+    tags: [frontier]
+  - key: example.model.price_in
+    value: "3"
+    volatility: high
+    source: https://example.invalid/docs/pricing
+    verified: 2026-09-16
+    lint: false
+    tags: [frontier]
+  - key: example.model.api_id
+    value: "example-model-4-5-20260101"
+    volatility: high
+    source: https://example.invalid/docs/models
+    verified: 2026-09-16
+    tags: [frontier]
