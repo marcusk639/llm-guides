@@ -90,8 +90,9 @@ them.
    compares formatter-stable forms, so Prettier's table padding and blank lines are not
    a pending change. Re-run `render .` (expect no `would render:` line and exit 0) and
    `lint .` (expect `lint: clean`).
-4. If a page's `verified` date or its referenced records changed, run
-   `node tools/corpus/cli.mjs ledger --write .` and commit `meta/ledger.yaml`.
+4. If a page was added, removed or deprecated, or its `verified` date or referenced
+   records changed, run `node tools/corpus/cli.mjs ledger --write .` and commit
+   `meta/ledger.yaml`.
 5. If tool code changed, `npm test`.
 
 Creating a new directory (for example a new `guides/<topic>/` or `examples/<name>/`) can
@@ -143,6 +144,14 @@ Marker comments sit **outside** fenced code blocks, so a generated region may co
 complete fence, fences and all. `render --write` replaces everything between the
 markers. The placeholders `some.key`, `sometag` below stand for a real record key and
 tag.
+
+**Fences do not protect marker syntax.** The parser does not know about code fences: a
+marker comment written inside a fenced block in a guide is a real marker, and
+`render --write` will rewrite it. To show marker syntax in a guide, break the comment
+opener with a backslash — `<\!-- corpus:data key=some.key -->` and
+`<\!-- /corpus:data -->` — which the parser does not match (checked against
+`findBlocks`); tell the reader to remove the backslash. The example below is safe only
+because this file is not under `guides/`.
 
 ```
 <!-- corpus:data key=some.key -->...generated...<!-- /corpus:data -->
@@ -198,6 +207,21 @@ unquoted `true`/`false` are booleans and bare numbers are numbers, so quote date
 any tool; the Verify stage checks them. `file` is set by the loader; do not use it as a
 field name.
 
+### Choosing `volatility`
+
+Record volatility sets the cadence of every page that references the record (numbers in
+`CADENCE_DAYS`, `tools/corpus/ledger.mjs`: currently high 30 days, medium 90, low 270 —
+the constant wins if these differ).
+
+| Volatility | Use when                                                                                                   | Seed example                                                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `high`     | The value changes with releases or repricing on a timescale of weeks: model ids, prices, limits, lineups.  | Every model row, e.g. `anthropic.models.opus-5`, `openai.models.gpt6-astra`                                                        |
+| `medium`   | A product default or documented threshold that is tuned between releases but not with every model launch.  | `anthropic.prompt_caching.default_ttl`, `claude_code.hooks.timeout_default.command`, `claude_code.sandbox.auto_allow_bash_default` |
+| `low`      | A value fixed by a published standard or stable API contract that has not changed across several releases. | None yet: no seed record is `low`. Do not use it for a vendor default just because it has not changed recently.                    |
+
+When unsure, choose the higher volatility; a too-short cadence costs a re-check, a
+too-long one lets a wrong value stand.
+
 ### What the lint indexes for a record
 
 - `lint: false` → nothing.
@@ -248,12 +272,14 @@ table, not into a shared record. Re-run render and lint for the whole corpus.
 
 Lint is closed-world (next section). Three kinds of value escape it by construction:
 
-1. **Short values** — below `MIN_LITERAL_LENGTH` characters.
+1. **Short values** — below `MIN_LITERAL_LENGTH` characters. Dropped from the literal
+   index automatically; no configuration is needed or possible.
 2. **Identifier-embedded values** — a value that is a substring of a name. In a row
    record, list the row's other literals in `lint_literals` and omit this one (do not
    use `lint: false`, which would unguard the whole row). Example: the Qwen3.8-27B row in
    `data/models-other.yaml`.
-3. **Generic tokens** — single-value records with `lint: false`.
+3. **Generic tokens** — a single-value record whose only literal is a token that would
+   collide with ordinary prose (`"true"`) uses `lint: false`.
 
 These are still values: they need a record and a marker block or table. Name each one
 in the page's "Where this rots" section as not lint-guarded, so the refresh re-checks it
@@ -331,8 +357,12 @@ Required and lint-enforced: `title`, `summary`, `topic` (a taxonomy topic), `ver
   `"Claude Code CLI 2.1.267, checked against the public hooks reference … on 2026-09-16"`).
 - `sources` — list of URLs. `related` — list of repo paths to other guides (may be `[]`).
 
-Optional: `research` (pointer to the grounding artifact) — required once the research
-stage exists, omitted on hand-authored seeds; `seed: true` marks a document authored
+Optional: `research` (path to the page's grounding artifact under `research/`). It is
+optional now and omitted on the seeds, because no research artefacts exist yet. It
+becomes required when sub-project 2 (authoring and refresh toolchain) delivers the
+research stage; that change will be made in this file and in `REQUIRED_FIELDS`
+(`tools/corpus/lint.mjs`). Until this file says otherwise, do not treat it as required.
+Also optional: `seed: true` marks a document authored
 before the pipeline existed; `status` (`deprecated`).
 
 **`volatility` is never a front-matter field.** Volatility is a property of a claim,
@@ -444,7 +474,8 @@ claims stay Documented or Plausible.
 
 - **Page volatility is derived**: the highest `volatility` among the records the page
   references — each terminated `corpus:data` block's record, and every record a
-  `corpus:table` selects by tag. A page referencing no records gets the low cadence.
+  `corpus:table` selects by tag. A page referencing no records is written to the
+  ledger with `volatility: null` and expires on the low cadence.
 - **Cadence** per volatility is `CADENCE_DAYS` in `tools/corpus/ledger.mjs` (the single
   source for the numbers). `expires = verified + cadence`.
 - **One high-volatility value sets the whole page's cadence.** Keep high-volatility
@@ -453,7 +484,10 @@ claims stay Documented or Plausible.
 - **Ledger** — `meta/ledger.yaml` is generated, never hand-edited: `generated` date and
   one entry per guide with a valid `verified` date and no `status: deprecated`, carrying
   `path`, `verified`, derived `volatility`, `expires`. Its consumers are the scheduled
-  audit (sub-project 2), the static site's freshness banners (sub-project 5), and lint.
+  audit (sub-project 2) and the static site's freshness banners (sub-project 5). **Lint
+  does not read `meta/ledger.yaml`**: it derives each page's volatility and expiry
+  itself with the same functions (`derivePageVolatility`, `expiryFor`), so a stale or
+  missing ledger file never changes lint results.
 - **`expired`** fails lint only when today is past `expires` by more than one further
   cadence, forcing a refresh or deprecation.
 - **Deprecation** — a page that cannot be refreshed gets `status: deprecated` in
@@ -489,6 +523,18 @@ or a citable public source before it reaches `guides/`.
 Do not use the owner's own Claude Code configuration (`~/.claude`, its settings, hooks,
 agents or skills) as a source or example; those files embed private project details.
 Examples are synthetic and sourced from public documentation.
+
+## Known lint gaps
+
+Found in review of the URL exclusion (Task 15a); not fixed. Each hides a known value
+from the bare-value scan (confirmed with `findBareValues`):
+
+- A link destination in angle brackets containing spaces, e.g.
+  `[x](<text with a value>)`: the whole bracketed text is treated as a URL.
+- A bare URL that runs into following text through `.`, `;` or an em dash with no space
+  (`https://example.com/x;value`): the value is swallowed into the URL span.
+
+Do not write either form. Reviewers check for them by eye.
 
 ## Known limitations (deferred to sub-project 2)
 
