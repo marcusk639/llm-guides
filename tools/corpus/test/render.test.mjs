@@ -187,3 +187,25 @@ test("sort=field orders rows ascending, ties stable, missing field last", () => 
 test("sort=-field orders rows descending, ties stable, missing field last", () => {
   assert.deepEqual(rowKeys(" sort=-name"), ["k4", "k1", "k2", "k5", "k3"]);
 });
+
+// --- fix round 1, m4: no silent sort fallback ---
+
+for (const [what, attr, message] of [
+  ["an unknown field", "sort=nosuchfield", /not present on any row: nosuchfield/],
+  ["a bare '-'", "sort=-", /malformed sort/],
+  ["an empty value", 'sort=""', /malformed sort/],
+]) {
+  test(`sort= naming ${what} raises render-sort-unknown and preserves content`, () => {
+    const src = `<!-- corpus:table fields=key,name tag=s ${attr} -->\nold\n<!-- /corpus:table -->`;
+    const { text, issues } = renderText(src, sortRecords);
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].rule, "render-sort-unknown");
+    assert.match(issues[0].message, message);
+    assert.equal(text, src);
+  });
+}
+
+test("sort= on a field present on only some records renders normally", () => {
+  // k3 lacks `name`; that is missing-last ordering, not an error.
+  assert.deepEqual(rowKeys(" sort=name"), ["k2", "k5", "k1", "k4", "k3"]);
+});

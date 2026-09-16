@@ -391,3 +391,79 @@ for (const [what, mutate] of Object.entries(genuineChanges)) {
     });
   });
 }
+
+// --- fix round 1, m1: normalisation scope is terminated corpus:table blocks only ---
+
+test("a corpus:data block differing from its record only by whitespace is still a pending change", () => {
+  const stale = CMP_PRETTIER.replace(
+    "Intro.",
+    "Intro <!-- corpus:data key=cmp.alpha --> Alpha <!-- /corpus:data -->.",
+  );
+  const exact = CMP_PRETTIER.replace(
+    "Intro.",
+    "Intro <!-- corpus:data key=cmp.alpha -->Alpha<!-- /corpus:data -->.",
+  );
+  withCmpCorpus(stale, (root, guide) => {
+    assert.equal(renderCorpus(root, { write: false })[0].changed, true);
+    assert.equal(renderCorpus(root, { write: true })[0].changed, true);
+    const written = fs.readFileSync(guide, "utf8");
+    assert.equal(
+      written.includes("<!-- corpus:data key=cmp.alpha -->Alpha<!-- /corpus:data -->"),
+      true,
+    );
+    assert.equal(renderCorpus(root, { write: false })[0].changed, false);
+  });
+  withCmpCorpus(exact, (root) => {
+    assert.equal(renderCorpus(root, { write: false })[0].changed, false);
+  });
+});
+
+test("whitespace in prose outside marker blocks is never reported or rewritten by render", () => {
+  const odd = CMP_PRETTIER.replace("Intro.", "Intro.   ").replace(
+    "After.",
+    "\n\n  After.",
+  );
+  withCmpCorpus(odd, (root, guide) => {
+    assert.equal(renderCorpus(root, { write: true })[0].changed, false);
+    assert.equal(fs.readFileSync(guide, "utf8"), odd);
+  });
+});
+
+// --- fix round 1, m2: only the line after the header row is a divider ---
+
+test("a dash-placeholder data row changing '-' to '--' is a pending change", () => {
+  const data = [
+    "records:",
+    "  - key: dash.one",
+    '    value: "-"',
+    '    a: "-"',
+    '    b: "-"',
+    "    volatility: low",
+    "    source: https://example.invalid/docs",
+    "    verified: 2026-09-16",
+    "    tags: [dash]",
+    "",
+  ].join("\n");
+  const guideFor = (row) =>
+    [
+      "<!-- corpus:table fields=a,b tag=dash -->",
+      "| a | b |",
+      "| --- | --- |",
+      row,
+      "<!-- /corpus:table -->",
+      "",
+    ].join("\n");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "corpus-dash-test-"));
+  try {
+    fs.mkdirSync(path.join(tmp, "data"));
+    fs.mkdirSync(path.join(tmp, "guides"));
+    fs.writeFileSync(path.join(tmp, "data", "dash.yaml"), data);
+    const guide = path.join(tmp, "guides", "dash.md");
+    fs.writeFileSync(guide, guideFor("| - | - |"));
+    assert.equal(renderCorpus(tmp, { write: false })[0].changed, false);
+    fs.writeFileSync(guide, guideFor("| -- | - |"));
+    assert.equal(renderCorpus(tmp, { write: false })[0].changed, true);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
