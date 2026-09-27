@@ -351,9 +351,10 @@ test("reports a verified that is not a real calendar date", () => {
   );
 });
 
-test("reports a verified that YAML parsed as a Date rather than a string", () => {
-  // An unquoted 2026-09-16 in YAML is a date, not a string; the contract
-  // requires it quoted, and the raw value must still be rejected loudly.
+test("reports a verified that is a Date or another non-string", () => {
+  // NOT reachable through this repo's loader: data.mjs reads with
+  // yaml.JSON_SCHEMA, so an unquoted 2026-09-16 stays a string. The guard is
+  // defensive against a caller that hands over a Date, a number, or a map.
   const issues = checkRecordFields(
     rec("a.b", "models.yaml", { verified: new Date("2026-09-16") }),
   );
@@ -746,6 +747,19 @@ test("returns no issues rather than throwing on null front-matter", () => {
   assert.deepEqual(checkResearchRequired(null), []);
 });
 
+test("returns no issues rather than throwing on non-object front-matter", () => {
+  // parseFrontmatter can yield a string or a number for a malformed block, and
+  // `"applies_to" in data` throws a TypeError on those.
+  for (const bad of ["just a string", 42, true]) {
+    assert.deepEqual(checkAppliesToShape(bad), []);
+    assert.deepEqual(
+      checkRelatedPaths(bad, () => true),
+      [],
+    );
+    assert.deepEqual(checkResearchRequired(bad), []);
+  }
+});
+
 test("accepts an empty related list", () => {
   assert.deepEqual(
     checkRelatedPaths(fm({ related: [] }), () => false),
@@ -799,6 +813,10 @@ test("reports a non-seed page with no research artifact", () => {
 test("treats seed: false as not a seed", () => {
   assert.equal(checkResearchRequired(fm({ seed: false })).length, 1);
 });
+
+test("exempts a deprecated page from the research requirement", () => {
+  assert.deepEqual(checkResearchRequired(fm({ status: "deprecated" })), []);
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -816,8 +834,12 @@ Create `tools/corpus/verify-pages.mjs`:
 // tolerates null front-matter: a page with none is already reported by lint's
 // frontmatter-missing, and these rules must not throw on top of it.
 
+// `typeof data !== "object"` rather than a null check: front-matter that is a
+// bare string or number parses to a non-object, and `"applies_to" in data`
+// throws a TypeError on those.
 export function checkAppliesToShape(data) {
-  if (data == null || !("applies_to" in data)) return [];
+  if (data == null || typeof data !== "object") return [];
+  if (!("applies_to" in data)) return [];
   const v = data.applies_to;
   const bad = !Array.isArray(v)
     ? `must be a list of strings, got ${v === null ? "null" : typeof v}`
@@ -831,8 +853,12 @@ export function checkAppliesToShape(data) {
     : [];
 }
 
+// `related` entries are repo-root-relative (`guides/context/context-management.md`),
+// unlike the page-relative links in the same files' prose (`../../CLAUDE.md`).
+// Resolve against the repo root, not the page's directory.
 export function checkRelatedPaths(data, exists) {
-  if (data == null || !Array.isArray(data.related)) return [];
+  if (data == null || typeof data !== "object") return [];
+  if (!Array.isArray(data.related)) return [];
   const issues = [];
   for (const entry of data.related) {
     if (typeof entry !== "string") {
@@ -855,8 +881,8 @@ export function checkRelatedPaths(data, exists) {
 // existed — so seeds are exempt forever. The rule's real subject is
 // pipeline-authored pages, which have a research artifact by construction.
 export function checkResearchRequired(data) {
-  if (data == null) return [];
-  if (data.seed === true) return [];
+  if (data == null || typeof data !== "object") return [];
+  if (data.seed === true || data.status === "deprecated") return [];
   if (typeof data.research === "string" && data.research.trim() !== "")
     return [];
   return [
@@ -894,6 +920,14 @@ for (const file of guidePaths(root)) {
   const text = fs.readFileSync(file, "utf8");
   const { data } = parseFrontmatter(text);
   const rel = path.relative(root, file);
+  // A deprecated page is one that could not be refreshed. The contract keeps it
+  // readable and still checks its front-matter and bare values, but must not
+  // hold it to authoring rules it cannot satisfy — lintCorpus makes the same
+  // carve-out for expiry (cli.mjs:88). Shape rules still apply; the authoring
+  // rules added in Tasks 5 and 8 are skipped via this flag. Without it, the
+  // first deprecated page fails the gate forever for being what deprecation
+  // already declared it to be.
+  const deprecated = data?.status === "deprecated";
   for (const i of [
     ...checkAppliesToShape(data),
     ...checkRelatedPaths(data, exists),
@@ -906,7 +940,7 @@ for (const file of guidePaths(root)) {
 - [ ] **Step 6: Confirm the real corpus is still clean**
 
 Run: `node tools/corpus/cli.mjs verify .`
-Expected: `verify: clean`. All five guides carry `applies_to` as a list of strings, all six `related` entries resolve, and all five are `seed: true` so `research-required` matches nothing.
+Expected: `verify: clean`. All five guides carry `applies_to` as a list of strings, all seven `related` entries resolve, and all five are `seed: true` so `research-required` matches nothing.
 
 `research-required` matching zero pages today is the designed outcome, not a defect — see the spec's redesign section. Do not "fix" it by removing `seed: true` from a guide.
 
@@ -1107,7 +1141,11 @@ Expected: PASS.
 
 - [ ] **Step 5: Wire into `verifyCorpus`**
 
-Add `checkTemplateSections` to the `./verify-pages.mjs` import in `cli.mjs` and add `...checkTemplateSections(text),` to the spread array in the page loop.
+Add `checkTemplateSections` to the `./verify-pages.mjs` import in `cli.mjs` and add this to the spread array in the page loop, honouring the `deprecated` flag introduced in Task 4:
+
+```javascript
+    ...(deprecated ? [] : checkTemplateSections(text)),
+```
 
 - [ ] **Step 6: Confirm the real corpus is still clean**
 
@@ -1469,8 +1507,13 @@ import { findBlocks } from "./markers.mjs";
 Append:
 
 ```javascript
-// The records a page actually renders. Must agree with render's selection
-// exactly, including that a corpus:table with no tag selects the whole corpus
+// Deliberately fence-BLIND, unlike sectionSixText and evidenceSegments ten
+// lines away: findBlocks does not know about fences, and the contract is
+// explicit that a marker inside a fence is a real marker that render rewrites.
+// Agreeing with render matters more than agreeing with the neighbouring rules.
+//
+// Must agree with render's selection exactly, including that a corpus:table
+// with no tag selects the whole corpus
 // — which is why omitting a tag makes a page as volatile as the most volatile
 // record anywhere.
 export function referencedRecordKeys(text, records) {
@@ -1647,7 +1690,11 @@ Expected: PASS.
 
 - [ ] **Step 5: Wire into `verifyCorpus`**
 
-Add `checkRotsTable` to the import and `...checkRotsTable(text, records),` to the spread array in the page loop.
+Add `checkRotsTable` to the import and this to the spread array, honouring the `deprecated` flag from Task 4 — a page that cannot be refreshed must not be failed for an incomplete refresh checklist:
+
+```javascript
+    ...(deprecated ? [] : checkRotsTable(text, records)),
+```
 
 - [ ] **Step 6: Confirm the real corpus is still clean**
 
@@ -1677,7 +1724,15 @@ recordReferences: 29
 
 - [ ] **Step 7: Mutation proof**
 
-Temporarily change `six.includes(k)` to a strict row check — `new RegExp(`^\\|[^|]_\`${k}\`[^|]_\\|`, "m").test(six)`. Run `node tools/corpus/cli.mjs verify .` and confirm it now reports against `guides/models/comparison.md` — this is the strict-reading false positive the loose reading avoids. Restore, confirm `verify: clean`, run the tests, confirm green.
+Temporarily change `six.includes(k)` to the strict row reading:
+
+```javascript
+      new RegExp(`^\\|[^|]*\\`${k}\\`[^|]*\\|`, "m").test(six)
+```
+
+It goes in a fenced block on purpose: as an inline span, Markdown eats the asterisks as
+emphasis, leaving a regex that matches nothing — so the mutation would silently "pass" and
+prove nothing. Run Run `node tools/corpus/cli.mjs verify .` and confirm it now reports against `guides/models/comparison.md` — this is the strict-reading false positive the loose reading avoids. Restore, confirm `verify: clean`, run the tests, confirm green.
 
 - [ ] **Step 8: Run the full suite and both gates**
 
@@ -1796,10 +1851,12 @@ Add `checkKnownLintGapForm` to the import and `...checkKnownLintGapForm(text),` 
 Run: `node tools/corpus/cli.mjs verify .`
 Expected: `verify: clean`.
 
-**This rule gets no positive control, and that is correct.** The corpus contains zero
-instances of Form 1 — the contract forbids the shape — so there is nothing to count. Its
-evidence comes from the unit tests and the mutation proof instead. Do not invent a count
-here; a fabricated control is worse than an acknowledged absence.
+**This rule gets no positive control, and that is correct.** `grep -rn '](\s*<' guides/`
+returns nothing at all: the corpus contains zero angle-bracket link destinations, near-miss
+or otherwise. The only two in the repository are in `CLAUDE.md` (lines 310 and 547), which
+`guidePaths` never walks. So there is nothing honest to count, and this rule's evidence
+comes entirely from its unit tests and mutation proof. Do not invent a count; a fabricated
+control is worse than an acknowledged absence.
 
 - [ ] **Step 7: Mutation proof**
 
@@ -1827,7 +1884,6 @@ The unit tests prove each rule in isolation. This proves `verifyCorpus` wires th
 
 - Create: `tools/corpus/test/verify-cli.test.mjs`
 - Create: `tools/corpus/test/fixtures/corpus/guides/verify/unverifiable.md`
-- Modify: `tools/corpus/test/fixtures/corpus/data/` (add a fixture data file)
 
 **Interfaces:**
 
@@ -1848,11 +1904,23 @@ Create `tools/corpus/test/verify-cli.test.mjs`:
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { verifyCorpus } from "../cli.mjs";
+import { fileURLToPath } from "node:url";
+import { verifyCorpus, renderCorpus } from "../cli.mjs";
 
-const ROOT = new URL("./fixtures/corpus/", import.meta.url).pathname;
-const CLI = new URL("../cli.mjs", import.meta.url).pathname;
-const REPO = new URL("../../../", import.meta.url).pathname;
+// fileURLToPath, not .pathname: a URL pathname is percent-encoded, so a repo
+// checked out under a path containing a space resolves wrongly. The existing
+// test files use .pathname and share that latent bug; do not copy it here.
+const ROOT = fileURLToPath(new URL("./fixtures/corpus/", import.meta.url));
+const CLI = fileURLToPath(new URL("../cli.mjs", import.meta.url));
+const REPO = fileURLToPath(new URL("../../../", import.meta.url));
+
+test("the fixture corpus still renders clean with the new page", () => {
+  // Guards the trap this task nearly walked into: an unknown corpus:data key
+  // makes cli.test.mjs:50-55 fail, and that assertion does not filter by
+  // filename, so the failure looks unrelated to this task.
+  for (const r of renderCorpus(ROOT, { write: false }))
+    assert.deepEqual(r.issues, [], `render issues on ${r.path}`);
+});
 
 test("the unverifiable fixture page trips every page-level rule", () => {
   const rules = new Set(
@@ -1892,16 +1960,11 @@ test("the CLI exits 1 and prints a count when there are issues", () => {
   assert.match(r.stdout, /verify: \d+ issue\(s\)/);
 });
 
-test("the CLI exits 0 and prints clean on the real corpus", () => {
-  const r = spawnSync(process.execPath, [CLI, "verify", REPO], {
-    encoding: "utf8",
-  });
-  assert.equal(r.status, 0);
-  assert.match(r.stdout, /verify: clean/);
-});
-
+// Exactly ONE live-corpus assertion in this file (the deepEqual above). Every
+// other test uses fixtures, so adding a guide cannot turn npm test red for a
+// reason unrelated to the code under test.
 test("verify rejects --write", () => {
-  const r = spawnSync(process.execPath, [CLI, "verify", "--write", REPO], {
+  const r = spawnSync(process.execPath, [CLI, "verify", "--write", ROOT], {
     encoding: "utf8",
   });
   assert.equal(r.status, 2);
@@ -1916,7 +1979,15 @@ Expected: FAIL — the fixture page does not exist, so no rules fire.
 
 - [ ] **Step 4: Create the adversarial fixture page**
 
-Create `tools/corpus/test/fixtures/corpus/guides/verify/unverifiable.md`. Use the topic list from the fixture taxonomy read in Step 1; substitute a real fixture topic for `models` and a real fixture record key for `fixture.value.one` if they differ.
+Create `tools/corpus/test/fixtures/corpus/guides/verify/unverifiable.md`.
+
+**The `corpus:data` key must be `example.model.context_window`** — the only record in
+`fixtures/corpus/data/models.yaml`. An unknown key makes `renderText` emit
+`render-unknown-key`, and `tools/corpus/test/cli.test.mjs:50-55`
+(`corpus render exits 0 against the existing fixture corpus`) is **the one `ROOT` assertion
+that does not filter by filename**, so the whole suite would go red for a reason that looks
+unrelated to this task. The other four `ROOT` assertions filter by `clean.md` or `dirty.md`
+and are unaffected. Reuse the existing record; do not add a new one.
 
 ```markdown
 ---
@@ -1935,7 +2006,7 @@ Trips every page-level rule.
 
 ## 2. The 60-second version
 
-<!-- corpus:data key=fixture.value.one -->x<!-- /corpus:data -->
+<!-- corpus:data key=example.model.context_window -->200K<!-- /corpus:data -->
 
 ## 3. How it actually works
 
