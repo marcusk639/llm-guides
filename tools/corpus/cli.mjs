@@ -23,6 +23,8 @@ import {
   checkResearchRequired,
   checkTemplateSections,
   numberedSections,
+  checkEvidenceLabels,
+  evidenceSegments,
 } from "./verify-pages.mjs";
 import { renderText, normaliseForComparison } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
@@ -145,6 +147,7 @@ export function verifyCorpus(root) {
       ...checkRelatedPaths(data, exists),
       ...checkResearchRequired(data),
       ...(deprecated ? [] : checkTemplateSections(text)),
+      ...checkEvidenceLabels(text),
     ])
       issues.push({ ...i, path: rel });
   }
@@ -178,6 +181,10 @@ export function verifyStats(root) {
     ).length,
     numberedHeadings: guidePaths(root).reduce(
       (n, f) => n + numberedSections(fs.readFileSync(f, "utf8")).length,
+      0,
+    ),
+    evidenceLines: guidePaths(root).reduce(
+      (n, f) => n + evidenceSegments(fs.readFileSync(f, "utf8")).length,
       0,
     ),
   };

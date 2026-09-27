@@ -66,9 +66,13 @@ export function checkResearchRequired(data) {
 const EXPECTED_SECTIONS = 8;
 const NUMBERED_H2 = /^##\s+(\d+)\.\s*(.*)$/;
 
-// Lines outside fenced code blocks only: a guide may quote the template inside
-// a fence, and that is documentation, not structure.
-export function numberedSections(text) {
+// Shared line iterator: walks `text` line by line, skipping any line inside a
+// fenced code block (``` or ~~~), and yields the non-fenced lines with their
+// 1-based line numbers. Also reports whether the file ended still inside an
+// open fence — an unbalanced fence otherwise inverts the toggle for every
+// following line and silently swallows them, which corrupts both heading
+// detection and Evidence-line detection without either check noticing.
+function nonFencedLines(text) {
   const out = [];
   let fenced = false;
   const lines = text.split("\n");
@@ -79,13 +83,32 @@ export function numberedSections(text) {
       continue;
     }
     if (fenced) continue;
+    out.push({ text: line, lineNo: i + 1 });
+  }
+  return { lines: out, unterminatedFence: fenced };
+}
+
+// Lines outside fenced code blocks only: a guide may quote the template inside
+// a fence, and that is documentation, not structure.
+export function numberedSections(text) {
+  const out = [];
+  for (const { text: line, lineNo } of nonFencedLines(text).lines) {
     const m = NUMBERED_H2.exec(line);
-    if (m) out.push({ n: Number(m[1]), line: i + 1, title: m[2].trim() });
+    if (m) out.push({ n: Number(m[1]), line: lineNo, title: m[2].trim() });
   }
   return out;
 }
 
 export function checkTemplateSections(text) {
+  if (nonFencedLines(text).unterminatedFence) {
+    return [
+      {
+        rule: "template-sections",
+        message:
+          "file ends inside an unterminated code fence, so heading detection is unreliable",
+      },
+    ];
+  }
   const found = numberedSections(text);
   const issues = [];
   const seen = found.map((s) => s.n);
@@ -123,6 +146,74 @@ export function checkTemplateSections(text) {
         rule: "template-sections",
         message: `template section "## ${inRange[i].n}." appears after "## ${inRange[i - 1].n}."; sections must run 1 to ${EXPECTED_SECTIONS} in order`,
         line: inRange[i].line,
+      });
+    }
+  }
+  return issues;
+}
+
+export const VALID_LABELS = Object.freeze([
+  "Verified",
+  "Documented",
+  "Plausible",
+]);
+// Module-private: no test imports this, so it does not need to be public
+// surface. VALID_LABELS is exported because a test does import it.
+const EVIDENCE_TOKEN = "Evidence:";
+const LABEL_LOOKUP = new Map(VALID_LABELS.map((l) => [l.toLowerCase(), l]));
+const BOLD = /\*\*([^*]+)\*\*/g;
+
+// Every line carrying the Evidence token, scanned from the token to end of
+// line. Anchoring at column 0 would miss a label that follows a trailing
+// caveat in the same paragraph, which two current pages do. Prose elsewhere is
+// untouched: every guide discusses **Verified** while disclaiming it, and
+// scanning whole bodies would fire on all five.
+export function evidenceSegments(text) {
+  const out = [];
+  for (const { text: line, lineNo } of nonFencedLines(text).lines) {
+    const at = line.indexOf(EVIDENCE_TOKEN);
+    if (at === -1) continue;
+    out.push({ segment: line.slice(at), line: lineNo });
+  }
+  return out;
+}
+
+export function checkEvidenceLabels(text) {
+  if (nonFencedLines(text).unterminatedFence) {
+    return [
+      {
+        rule: "evidence-label-invalid",
+        message:
+          "file ends inside an unterminated code fence, so evidence-label detection is unreliable",
+      },
+    ];
+  }
+  const issues = [];
+  for (const { segment, line: lineNo } of evidenceSegments(text)) {
+    const i = lineNo - 1;
+    // Counts any bold text that names a label, correctly cased or not — a
+    // miscased label ("**documented**") is still a label, so it must not also
+    // trigger the "no evidence label" fallback below. That fallback exists
+    // only for a line with no label-shaped bold text at all.
+    let found = 0;
+    for (const m of segment.matchAll(BOLD)) {
+      const bold = m[1].trim();
+      const canonical = LABEL_LOOKUP.get(bold.toLowerCase());
+      if (canonical === undefined) continue; // bolding something else is fine
+      found++;
+      if (canonical !== bold) {
+        issues.push({
+          rule: "evidence-label-invalid",
+          message: `evidence label ${JSON.stringify(bold)} must be spelled exactly ${JSON.stringify(canonical)}`,
+          line: i + 1,
+        });
+      }
+    }
+    if (found === 0) {
+      issues.push({
+        rule: "evidence-label-invalid",
+        message: `Evidence line has no evidence label; it must bold at least one of ${VALID_LABELS.join(", ")}`,
+        line: i + 1,
       });
     }
   }

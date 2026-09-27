@@ -6,6 +6,9 @@ import {
   checkResearchRequired,
   checkTemplateSections,
   numberedSections,
+  checkEvidenceLabels,
+  evidenceSegments,
+  VALID_LABELS,
 } from "../verify-pages.mjs";
 
 const fm = (extra = {}) => ({
@@ -201,4 +204,101 @@ test("numberedSections reports the line each heading sits on", () => {
       [2, 5],
     ],
   );
+});
+
+test("exports exactly the three label spellings", () => {
+  assert.deepEqual([...VALID_LABELS], ["Verified", "Documented", "Plausible"]);
+});
+
+test("accepts a single-label Evidence line", () => {
+  const text =
+    "Evidence: **Documented** — [caching](https://x.invalid), read 2026-09-16.\n";
+  assert.deepEqual(checkEvidenceLabels(text), []);
+});
+
+test("accepts a mixed-label Evidence line", () => {
+  const text =
+    "Evidence: the setup is **Documented** ([ref](https://x.invalid)); the failure shapes are **Plausible**.\n";
+  assert.deepEqual(checkEvidenceLabels(text), []);
+});
+
+test("ignores bolded Verified in ordinary prose", () => {
+  const text =
+    "Nothing on this page is **Verified**: no proof in this repository backs these claims.\n";
+  assert.deepEqual(checkEvidenceLabels(text), []);
+});
+
+test("reports a miscased label on an Evidence line", () => {
+  const text = "Evidence: **documented** — [ref](https://x.invalid).\n";
+  const issues = checkEvidenceLabels(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "evidence-label-invalid");
+  assert.match(issues[0].message, /documented/);
+});
+
+test("reports an Evidence line whose only bold text is not a label", () => {
+  const text = "Evidence: **the vendor changelog** says so.\n";
+  const issues = checkEvidenceLabels(text);
+  assert.equal(issues.length, 1);
+  assert.match(issues[0].message, /no evidence label/);
+});
+
+test("reports an Evidence line with no bold text at all", () => {
+  assert.equal(checkEvidenceLabels("Evidence: it seemed right.\n").length, 1);
+});
+
+test("reports the line number of the offending Evidence line", () => {
+  const text = "intro\n\nEvidence: **plausible** — a guess.\n";
+  assert.equal(checkEvidenceLabels(text)[0].line, 3);
+});
+
+test("ignores an Evidence line inside a fenced code block", () => {
+  const text = "```\nEvidence: **documented** — sample.\n```\n";
+  assert.deepEqual(checkEvidenceLabels(text), []);
+});
+
+test("accepts a label that follows a trailing caveat on the same line", () => {
+  // The shape at guides/claude-code/hooks.md:158.
+  const text =
+    "One caveat: `xargs` splits on whitespace. Evidence: **Plausible** — standard behavior.\n";
+  assert.deepEqual(checkEvidenceLabels(text), []);
+});
+
+test("reports a miscased label that follows a trailing caveat", () => {
+  const text = "A caveat holds here. Evidence: **plausible** — a guess.\n";
+  const issues = checkEvidenceLabels(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].line, 1);
+});
+
+test("evidenceSegments finds both column-0 and mid-line labels", () => {
+  const text = "Evidence: **Documented** — a.\n\nprose. Evidence: **Plausible** — b.\n";
+  assert.deepEqual(
+    evidenceSegments(text).map((s) => s.line),
+    [1, 3],
+  );
+});
+
+test("a bolded label in ordinary prose with no Evidence token is ignored", () => {
+  assert.deepEqual(
+    checkEvidenceLabels("Nothing here is **Verified**, and that is honest.\n"),
+    [],
+  );
+});
+
+test("checkTemplateSections reports one issue, naming the unterminated fence, when the file ends inside an open fence instead of the usual missing-section artifacts", () => {
+  const text =
+    "## 1. Covers\n\n```\nsome code that never closes\n## 2. Not real, still inside the fence\n";
+  const issues = checkTemplateSections(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "template-sections");
+  assert.match(issues[0].message, /unterminated code fence/);
+});
+
+test("checkEvidenceLabels reports one issue, naming the unterminated fence, when the file ends inside an open fence instead of going silent", () => {
+  const text = "```\nEvidence: **documented** — inside an unterminated fence.\n";
+  const issues = checkEvidenceLabels(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "evidence-label-invalid");
+  assert.match(issues[0].message, /unterminated code fence/);
 });
