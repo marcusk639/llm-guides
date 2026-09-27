@@ -1,7 +1,7 @@
 ---
 title: Corpus Refresh Loop — Design
 date: 2026-09-27
-revision: 2
+revision: 3
 status: approved
 scope: sub-project 2a of 5 (authoring and refresh toolchain — freshness loop only)
 ---
@@ -157,15 +157,20 @@ and section 6, and works that checklist:
 4. For dated studies, confirm the citation resolves and note if superseded. Studies do not
    change; they age.
 5. Re-render, re-lint, and bump each page's `verified`.
-6. **Graduate the page out of seed status:** remove `seed: true` and set `research:` to the
-   artifact written below. A refreshed page is no longer "authored before the pipeline
-   existed," which is what `seed` means.
+6. **Set `research:`** to the artifact written below, on every page in the unit.
+
+**`seed: true` is never removed.** The contract defines it as marking "a document authored
+before the pipeline existed" (`CLAUDE.md:379-380`) — a permanent fact about a page's
+provenance, not a status it grows out of. Revision 2 proposed stripping it on refresh; that
+would make the flag lie about history and destroy the only record of which pages predate the
+toolchain. A refreshed seed is a seed with fresh sources.
 
 **`refresh` does not regenerate `meta/ledger.yaml`.** See "Where the ledger is written".
 
 ### Three outcomes
 
-**Confirmed** — nothing moved. The only diff is `verified` dates and the seed graduation.
+**Confirmed** — nothing moved. The only diff is `verified` dates and, on a page's first
+refresh, a new `research:` field.
 This is still a real change: it asserts a reviewed agent re-read these sources on this date,
 which is the product.
 
@@ -192,7 +197,8 @@ distinguish them, and nothing downstream should care.
 ### Idempotence
 
 Refreshing an unchanged unit produces exactly one class of diff — dates, plus the one-time
-seed graduation — and nothing else. This earns a proof under `examples/`, mirroring
+first-refresh `research:` field — and nothing else. This earns a proof under `examples/`,
+mirroring
 `examples/marker-render-idempotence/`.
 
 ## Where the ledger is written
@@ -280,10 +286,19 @@ this twice, in two tools, at two different scopes, and one of them was impossibl
 `frontmatter-required` errors and destroy `lint: clean` on contact.
 
 **`REQUIRED_FIELDS` is not touched.** The rule lives in `corpus verify` alone: _a page with
-no `seed: true` and no `research:` is an error._ Today that matches zero pages, by design —
-nothing has been refreshed yet. It gains coverage through refresh's step 6, which removes
-`seed: true` and sets `research:` together. Seed status is a one-way door: a page that has
-been refreshed can never legitimately claim it predates the pipeline.
+no `seed: true` and no `research:` is an error._
+
+Today that matches zero pages, and it will keep matching zero until the first non-seed page
+exists — which is correct rather than a defect. Since `seed: true` is permanent, the rule's
+real subject is **pages authored by the pipeline**, every one of which will have a research
+artifact by construction. The five seeds are exempt forever, and that costs nothing: refresh
+sets `research:` on them anyway, so all five acquire one within a cadence regardless of
+whether a rule compels it. What the rule actually prevents is a future `write-guide` shipping
+an ungrounded page — which is the case worth guarding.
+
+This is the honest version of the trade-off the review identified. A rule with zero current
+coverage is acceptable when the thing it guards does not exist yet; a rule that forces a
+false claim about provenance to gain coverage is not.
 
 ## Component 3: the verify agent
 
@@ -318,7 +333,8 @@ block-with-findings.
 
 **On a block, refresh's freshness assertions are reverted on the branch before the pull
 request is opened.** Page and record `verified` dates go back to their prior values and the
-seed graduation is undone. The evidence artifact is kept, stamped `verdict: blocked`, because
+any `research:` field refresh added is removed. The evidence artifact is kept on disk,
+stamped `verdict: blocked`, because
 what was checked and what was found is exactly what the next attempt needs.
 
 Revision 1 left the bumped dates in place on a blocked draft branch — a fully-formed,
@@ -442,7 +458,7 @@ existing yet — and hand-driving it once is the point of that plan.
   `effective interval = cadence - lead` relationship, refresh units, cluster cap, draft-on-block
   with reverted dates, and the `stale-past-expiry` alarm.
 - Refresh units and the one-writer ledger rule, so a future reader does not "fix" either.
-- Seed graduation: `seed: true` is removed by a refresh, and `research:` has one meaning.
+- `seed: true` is permanent provenance and is never removed; `research:` has one meaning.
 - **"Duplicates are not detected (the later one wins in render)"** becomes false once
   `record-duplicate-key` ships. Correct it.
 - **"Do not write either form. Reviewers check for them by eye"** must say that Form 1 is now
@@ -498,7 +514,7 @@ answered the foundation's open question on what runs the scheduled audit.
 
 **Revision 2 (2026-09-27)** — Substantial rework after adversarial review against the tree at
 `f0256b5`. Six blockers fixed: the impossible `research:`/`REQUIRED_FIELDS` amendment (redesigned
-as a single `corpus verify` rule plus seed graduation); `evidence-label-invalid` false-positiving
+as a single `corpus verify` rule); `evidence-label-invalid` false-positiving
 on all five pages (scoped to `Evidence:` lines, multi-label tolerant, proof check cut as
 undecidable); `known-lint-gap-form` Form 2 (cut as undecidable); guaranteed `meta/ledger.yaml`
 conflicts and an unfireable shared-record cheap path (refresh units replace per-page PRs; the
@@ -509,3 +525,10 @@ silently broke, `rots-table-incomplete`'s loose reading, `template-sections` res
 the `stale-past-expiry` alarm, proof re-runs, a rollback and re-queue path, and the
 `comparison.md` section 6 prerequisite. Decomposed into three plans so the gate ships before
 anything executes section 6, and restated the acceptance criterion without its false deadline.
+
+**Revision 3 (2026-09-27)** — Corrects revision 2's seed handling. `seed: true` is permanent
+provenance per `CLAUDE.md:379-380`, not a status a refresh clears; stripping it would have made
+the flag lie about which pages predate the toolchain. `research-required` therefore keeps its
+seed exemption permanently, and its subject is pipeline-authored pages rather than refreshed
+seeds. A verify-agent block now reverts the added `research:` field rather than an imaginary
+graduation.
