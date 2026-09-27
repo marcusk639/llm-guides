@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkDuplicateKeys, checkRecordFields } from "../verify-records.mjs";
+import {
+  checkDuplicateKeys,
+  checkRecordFields,
+  checkLintLiteralsStale,
+} from "../verify-records.mjs";
 
 const rec = (key, file = "models.yaml", extra = {}) => ({
   key,
@@ -96,5 +100,55 @@ test("does not report verified-invalid when verified is absent", () => {
   assert.equal(
     checkRecordFields(r).some((i) => i.rule === "record-verified-invalid"),
     false,
+  );
+});
+
+test("accepts a literal that is a whole field value", () => {
+  const r = rec("a.b", "models.yaml", {
+    display: "600 seconds for command handlers",
+    lint_literals: ["600 seconds for command handlers"],
+  });
+  assert.deepEqual(checkLintLiteralsStale(r), []);
+});
+
+test("accepts a literal that is a fragment of a field value", () => {
+  const r = rec("a.b", "models.yaml", {
+    display: "a shared 1.5-second budget, raised to match a longer timeout",
+    lint_literals: ["1.5-second budget"],
+  });
+  assert.deepEqual(checkLintLiteralsStale(r), []);
+});
+
+test("accepts a literal that matches a numeric field", () => {
+  const r = rec("a.b", "models.yaml", { value: 600, lint_literals: ["600"] });
+  assert.deepEqual(checkLintLiteralsStale(r), []);
+});
+
+test("reports a literal matching no field on the record", () => {
+  const r = rec("a.b", "models.yaml", {
+    display: "60 seconds for agent handlers",
+    lint_literals: ["30 seconds for agent handlers"],
+  });
+  const issues = checkLintLiteralsStale(r);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "lint-literals-stale");
+  assert.match(issues[0].message, /30 seconds for agent handlers/);
+});
+
+test("does not let a literal satisfy itself via the lint_literals field", () => {
+  const r = rec("a.b", "models.yaml", {
+    value: "x",
+    lint_literals: ["nowhere else on this record"],
+  });
+  assert.equal(checkLintLiteralsStale(r).length, 1);
+});
+
+test("ignores a record whose lint_literals is absent or malformed", () => {
+  assert.deepEqual(checkLintLiteralsStale(rec("a.b")), []);
+  assert.deepEqual(
+    checkLintLiteralsStale(
+      rec("a.b", "models.yaml", { lint_literals: "not a list" }),
+    ),
+    [],
   );
 });

@@ -12,7 +12,11 @@ import {
   checkExpiry,
   checkRecordLintConfig,
 } from "./lint.mjs";
-import { checkDuplicateKeys, checkRecordFields } from "./verify-records.mjs";
+import {
+  checkDuplicateKeys,
+  checkRecordFields,
+  checkLintLiteralsStale,
+} from "./verify-records.mjs";
 import { renderText, normaliseForComparison } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
 import {
@@ -115,6 +119,8 @@ export function verifyCorpus(root) {
   for (const record of records) {
     for (const i of checkRecordFields(record))
       issues.push({ ...i, path: path.join("data", record.file) });
+    for (const i of checkLintLiteralsStale(record))
+      issues.push({ ...i, path: path.join("data", record.file) });
   }
   return issues;
 }
@@ -131,6 +137,12 @@ export function verifyStats(root) {
     guides: guidePaths(root).length,
     recordsChecked,
     recordsWithSource,
+    recordsWithLintLiterals: records.filter((r) => Array.isArray(r.lint_literals))
+      .length,
+    lintLiteralEntries: records.reduce(
+      (n, r) => n + (Array.isArray(r.lint_literals) ? r.lint_literals.length : 0),
+      0,
+    ),
   };
 }
 
