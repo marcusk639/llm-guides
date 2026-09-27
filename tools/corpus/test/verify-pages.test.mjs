@@ -9,6 +9,7 @@ import {
   checkEvidenceLabels,
   evidenceSegments,
   VALID_LABELS,
+  referencedRecordKeys,
 } from "../verify-pages.mjs";
 
 const fm = (extra = {}) => ({
@@ -301,4 +302,43 @@ test("checkEvidenceLabels reports one issue, naming the unterminated fence, when
   assert.equal(issues.length, 1);
   assert.equal(issues[0].rule, "evidence-label-invalid");
   assert.match(issues[0].message, /unterminated code fence/);
+});
+
+const RECORDS = [
+  { key: "a.one", value: "1", tags: ["alpha"], file: "a.yaml" },
+  { key: "a.two", value: "2", tags: ["alpha", "beta"], file: "a.yaml" },
+  { key: "b.one", value: "3", tags: ["beta"], file: "b.yaml" },
+  { key: "c.none", value: "4", file: "c.yaml" },
+];
+
+test("collects the key of a terminated corpus:data block", () => {
+  const text = "<!-- corpus:data key=a.one -->1<!-- /corpus:data -->\n";
+  assert.deepEqual([...referencedRecordKeys(text, RECORDS)], ["a.one"]);
+});
+
+test("collects every record a tagged corpus:table selects", () => {
+  const text =
+    "<!-- corpus:table fields=key,value tag=beta -->\n\n| x |\n\n<!-- /corpus:table -->\n";
+  assert.deepEqual([...referencedRecordKeys(text, RECORDS)].sort(), [
+    "a.two",
+    "b.one",
+  ]);
+});
+
+test("a table with no tag references every record in the corpus", () => {
+  const text =
+    "<!-- corpus:table fields=key,value -->\n\n| x |\n\n<!-- /corpus:table -->\n";
+  assert.equal(referencedRecordKeys(text, RECORDS).size, RECORDS.length);
+});
+
+test("ignores an unterminated block", () => {
+  const text =
+    "<!-- corpus:data key=a.one -->\n<!-- corpus:data key=a.two -->x<!-- /corpus:data -->\n";
+  const keys = referencedRecordKeys(text, RECORDS);
+  assert.equal(keys.has("a.one"), false);
+  assert.equal(keys.has("a.two"), true);
+});
+
+test("returns an empty set for a page with no marker blocks", () => {
+  assert.equal(referencedRecordKeys("just prose\n", RECORDS).size, 0);
 });

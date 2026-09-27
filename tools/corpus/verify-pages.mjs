@@ -3,6 +3,8 @@
 // tolerates null front-matter: a page with none is already reported by lint's
 // frontmatter-missing, and these rules must not throw on top of it.
 
+import { findBlocks } from "./markers.mjs";
+
 // `typeof data !== "object"` rather than a null check: front-matter that is a
 // bare string or number parses to a non-object, and `"applies_to" in data`
 // throws a TypeError on those.
@@ -219,3 +221,30 @@ export function checkEvidenceLabels(text) {
   }
   return issues;
 }
+
+// Deliberately fence-BLIND, unlike sectionSixText and evidenceSegments ten
+// lines away: findBlocks does not know about fences, and the contract is
+// explicit that a marker inside a fence is a real marker that render rewrites.
+// Agreeing with render matters more than agreeing with the neighbouring rules.
+//
+// Must agree with render's selection exactly, including that a corpus:table
+// with no tag selects the whole corpus
+// — which is why omitting a tag makes a page as volatile as the most volatile
+// record anywhere.
+export function referencedRecordKeys(text, records) {
+  const keys = new Set();
+  for (const block of findBlocks(text)) {
+    if (block.unterminated) continue;
+    if (block.kind === "data") {
+      if (block.attrs.key) keys.add(block.attrs.key);
+      continue;
+    }
+    if (block.kind !== "table") continue;
+    const tag = block.attrs.tag;
+    for (const r of records) {
+      if (tag == null || [].concat(r.tags ?? []).includes(tag)) keys.add(r.key);
+    }
+  }
+  return keys;
+}
+
