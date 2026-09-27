@@ -22,6 +22,32 @@
 - Both existing gates must stay green after every task: `node tools/corpus/cli.mjs render --check .` exits 0 with no `would render:` line, and `node tools/corpus/cli.mjs lint .` prints `lint: clean`.
 - After creating any new directory, check for and delete a hook-generated `.claude/` folder inside it before staging. Stage by filename, never `git add -A`.
 
+- **Stats helpers need imports.** `verifyStats` calls `numberedSections`,
+  `evidenceSegments` and `referencedRecordKeys` from `./verify-pages.mjs`, plus
+  `parseFrontmatter` and `fs` which `cli.mjs` already imports. Add each helper to the
+  existing `./verify-pages.mjs` import in the task that introduces it.
+- **Every rule needs a positive control, not just a clean exit.** `verify: clean` is
+  what a working rule prints on a clean corpus — and also what a rule that matches
+  nothing prints. A rule that silently never fires is the exact invisible-failure class
+  this gate exists to catch, so each task confirms its rule actually inspected the real
+  corpus by checking a count, not only an exit code. `corpus verify --stats` (built in
+  Task 1) prints those counts. The expected values, computed against the tree at
+  `50a3522`:
+
+| Count | Value | Owning task |
+| --- | --- | --- |
+| Records loaded | 25 | Task 1 |
+| Records carrying `lint_literals` | 13 | Task 3 |
+| `lint_literals` entries | 48 | Task 3 |
+| Guides walked | 5 | Task 1 |
+| `related` entries | 7 | Task 4 |
+| Numbered `##` headings | 40 (8 per guide) | Task 5 |
+| Evidence lines | 48 (2 of them mid-line) | Task 6 |
+| Record references | 29 (7/3/2/4/13 by guide, sorted) | Tasks 7, 8 |
+
+A count that comes back lower than the table means the rule is not seeing what it
+should. Investigate before moving on; do not adjust the table to match.
+
 ## Review Focus
 
 Five input classes the spec implies but which no rule's happy path exercises. Each has its test assigned to the task that owns the code.
@@ -176,6 +202,17 @@ export function verifyCorpus(root) {
     issues.push({ ...i, path: path.join("data", file) });
   return issues;
 }
+
+// What verify actually looked at. `verify: clean` is also what a rule matching
+// nothing prints, so these counts are how a reader tells a working gate from a
+// silent one. Each later task adds its own counter here.
+export function verifyStats(root) {
+  const records = loadRecords(path.join(root, "data"));
+  return {
+    records: records.length,
+    guides: guidePaths(root).length,
+  };
+}
 ```
 
 - [ ] **Step 6: Wire the `verify` command into `main()`**
@@ -195,6 +232,11 @@ Add this branch immediately after the `if (command === "lint") { ... }` block cl
 ```javascript
   } else if (command === "verify") {
     if (write) usage();
+    if (rest.includes("--stats")) {
+      for (const [k, v] of Object.entries(verifyStats(root)))
+        console.log(`${k}: ${v}`);
+      process.exit(0);
+    }
     const issues = verifyCorpus(root);
     for (const i of issues)
       console.error(
@@ -223,6 +265,20 @@ Expected: `verify: clean`, exit 0. There are no duplicate keys among the 25 reco
 
 Run: `node tools/corpus/cli.mjs verify --write .`
 Expected: the usage message and exit 2 — `verify` rejects `--write`.
+
+- [ ] **Step 8b: Positive control**
+
+Run: `node tools/corpus/cli.mjs verify --stats .`
+Expected, exit 0:
+
+```
+records: 25
+guides: 5
+```
+
+If `records` or `guides` is 0, the command is reporting `verify: clean` because it
+loaded nothing — not because the corpus is clean. Every later task adds a counter here
+and checks it the same way.
 
 - [ ] **Step 9: Mutation proof**
 
@@ -388,6 +444,25 @@ for (const record of records) {
 Run: `node tools/corpus/cli.mjs verify .`
 Expected: `verify: clean`. All 25 records carry a `source` and a quoted `"2026-09-16"`.
 
+- [ ] **Step 6b: Positive control**
+
+Add to `verifyStats` in `tools/corpus/cli.mjs`:
+
+```javascript
+    recordsChecked: records.length,
+    recordsWithSource: records.filter((r) => r.source != null).length,
+```
+
+Run: `node tools/corpus/cli.mjs verify --stats .`
+Expected to include:
+
+```
+recordsChecked: 25
+recordsWithSource: 25
+```
+
+`recordsWithSource` below 25 means a record is missing a `source` and the rule should have fired. Equal to 25 confirms the rule inspected every record and found nothing, rather than inspecting none.
+
 - [ ] **Step 7: Mutation proof**
 
 Temporarily change `typeof record.verified !== "string"` to `false`. Run the tests and confirm the Date test fails. Restore and confirm green.
@@ -550,6 +625,29 @@ for (const i of checkLintLiteralsStale(record))
 
 Run: `node tools/corpus/cli.mjs verify .`
 Expected: `verify: clean`. All 13 literal-bearing records pass under substring semantics.
+
+- [ ] **Step 6b: Positive control**
+
+Add to `verifyStats` in `tools/corpus/cli.mjs`:
+
+```javascript
+    recordsWithLintLiterals: records.filter((r) => Array.isArray(r.lint_literals))
+      .length,
+    lintLiteralEntries: records.reduce(
+      (n, r) => n + (Array.isArray(r.lint_literals) ? r.lint_literals.length : 0),
+      0,
+    ),
+```
+
+Run: `node tools/corpus/cli.mjs verify --stats .`
+Expected to include:
+
+```
+recordsWithLintLiterals: 13
+lintLiteralEntries: 48
+```
+
+48 is the number of literal strings the rule actually resolved. If it reads 0, `lint_literals` is not being seen at all — for example because the records were loaded from the wrong directory — and `verify: clean` means nothing.
 
 If any record fires here, **the rule is what needs examining first** — the contract blesses fragment literals, so a fire means the substring logic or the excluded-field set is wrong, not that the seed is.
 
@@ -812,6 +910,30 @@ Expected: `verify: clean`. All five guides carry `applies_to` as a list of strin
 
 `research-required` matching zero pages today is the designed outcome, not a defect — see the spec's redesign section. Do not "fix" it by removing `seed: true` from a guide.
 
+- [ ] **Step 6b: Positive control**
+
+Add to `verifyStats` in `tools/corpus/cli.mjs`:
+
+```javascript
+    relatedEntries: guidePaths(root).reduce((n, f) => {
+      const { data } = parseFrontmatter(fs.readFileSync(f, "utf8"));
+      return n + (Array.isArray(data?.related) ? data.related.length : 0);
+    }, 0),
+    seedPages: guidePaths(root).filter(
+      (f) => parseFrontmatter(fs.readFileSync(f, "utf8")).data?.seed === true,
+    ).length,
+```
+
+Run: `node tools/corpus/cli.mjs verify --stats .`
+Expected to include:
+
+```
+relatedEntries: 7
+seedPages: 5
+```
+
+7 related entries were resolved against the filesystem (1/0/3/1/2 across the five guides). `seedPages: 5` is the positive control for `research-required`: it confirms the rule found five seed pages and exempted them, which is why it reported nothing — as opposed to never having run.
+
 - [ ] **Step 7: Mutation proof**
 
 Temporarily change `if (data.seed === true) return [];` to `return [];`. Run the tests and confirm the non-seed test fails. Restore. Then temporarily change `!Array.isArray(v)` to `false` and confirm the object-shaped test fails. Restore and confirm green.
@@ -992,6 +1114,26 @@ Add `checkTemplateSections` to the `./verify-pages.mjs` import in `cli.mjs` and 
 Run: `node tools/corpus/cli.mjs verify .`
 Expected: `verify: clean`. All five guides use `## 1.`–`## 8.` — confirmed for `software-engineering.md` at lines 40, 45, 103, 119, 252, 354, 380, 390.
 
+- [ ] **Step 6b: Positive control**
+
+Add to `verifyStats` in `tools/corpus/cli.mjs`:
+
+```javascript
+    numberedHeadings: guidePaths(root).reduce(
+      (n, f) => n + numberedSections(fs.readFileSync(f, "utf8")).length,
+      0,
+    ),
+```
+
+Run: `node tools/corpus/cli.mjs verify --stats .`
+Expected to include:
+
+```
+numberedHeadings: 40
+```
+
+40 is 8 headings on each of 5 guides. Any lower number means the fence toggle swallowed headings or the regex missed them, and the rule would then be reporting spurious missing sections or nothing at all.
+
 - [ ] **Step 7: Mutation proof**
 
 Temporarily remove the fence tracking (delete the `if (/^\s*(```|~~~)/...)` block and the `if (fenced) continue;` line). Run the tests and confirm the fenced-heading test fails. Restore and confirm green.
@@ -1012,7 +1154,14 @@ git commit -m "feat: verify the eight-part page template structure"
 
 ### Task 6: Evidence labels
 
-Scoped to lines beginning `Evidence:` — **not** prose. Every guide explains the label system with a bolded `**Verified**` in ordinary prose (`hooks.md:130`, `context-management.md:108`, `software-engineering.md:121`, `claude-models.md:77`, `comparison.md:128`, and `hooks.md:315`); a rule that scanned the whole body would fire on all five pages and would punish them for honestly disclaiming Verified status.
+Scoped to the `Evidence:` label and the text after it on the same line — **not** prose elsewhere.
+
+**The anchor is the token, not the column.** An earlier draft of this rule required
+`/^Evidence:/`. Two real labels sit mid-line — `guides/claude-code/hooks.md:158` at column
+110 and `guides/models/claude-models.md:91` at column 191, each following a trailing caveat
+in the same paragraph — so a column-0 anchor would have checked 46 of 48 labels while
+printing `verify: clean`. That is the silent-rule failure this gate exists to prevent,
+committed by the gate itself. Every guide explains the label system with a bolded `**Verified**` in ordinary prose (`hooks.md:130`, `context-management.md:108`, `software-engineering.md:121`, `claude-models.md:77`, `comparison.md:128`, and `hooks.md:315`); a rule that scanned the whole body would fire on all five pages and would punish them for honestly disclaiming Verified status.
 
 Multiple labels on one `Evidence:` line are **legal and in use** (`software-engineering.md:268`, `:352`), because the contract requires each part of a mixed claim to be labeled separately.
 
@@ -1030,7 +1179,7 @@ The "**Verified** requires a shipping proof" check is deliberately **not** imple
 
 - [ ] **Step 1: Write the failing tests**
 
-Add `checkEvidenceLabels` and `VALID_LABELS` to the import, then append:
+Add `checkEvidenceLabels`, `evidenceSegments` and `VALID_LABELS` to the import, then append:
 
 ````javascript
 test("exports exactly the three label spellings", () => {
@@ -1083,6 +1232,35 @@ test("ignores an Evidence line inside a fenced code block", () => {
   const text = "```\nEvidence: **documented** — sample.\n```\n";
   assert.deepEqual(checkEvidenceLabels(text), []);
 });
+
+test("accepts a label that follows a trailing caveat on the same line", () => {
+  // The shape at guides/claude-code/hooks.md:158.
+  const text =
+    "One caveat: `xargs` splits on whitespace. Evidence: **Plausible** — standard behavior.\n";
+  assert.deepEqual(checkEvidenceLabels(text), []);
+});
+
+test("reports a miscased label that follows a trailing caveat", () => {
+  const text = "A caveat holds here. Evidence: **plausible** — a guess.\n";
+  const issues = checkEvidenceLabels(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].line, 1);
+});
+
+test("evidenceSegments finds both column-0 and mid-line labels", () => {
+  const text = "Evidence: **Documented** — a.\n\nprose. Evidence: **Plausible** — b.\n";
+  assert.deepEqual(
+    evidenceSegments(text).map((s) => s.line),
+    [1, 3],
+  );
+});
+
+test("a bolded label in ordinary prose with no Evidence token is ignored", () => {
+  assert.deepEqual(
+    checkEvidenceLabels("Nothing here is **Verified**, and that is honest.\n"),
+    [],
+  );
+});
 ````
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -1100,13 +1278,17 @@ export const VALID_LABELS = Object.freeze([
   "Documented",
   "Plausible",
 ]);
+export const EVIDENCE_TOKEN = "Evidence:";
 const LABEL_LOOKUP = new Map(VALID_LABELS.map((l) => [l.toLowerCase(), l]));
 const BOLD = /\*\*([^*]+)\*\*/g;
 
-// Only lines that ARE an Evidence line. Every guide discusses **Verified** in
-// prose while disclaiming it; scanning the body would fire on all of them.
-export function checkEvidenceLabels(text) {
-  const issues = [];
+// Every line carrying the Evidence token, scanned from the token to end of
+// line. Anchoring at column 0 would miss a label that follows a trailing
+// caveat in the same paragraph, which two current pages do. Prose elsewhere is
+// untouched: every guide discusses **Verified** while disclaiming it, and
+// scanning whole bodies would fire on all five.
+export function evidenceSegments(text) {
+  const out = [];
   let fenced = false;
   const lines = text.split("\n");
   for (let i = 0; i < lines.length; i++) {
@@ -1115,9 +1297,20 @@ export function checkEvidenceLabels(text) {
       fenced = !fenced;
       continue;
     }
-    if (fenced || !/^Evidence:/.test(line)) continue;
+    if (fenced) continue;
+    const at = line.indexOf(EVIDENCE_TOKEN);
+    if (at === -1) continue;
+    out.push({ segment: line.slice(at), line: i + 1 });
+  }
+  return out;
+}
+
+export function checkEvidenceLabels(text) {
+  const issues = [];
+  for (const { segment, line: lineNo } of evidenceSegments(text)) {
+    const i = lineNo - 1;
     let valid = 0;
-    for (const m of line.matchAll(BOLD)) {
+    for (const m of segment.matchAll(BOLD)) {
       const bold = m[1].trim();
       const canonical = LABEL_LOOKUP.get(bold.toLowerCase());
       if (canonical === undefined) continue; // bolding something else is fine
@@ -1134,7 +1327,7 @@ export function checkEvidenceLabels(text) {
     if (valid === 0) {
       issues.push({
         rule: "evidence-label-invalid",
-        message: `Evidence line carries no evidence label; it must bold at least one of ${VALID_LABELS.join(", ")}`,
+        message: `Evidence label carries no valid label; it must bold at least one of ${VALID_LABELS.join(", ")}`,
         line: i + 1,
       });
     }
@@ -1159,9 +1352,33 @@ Expected: `verify: clean`.
 
 If an `Evidence:` line fires here, inspect it before changing anything. The contract is the authority on how labels are written; if the page follows the contract and the rule disagrees, **the rule is wrong**. Record which line fired and why in the commit message.
 
+- [ ] **Step 6b: Positive control**
+
+Add to `verifyStats` in `tools/corpus/cli.mjs`:
+
+```javascript
+    evidenceLines: guidePaths(root).reduce(
+      (n, f) => n + evidenceSegments(fs.readFileSync(f, "utf8")).length,
+      0,
+    ),
+```
+
+Run: `node tools/corpus/cli.mjs verify --stats .`
+Expected to include:
+
+```
+evidenceLines: 48
+```
+
+**48 is the number that matters most in this plan.** A column-0 anchor yields 46 and still prints `verify: clean`; the two it drops are `hooks.md:158` and `claude-models.md:91`. If this reads 46, the token anchor was not applied.
+
 - [ ] **Step 7: Mutation proof**
 
-Temporarily change `!/^Evidence:/.test(line)` to `false` so every line is scanned. Run `node tools/corpus/cli.mjs verify .` and confirm it now reports issues on all five guides — this is the false-positive the scoping prevents. Restore, confirm `verify: clean`, run the tests, confirm green.
+Two mutations, because this rule has a failure mode in each direction.
+
+**Over-scanning.** In `evidenceSegments`, replace `const at = line.indexOf(EVIDENCE_TOKEN); if (at === -1) continue;` with `const at = 0;`. Run `node tools/corpus/cli.mjs verify .` and confirm it now reports issues on all five guides — the false positive the token anchor prevents, since every guide bolds **Verified** in prose. Restore and confirm `verify: clean`.
+
+**Under-scanning.** Change `line.indexOf(EVIDENCE_TOKEN)` to `line.startsWith(EVIDENCE_TOKEN) ? 0 : -1`. Run `node tools/corpus/cli.mjs verify --stats .` and confirm `evidenceLines` drops from 48 to 46 while `verify` still prints clean — the silent failure this task exists to prevent, reproduced. Confirm the two mid-line tests go red. Restore, confirm 48 and green tests.
 
 - [ ] **Step 8: Run the full suite and both gates**
 
@@ -1437,6 +1654,27 @@ Add `checkRotsTable` to the import and `...checkRotsTable(text, records),` to th
 Run: `node tools/corpus/cli.mjs verify .`
 Expected: `verify: clean`. All 29 current record references appear in their page's section 6 under the loose reading.
 
+- [ ] **Step 6b: Positive control**
+
+Add to `verifyStats` in `tools/corpus/cli.mjs`:
+
+```javascript
+    recordReferences: guidePaths(root).reduce(
+      (n, f) =>
+        n + referencedRecordKeys(fs.readFileSync(f, "utf8"), records).size,
+      0,
+    ),
+```
+
+Run: `node tools/corpus/cli.mjs verify --stats .`
+Expected to include:
+
+```
+recordReferences: 29
+```
+
+29 is the total across the five guides — 7, 3, 2, 4 and 13 in sorted path order. This is the positive control for the highest-value rule in the set: if it reads 0, section 6 completeness is not being checked on any page and refresh would later execute checklists nobody verified.
+
 - [ ] **Step 7: Mutation proof**
 
 Temporarily change `six.includes(k)` to a strict row check — `new RegExp(`^\\|[^|]_\`${k}\`[^|]_\\|`, "m").test(six)`. Run `node tools/corpus/cli.mjs verify .` and confirm it now reports against `guides/models/comparison.md` — this is the strict-reading false positive the loose reading avoids. Restore, confirm `verify: clean`, run the tests, confirm green.
@@ -1557,6 +1795,11 @@ Add `checkKnownLintGapForm` to the import and `...checkKnownLintGapForm(text),` 
 
 Run: `node tools/corpus/cli.mjs verify .`
 Expected: `verify: clean`.
+
+**This rule gets no positive control, and that is correct.** The corpus contains zero
+instances of Form 1 — the contract forbids the shape — so there is nothing to count. Its
+evidence comes from the unit tests and the mutation proof instead. Do not invent a count
+here; a fabricated control is worse than an acknowledged absence.
 
 - [ ] **Step 7: Mutation proof**
 
