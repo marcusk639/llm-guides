@@ -17,6 +17,11 @@ import {
   checkRecordFields,
   checkLintLiteralsStale,
 } from "./verify-records.mjs";
+import {
+  checkAppliesToShape,
+  checkRelatedPaths,
+  checkResearchRequired,
+} from "./verify-pages.mjs";
 import { renderText, normaliseForComparison } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
 import {
@@ -122,6 +127,19 @@ export function verifyCorpus(root) {
     for (const i of checkLintLiteralsStale(record))
       issues.push({ ...i, path: path.join("data", record.file) });
   }
+
+  const exists = (rel) => fs.existsSync(path.join(root, rel));
+  for (const file of guidePaths(root)) {
+    const text = fs.readFileSync(file, "utf8");
+    const { data } = parseFrontmatter(text);
+    const rel = path.relative(root, file);
+    for (const i of [
+      ...checkAppliesToShape(data),
+      ...checkRelatedPaths(data, exists),
+      ...checkResearchRequired(data),
+    ])
+      issues.push({ ...i, path: rel });
+  }
   return issues;
 }
 
@@ -143,6 +161,13 @@ export function verifyStats(root) {
       (n, r) => n + (Array.isArray(r.lint_literals) ? r.lint_literals.length : 0),
       0,
     ),
+    relatedEntries: guidePaths(root).reduce((n, f) => {
+      const { data } = parseFrontmatter(fs.readFileSync(f, "utf8"));
+      return n + (Array.isArray(data?.related) ? data.related.length : 0);
+    }, 0),
+    seedPages: guidePaths(root).filter(
+      (f) => parseFrontmatter(fs.readFileSync(f, "utf8")).data?.seed === true,
+    ).length,
   };
 }
 
