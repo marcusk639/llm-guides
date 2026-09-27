@@ -25,39 +25,29 @@ export function checkDuplicateKeys(records) {
   return issues;
 }
 
+// source and verified are required by the contract but checked by no tool:
+// "The Verify stage checks them."
 export function checkRecordFields(record) {
   const issues = [];
-
-  // Check for missing source
-  if (record.source == null) {
+  if (record.source == null || String(record.source).trim() === "") {
     issues.push({
       rule: "record-source-missing",
-      message: `Record ${record.key} is missing a source URL`,
+      message: `record ${record.key}: no source; every value must name the URL it was read from`,
     });
   }
-
-  // Check for missing verified
-  if (record.verified == null) {
+  if (!("verified" in record) || record.verified == null) {
     issues.push({
       rule: "record-verified-missing",
-      message: `Record ${record.key} is missing a verified date`,
+      message: `record ${record.key}: no verified date`,
+    });
+  } else if (
+    typeof record.verified !== "string" ||
+    !isValidIsoDate(record.verified)
+  ) {
+    issues.push({
+      rule: "record-verified-invalid",
+      message: `record ${record.key}: verified must be a quoted real date written YYYY-MM-DD; got ${JSON.stringify(record.verified)}`,
     });
   }
-
-  // Check verified is a string and a valid ISO date (only if verified is present)
-  if (record.verified != null) {
-    if (typeof record.verified !== "string") {
-      issues.push({
-        rule: "record-verified-invalid",
-        message: `Record ${record.key} verified must be a string, got ${typeof record.verified}`,
-      });
-    } else if (!isValidIsoDate(record.verified)) {
-      issues.push({
-        rule: "record-verified-invalid",
-        message: `Record ${record.key} verified is not a valid YYYY-MM-DD date: ${record.verified}`,
-      });
-    }
-  }
-
   return issues;
 }

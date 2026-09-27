@@ -50,6 +50,14 @@ test("reports a missing source", () => {
   assert.match(issues[0].message, /a\.b/);
 });
 
+test("reports an empty-string source", () => {
+  const issues = checkRecordFields(rec("a.b", "models.yaml", { source: "" }));
+  assert.equal(
+    issues.some((i) => i.rule === "record-source-missing"),
+    true,
+  );
+});
+
 test("reports a missing verified", () => {
   const r = rec("a.b");
   delete r.verified;
@@ -70,6 +78,9 @@ test("reports a verified that is not a real calendar date", () => {
 });
 
 test("reports a verified that is a Date or another non-string", () => {
+  // NOT reachable through this repo's loader: data.mjs reads with
+  // yaml.JSON_SCHEMA, so an unquoted 2026-09-16 stays a string. The guard is
+  // defensive against a caller that hands over a Date, a number, or a map.
   const issues = checkRecordFields(
     rec("a.b", "models.yaml", { verified: new Date("2026-09-16") }),
   );
