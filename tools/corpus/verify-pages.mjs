@@ -62,3 +62,57 @@ export function checkResearchRequired(data) {
     },
   ];
 }
+
+const EXPECTED_SECTIONS = 8;
+const NUMBERED_H2 = /^##\s+(\d+)\.\s*(.*)$/;
+
+// Lines outside fenced code blocks only: a guide may quote the template inside
+// a fence, and that is documentation, not structure.
+export function numberedSections(text) {
+  const out = [];
+  let fenced = false;
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) continue;
+    const m = NUMBERED_H2.exec(line);
+    if (m) out.push({ n: Number(m[1]), line: i + 1, title: m[2].trim() });
+  }
+  return out;
+}
+
+export function checkTemplateSections(text) {
+  const found = numberedSections(text);
+  const issues = [];
+  const seen = found.map((s) => s.n);
+  for (let n = 1; n <= EXPECTED_SECTIONS; n++) {
+    if (!seen.includes(n)) {
+      issues.push({
+        rule: "template-sections",
+        message: `missing template section: expected a "## ${n}." heading`,
+      });
+    }
+  }
+  const extras = found.filter((s) => s.n < 1 || s.n > EXPECTED_SECTIONS);
+  for (const s of extras) {
+    issues.push({
+      rule: "template-sections",
+      message: `unexpected numbered section "## ${s.n}."; the template has ${EXPECTED_SECTIONS} sections`,
+      line: s.line,
+    });
+  }
+  for (let i = 1; i < found.length; i++) {
+    if (found[i].n <= found[i - 1].n) {
+      issues.push({
+        rule: "template-sections",
+        message: `template section "## ${found[i].n}." appears after "## ${found[i - 1].n}."; sections must run 1 to ${EXPECTED_SECTIONS} in order`,
+        line: found[i].line,
+      });
+    }
+  }
+  return issues;
+}

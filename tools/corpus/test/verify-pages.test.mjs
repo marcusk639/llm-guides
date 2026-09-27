@@ -4,6 +4,8 @@ import {
   checkAppliesToShape,
   checkRelatedPaths,
   checkResearchRequired,
+  checkTemplateSections,
+  numberedSections,
 } from "../verify-pages.mjs";
 
 const fm = (extra = {}) => ({
@@ -121,4 +123,67 @@ test("treats seed: false as not a seed", () => {
 
 test("exempts a deprecated page from the research requirement", () => {
   assert.deepEqual(checkResearchRequired(fm({ status: "deprecated" })), []);
+});
+
+const eightSections = (mutate = (xs) => xs) =>
+  mutate([
+    "## 1. What this covers / who it's for",
+    "## 2. The 60-second version",
+    "## 3. How it actually works",
+    "## 4. Patterns that hold up",
+    "## 5. Edge cases and failure modes",
+    "## 6. Where this rots",
+    "## 7. Proofs",
+    "## 8. Sources",
+  ]).join("\n\nbody text\n\n");
+
+test("accepts the eight numbered headings in order", () => {
+  assert.deepEqual(checkTemplateSections(eightSections()), []);
+});
+
+test("ignores ### subheadings, numbered or not", () => {
+  const text = eightSections() + "\n\n### 4.1 A subsection\n\n### Unnumbered\n";
+  assert.deepEqual(checkTemplateSections(text), []);
+});
+
+test("ignores a numbered heading inside a fenced code block", () => {
+  const text =
+    eightSections() + "\n\n```markdown\n## 9. Not a real section\n```\n";
+  assert.deepEqual(checkTemplateSections(text), []);
+});
+
+test("reports a missing section", () => {
+  const text = eightSections((xs) => xs.filter((h) => !h.startsWith("## 7.")));
+  const issues = checkTemplateSections(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "template-sections");
+  assert.match(issues[0].message, /7/);
+});
+
+test("reports sections in the wrong order", () => {
+  const text = eightSections((xs) => {
+    const out = [...xs];
+    [out[2], out[3]] = [out[3], out[2]];
+    return out;
+  });
+  assert.equal(
+    checkTemplateSections(text).some((i) => i.rule === "template-sections"),
+    true,
+  );
+});
+
+test("reports a duplicated section number", () => {
+  const text = eightSections((xs) => [...xs, "## 8. Sources again"]);
+  assert.equal(checkTemplateSections(text).length >= 1, true);
+});
+
+test("numberedSections reports the line each heading sits on", () => {
+  const found = numberedSections("intro\n\n## 1. First\n\n## 2. Second\n");
+  assert.deepEqual(
+    found.map((s) => [s.n, s.line]),
+    [
+      [1, 3],
+      [2, 5],
+    ],
+  );
 });

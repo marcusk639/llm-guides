@@ -21,6 +21,8 @@ import {
   checkAppliesToShape,
   checkRelatedPaths,
   checkResearchRequired,
+  checkTemplateSections,
+  numberedSections,
 } from "./verify-pages.mjs";
 import { renderText, normaliseForComparison } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
@@ -133,10 +135,16 @@ export function verifyCorpus(root) {
     const text = fs.readFileSync(file, "utf8");
     const { data } = parseFrontmatter(text);
     const rel = path.relative(root, file);
+    // A deprecated page is one that could not be refreshed. The contract keeps it
+    // readable and still checks its front-matter and bare values, but must not hold
+    // it to authoring rules it cannot satisfy — lintCorpus makes the same carve-out
+    // for expiry. Shape rules still apply.
+    const deprecated = data?.status === "deprecated";
     for (const i of [
       ...checkAppliesToShape(data),
       ...checkRelatedPaths(data, exists),
       ...checkResearchRequired(data),
+      ...(deprecated ? [] : checkTemplateSections(text)),
     ])
       issues.push({ ...i, path: rel });
   }
@@ -168,6 +176,10 @@ export function verifyStats(root) {
     seedPages: guidePaths(root).filter(
       (f) => parseFrontmatter(fs.readFileSync(f, "utf8")).data?.seed === true,
     ).length,
+    numberedHeadings: guidePaths(root).reduce(
+      (n, f) => n + numberedSections(fs.readFileSync(f, "utf8")).length,
+      0,
+    ),
   };
 }
 
