@@ -12,7 +12,7 @@ import {
   checkExpiry,
   checkRecordLintConfig,
 } from "./lint.mjs";
-import { checkDuplicateKeys } from "./verify-records.mjs";
+import { checkDuplicateKeys, checkRecordFields } from "./verify-records.mjs";
 import { renderText, normaliseForComparison } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
 import {
@@ -111,6 +111,11 @@ export function verifyCorpus(root) {
   // data file for the issue path and does not survive onto the issue itself.
   for (const { file, ...i } of checkDuplicateKeys(records))
     issues.push({ ...i, path: path.join("data", file) });
+
+  for (const record of records) {
+    for (const i of checkRecordFields(record))
+      issues.push({ ...i, path: path.join("data", record.file) });
+  }
   return issues;
 }
 
@@ -119,9 +124,13 @@ export function verifyCorpus(root) {
 // silent one. Each later task adds its own counter here.
 export function verifyStats(root) {
   const records = loadRecords(path.join(root, "data"));
+  const recordsChecked = records.length;
+  const recordsWithSource = records.filter((r) => r.source != null).length;
   return {
     records: records.length,
     guides: guidePaths(root).length,
+    recordsChecked,
+    recordsWithSource,
   };
 }
 

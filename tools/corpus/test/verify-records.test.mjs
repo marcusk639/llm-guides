@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkDuplicateKeys } from "../verify-records.mjs";
+import { checkDuplicateKeys, checkRecordFields } from "../verify-records.mjs";
 
 const rec = (key, file = "models.yaml", extra = {}) => ({
   key,
@@ -35,4 +35,55 @@ test("reports a key that appears twice, naming both files", () => {
 test("reports a key appearing three times exactly once", () => {
   const issues = checkDuplicateKeys([rec("a.b"), rec("a.b"), rec("a.b")]);
   assert.equal(issues.length, 1);
+});
+
+test("accepts a record with source and a valid verified date", () => {
+  assert.deepEqual(checkRecordFields(rec("a.b")), []);
+});
+
+test("reports a missing source", () => {
+  const r = rec("a.b");
+  delete r.source;
+  const issues = checkRecordFields(r);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "record-source-missing");
+  assert.match(issues[0].message, /a\.b/);
+});
+
+test("reports a missing verified", () => {
+  const r = rec("a.b");
+  delete r.verified;
+  assert.equal(
+    checkRecordFields(r).some((i) => i.rule === "record-verified-missing"),
+    true,
+  );
+});
+
+test("reports a verified that is not a real calendar date", () => {
+  const issues = checkRecordFields(
+    rec("a.b", "models.yaml", { verified: "2026-02-30" }),
+  );
+  assert.equal(
+    issues.some((i) => i.rule === "record-verified-invalid"),
+    true,
+  );
+});
+
+test("reports a verified that is a Date or another non-string", () => {
+  const issues = checkRecordFields(
+    rec("a.b", "models.yaml", { verified: new Date("2026-09-16") }),
+  );
+  assert.equal(
+    issues.some((i) => i.rule === "record-verified-invalid"),
+    true,
+  );
+});
+
+test("does not report verified-invalid when verified is absent", () => {
+  const r = rec("a.b");
+  delete r.verified;
+  assert.equal(
+    checkRecordFields(r).some((i) => i.rule === "record-verified-invalid"),
+    false,
+  );
 });
