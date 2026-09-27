@@ -27,6 +27,7 @@ import {
   evidenceSegments,
   checkRotsTable,
   referencedRecordKeys,
+  checkKnownLintGapForm,
 } from "./verify-pages.mjs";
 import { renderText, normaliseForComparison } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
@@ -151,6 +152,7 @@ export function verifyCorpus(root) {
       ...(deprecated ? [] : checkTemplateSections(text)),
       ...checkEvidenceLabels(text),
       ...(deprecated ? [] : checkRotsTable(text, records)),
+      ...checkKnownLintGapForm(text),
     ])
       issues.push({ ...i, path: rel });
   }

@@ -284,3 +284,23 @@ export function checkRotsTable(text, records) {
     },
   ];
 }
+
+// Form 1 of the documented lint gaps: an angle-bracket link destination
+// containing a space is treated wholly as a URL, so a known value inside it
+// escapes the bare-value scan. Form 2 is undecidable and stays a human check.
+const ANGLE_DESTINATION_WITH_SPACE = /\]\(<[^>\n]*\s[^>\n]*>\)/;
+
+export function checkKnownLintGapForm(text) {
+  const issues = [];
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (!ANGLE_DESTINATION_WITH_SPACE.test(lines[i])) continue;
+    issues.push({
+      rule: "known-lint-gap-form",
+      message:
+        "angle-bracket link destination contains a space; the whole span is read as a URL, so any known value inside it escapes the bare-value scan",
+      line: i + 1,
+    });
+  }
+  return issues;
+}

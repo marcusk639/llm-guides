@@ -12,6 +12,7 @@ import {
   referencedRecordKeys,
   checkRotsTable,
   sectionSixText,
+  checkKnownLintGapForm,
 } from "../verify-pages.mjs";
 
 const fm = (extra = {}) => ({
@@ -398,4 +399,41 @@ test("reports a page that references records but has no section 6 at all", () =>
 
 test("stays silent on a page that references no records", () => {
   assert.deepEqual(checkRotsTable(withRots("nothing rots here"), RECORDS), []);
+});
+
+
+test("accepts an ordinary angle-bracket destination with no space", () => {
+  assert.deepEqual(
+    checkKnownLintGapForm("see [x](<./guides/models/comparison.md>)\n"),
+    [],
+  );
+});
+
+test("accepts an ordinary link destination", () => {
+  assert.deepEqual(
+    checkKnownLintGapForm("see [x](https://example.invalid/a%20b)\n"),
+    [],
+  );
+});
+
+test("reports an angle-bracket destination containing a space", () => {
+  const issues = checkKnownLintGapForm("see [x](<./text with 200000 in it>)\n");
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "known-lint-gap-form");
+  assert.equal(issues[0].line, 1);
+});
+
+test("reports each occurrence on its own line", () => {
+  const text = "a [x](<a b>)\n\nc [y](<c d>)\n";
+  assert.deepEqual(
+    checkKnownLintGapForm(text).map((i) => i.line),
+    [1, 3],
+  );
+});
+
+test("does not report a bare URL running into text — Form 2 is not automated", () => {
+  assert.deepEqual(
+    checkKnownLintGapForm("see https://example.invalid/x;200000 here\n"),
+    [],
+  );
 });
