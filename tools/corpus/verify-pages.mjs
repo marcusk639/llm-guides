@@ -248,3 +248,39 @@ export function referencedRecordKeys(text, records) {
   return keys;
 }
 
+// Section 6 runs from its own heading to the next numbered ## heading.
+export function sectionSixText(text) {
+  const sections = numberedSections(text);
+  const six = sections.find((s) => s.n === 6);
+  if (!six) return null;
+  const after = sections.find((s) => s.line > six.line);
+  const lines = text.split("\n");
+  return lines
+    .slice(six.line, after ? after.line - 1 : lines.length)
+    .join("\n");
+}
+
+// Loose reading: the key must appear SOMEWHERE in section 6, not as its own
+// table row. comparison.md deliberately collapses three shared Claude records
+// into one row; that documents a real relationship and must stay legal.
+export function checkRotsTable(text, records) {
+  const referenced = referencedRecordKeys(text, records);
+  if (referenced.size === 0) return [];
+  const six = sectionSixText(text);
+  if (six === null) {
+    return [
+      {
+        rule: "rots-table-incomplete",
+        message: `page references ${referenced.size} record(s) but has no "## 6." section; refresh executes section 6, so there is nothing for it to work`,
+      },
+    ];
+  }
+  const missing = [...referenced].filter((k) => !six.includes(k)).sort();
+  if (missing.length === 0) return [];
+  return [
+    {
+      rule: "rots-table-incomplete",
+      message: `section 6 does not mention referenced record(s): ${missing.join(", ")}; refresh would silently skip them`,
+    },
+  ];
+}

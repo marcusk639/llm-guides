@@ -10,6 +10,8 @@ import {
   evidenceSegments,
   VALID_LABELS,
   referencedRecordKeys,
+  checkRotsTable,
+  sectionSixText,
 } from "../verify-pages.mjs";
 
 const fm = (extra = {}) => ({
@@ -341,4 +343,59 @@ test("ignores an unterminated block", () => {
 
 test("returns an empty set for a page with no marker blocks", () => {
   assert.equal(referencedRecordKeys("just prose\n", RECORDS).size, 0);
+});
+
+const withRots = (body) =>
+  [
+    "## 5. Edge cases and failure modes",
+    "prose",
+    "## 6. Where this rots",
+    body,
+    "## 7. Proofs",
+    "None yet.",
+  ].join("\n\n");
+
+test("sectionSixText returns the body between section 6 and section 7", () => {
+  const got = sectionSixText(withRots("the rot table"));
+  assert.match(got, /the rot table/);
+  assert.equal(/None yet/.test(got), false);
+});
+
+test("sectionSixText returns null when there is no section 6", () => {
+  assert.equal(sectionSixText("## 1. Intro\n\nprose\n"), null);
+});
+
+test("accepts a page whose section 6 names every referenced record", () => {
+  const text =
+    "<!-- corpus:data key=a.one -->1<!-- /corpus:data -->\n\n" +
+    withRots("| Claim | Record |\n| --- | --- |\n| x | `a.one` |");
+  assert.deepEqual(checkRotsTable(text, RECORDS), []);
+});
+
+test("accepts several records collapsed into one row", () => {
+  const text =
+    "<!-- corpus:table fields=key,value tag=beta -->\n\n| x |\n\n<!-- /corpus:table -->\n\n" +
+    withRots("| Claim | Record |\n| --- | --- |\n| rows | `a.two`, `b.one` |");
+  assert.deepEqual(checkRotsTable(text, RECORDS), []);
+});
+
+test("reports a referenced record missing from section 6", () => {
+  const text =
+    "<!-- corpus:table fields=key,value tag=beta -->\n\n| x |\n\n<!-- /corpus:table -->\n\n" +
+    withRots("| Claim | Record |\n| --- | --- |\n| rows | `a.two` |");
+  const issues = checkRotsTable(text, RECORDS);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "rots-table-incomplete");
+  assert.match(issues[0].message, /b\.one/);
+});
+
+test("reports a page that references records but has no section 6 at all", () => {
+  const text = "<!-- corpus:data key=a.one -->1<!-- /corpus:data -->\n";
+  const issues = checkRotsTable(text, RECORDS);
+  assert.equal(issues.length, 1);
+  assert.match(issues[0].message, /no "## 6\." section/);
+});
+
+test("stays silent on a page that references no records", () => {
+  assert.deepEqual(checkRotsTable(withRots("nothing rots here"), RECORDS), []);
 });

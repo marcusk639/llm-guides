@@ -25,6 +25,8 @@ import {
   numberedSections,
   checkEvidenceLabels,
   evidenceSegments,
+  checkRotsTable,
+  referencedRecordKeys,
 } from "./verify-pages.mjs";
 import { renderText, normaliseForComparison } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
@@ -148,6 +150,7 @@ export function verifyCorpus(root) {
       ...checkResearchRequired(data),
       ...(deprecated ? [] : checkTemplateSections(text)),
       ...checkEvidenceLabels(text),
+      ...(deprecated ? [] : checkRotsTable(text, records)),
     ])
       issues.push({ ...i, path: rel });
   }
@@ -185,6 +188,11 @@ export function verifyStats(root) {
     ),
     evidenceLines: guidePaths(root).reduce(
       (n, f) => n + evidenceSegments(fs.readFileSync(f, "utf8")).length,
+      0,
+    ),
+    recordReferences: guidePaths(root).reduce(
+      (n, f) =>
+        n + referencedRecordKeys(fs.readFileSync(f, "utf8"), records).size,
       0,
     ),
   };
