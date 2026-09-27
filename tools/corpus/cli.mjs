@@ -12,6 +12,7 @@ import {
   checkExpiry,
   checkRecordLintConfig,
 } from "./lint.mjs";
+import { checkDuplicateKeys } from "./verify-records.mjs";
 import { renderText, normaliseForComparison } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
 import {
@@ -101,6 +102,29 @@ export function lintCorpus(
   return issues;
 }
 
+// The Verify stage's deterministic half. Strictly read-only: it must never
+// write, because it runs as a CI gate over the tree it is judging.
+export function verifyCorpus(root) {
+  const records = loadRecords(path.join(root, "data"));
+  const issues = [];
+  // Same destructuring as lintCorpus uses for checkDataFiles: `file` names the
+  // data file for the issue path and does not survive onto the issue itself.
+  for (const { file, ...i } of checkDuplicateKeys(records))
+    issues.push({ ...i, path: path.join("data", file) });
+  return issues;
+}
+
+// What verify actually looked at. `verify: clean` is also what a rule matching
+// nothing prints, so these counts are how a reader tells a working gate from a
+// silent one. Each later task adds its own counter here.
+export function verifyStats(root) {
+  const records = loadRecords(path.join(root, "data"));
+  return {
+    records: records.length,
+    guides: guidePaths(root).length,
+  };
+}
+
 export function renderCorpus(root, { write = false } = {}) {
   const records = loadRecords(path.join(root, "data"));
   return guidePaths(root).map((file) => {
@@ -146,7 +170,7 @@ function main(argv) {
   const check = rest.includes("--check");
   const root = rest.find((a) => !a.startsWith("--")) ?? process.cwd();
   const usage = () => {
-    console.error("usage: corpus <render|lint|ledger> [--write] [dir]");
+    console.error("usage: corpus <render|lint|verify|ledger> [--write] [dir]");
     console.error("       corpus render --check [dir]");
     process.exit(2);
   };
@@ -159,6 +183,24 @@ function main(argv) {
       );
     console.log(
       issues.length === 0 ? "lint: clean" : `lint: ${issues.length} issue(s)`,
+    );
+    process.exit(issues.length === 0 ? 0 : 1);
+  } else if (command === "verify") {
+    if (write) usage();
+    if (rest.includes("--stats")) {
+      for (const [k, v] of Object.entries(verifyStats(root)))
+        console.log(`${k}: ${v}`);
+      process.exit(0);
+    }
+    const issues = verifyCorpus(root);
+    for (const i of issues)
+      console.error(
+        `${i.path}${i.line ? `:${i.line}` : ""} [${i.rule}] ${i.message}`,
+      );
+    console.log(
+      issues.length === 0
+        ? "verify: clean"
+        : `verify: ${issues.length} issue(s)`,
     );
     process.exit(issues.length === 0 ? 0 : 1);
   } else if (command === "render") {
