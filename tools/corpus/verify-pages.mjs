@@ -105,12 +105,24 @@ export function checkTemplateSections(text) {
       line: s.line,
     });
   }
-  for (let i = 1; i < found.length; i++) {
-    if (found[i].n <= found[i - 1].n) {
+  // Ordering and duplicates are checked only over in-range headings: an
+  // out-of-range heading (e.g. a stray "## 9.") is already reported once by
+  // the extras check above, and walking the raw `found` array here would
+  // additionally misattribute its position as a neighboring section's
+  // ordering violation.
+  const inRange = found.filter((s) => s.n >= 1 && s.n <= EXPECTED_SECTIONS);
+  for (let i = 1; i < inRange.length; i++) {
+    if (inRange[i].n === inRange[i - 1].n) {
       issues.push({
         rule: "template-sections",
-        message: `template section "## ${found[i].n}." appears after "## ${found[i - 1].n}."; sections must run 1 to ${EXPECTED_SECTIONS} in order`,
-        line: found[i].line,
+        message: `template section "## ${inRange[i].n}." is duplicated`,
+        line: inRange[i].line,
+      });
+    } else if (inRange[i].n < inRange[i - 1].n) {
+      issues.push({
+        rule: "template-sections",
+        message: `template section "## ${inRange[i].n}." appears after "## ${inRange[i - 1].n}."; sections must run 1 to ${EXPECTED_SECTIONS} in order`,
+        line: inRange[i].line,
       });
     }
   }

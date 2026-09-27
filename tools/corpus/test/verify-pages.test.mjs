@@ -166,15 +166,30 @@ test("reports sections in the wrong order", () => {
     [out[2], out[3]] = [out[3], out[2]];
     return out;
   });
-  assert.equal(
-    checkTemplateSections(text).some((i) => i.rule === "template-sections"),
-    true,
-  );
+  const issues = checkTemplateSections(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "template-sections");
+  assert.match(issues[0].message, /"## 3\." appears after "## 4\."/);
 });
 
 test("reports a duplicated section number", () => {
   const text = eightSections((xs) => [...xs, "## 8. Sources again"]);
-  assert.equal(checkTemplateSections(text).length >= 1, true);
+  const issues = checkTemplateSections(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "template-sections");
+  assert.match(issues[0].message, /"## 8\." is duplicated/);
+});
+
+test("reports a stray out-of-range heading once, as an extras issue, not as an ordering violation", () => {
+  const text = eightSections((xs) => {
+    const out = [...xs];
+    out.splice(2, 0, "## 9. Not a real section");
+    return out;
+  });
+  const issues = checkTemplateSections(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "template-sections");
+  assert.match(issues[0].message, /unexpected numbered section "## 9\."/);
 });
 
 test("numberedSections reports the line each heading sits on", () => {
