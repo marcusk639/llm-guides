@@ -288,19 +288,44 @@ export function checkRotsTable(text, records) {
 // Form 1 of the documented lint gaps: an angle-bracket link destination
 // containing a space is treated wholly as a URL, so a known value inside it
 // escapes the bare-value scan. Form 2 is undecidable and stays a human check.
-const ANGLE_DESTINATION_WITH_SPACE = /\]\(<[^>\n]*\s[^>\n]*>\)/;
+//
+// `(?:\\.|[^>\n])` is one destination character: either an escaped character
+// (a backslash followed by anything, including a literal `>` — so an
+// escaped `>` inside the destination does not end it early) or any
+// character that is not `>` or a newline. An explicit `\s` sits between two
+// runs of that class, so the destination must contain real whitespace to
+// match at all — a destination with no space never matches, however long it
+// is (this is what keeps ordinary angle-bracket destinations, e.g. a plain
+// `.md` link, out of the rule). After the closing `>`, an optional markdown
+// link title — "double quoted", 'single quoted', or (parenthesised) — may
+// sit before the closing `)`: a title never triggers the rule by itself,
+// and its presence or absence does not change whether the destination had a
+// space. The `g` flag lets one line report more than one occurrence.
+const ANGLE_DESTINATION_WITH_SPACE =
+  /\]\(<(?:\\.|[^>\n])*\s(?:\\.|[^>\n])*>(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?\)/g;
 
+// Deliberately fence-BLIND, unlike checkTemplateSections and
+// checkEvidenceLabels, which scan only nonFencedLines. That is correct here:
+// the bare-value lint this rule backstops itself scans fenced code blocks
+// (per the contract's "Scanned" list), so a value-hiding angle-bracket
+// destination can hide inside a fenced example exactly as easily as in
+// prose. Restricting this rule to non-fenced lines would silently stop
+// backstopping the one case — a fenced example — the lint itself still
+// checks.
 export function checkKnownLintGapForm(text) {
   const issues = [];
   const lines = text.split("\n");
   for (let i = 0; i < lines.length; i++) {
-    if (!ANGLE_DESTINATION_WITH_SPACE.test(lines[i])) continue;
-    issues.push({
-      rule: "known-lint-gap-form",
-      message:
-        "angle-bracket link destination contains a space; the whole span is read as a URL, so any known value inside it escapes the bare-value scan",
-      line: i + 1,
-    });
+    const matches = lines[i].match(ANGLE_DESTINATION_WITH_SPACE);
+    if (!matches) continue;
+    for (const _match of matches) {
+      issues.push({
+        rule: "known-lint-gap-form",
+        message:
+          "angle-bracket link destination contains a space; the whole span is read as a URL, so any known value inside it escapes the bare-value scan",
+        line: i + 1,
+      });
+    }
   }
   return issues;
 }

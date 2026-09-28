@@ -437,3 +437,81 @@ test("does not report a bare URL running into text — Form 2 is not automated",
     [],
   );
 });
+
+// --- Fix round 1: harden known-lint-gap-form against a trailing link title
+// and a backslash-escaped ">" inside the destination. The original regex
+// required ">" to be followed immediately by ")" (so a title after the
+// destination defeated it) and used a character class that stops at any
+// literal ">" regardless of a preceding backslash (so an escaped ">" inside
+// the destination defeated it too).
+
+test("still accepts an ordinary angle-bracket destination with no space (round 1)", () => {
+  assert.deepEqual(
+    checkKnownLintGapForm("see [x](<./guides/models/comparison.md>)\n"),
+    [],
+  );
+});
+
+test("accepts an angle-bracket destination with a title but no space in the destination", () => {
+  assert.deepEqual(checkKnownLintGapForm('see [x](<./file.md> "title")\n'), []);
+});
+
+test("still accepts an ordinary (non-angle-bracket) link destination (round 1)", () => {
+  assert.deepEqual(
+    checkKnownLintGapForm("see [x](https://example.invalid/a%20b)\n"),
+    [],
+  );
+});
+
+test("still ignores Form 2 — a bare URL running into text (round 1)", () => {
+  assert.deepEqual(
+    checkKnownLintGapForm("see https://example.invalid/x;200000 here\n"),
+    [],
+  );
+});
+
+test("ignores '](' with no angle bracket at all", () => {
+  assert.deepEqual(checkKnownLintGapForm("call handlers[i](some-id) here\n"), []);
+});
+
+test("reports a space in the destination even with a double-quoted title", () => {
+  const issues = checkKnownLintGapForm('see [x](<a b> "title")\n');
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "known-lint-gap-form");
+  assert.equal(issues[0].line, 1);
+});
+
+test("reports a space in the destination even with a single-quoted title", () => {
+  const issues = checkKnownLintGapForm("see [x](<a b> 'title')\n");
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].line, 1);
+});
+
+test("reports a space in the destination even with a parenthesised title", () => {
+  const issues = checkKnownLintGapForm("see [x](<a b> (title))\n");
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].line, 1);
+});
+
+test("reports a backslash-escaped '>' inside the destination", () => {
+  const issues = checkKnownLintGapForm("see [x](<a\\> b>)\n");
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "known-lint-gap-form");
+  assert.equal(issues[0].line, 1);
+});
+
+test("reports a tab used instead of a space inside the destination", () => {
+  const issues = checkKnownLintGapForm("see [x](<a\tb>)\n");
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].line, 1);
+});
+
+test("reports two spaced destinations on one line as two issues", () => {
+  const text = "a [x](<a b>) and c [y](<c d>)\n";
+  const issues = checkKnownLintGapForm(text);
+  assert.equal(issues.length, 2);
+  assert.deepEqual(
+    issues.map((i) => i.line),
+    [1, 1],
+  );
+});
