@@ -383,8 +383,8 @@ Required and lint-enforced: `title`, `summary`, `topic` (a taxonomy topic), `ver
 (`YYYY-MM-DD`, the date the page was last checked against its sources), `applies_to`,
 `sources`, `related`.
 
-Lint issues from records carry the `data/<file>.yaml` path; lint never runs render or
-verify, so run all three.
+- `applies_to` — a list of strings, each naming the product or scope and version, and
+  the date the documentation was read (e.g.
   `"Claude Code CLI 2.1.267, checked against the public hooks reference … on 2026-09-16"`).
 - `sources` — list of URLs. `related` — list of repo paths to other guides (may be `[]`).
 

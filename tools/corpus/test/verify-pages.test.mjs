@@ -515,3 +515,25 @@ test("reports two spaced destinations on one line as two issues", () => {
     [1, 1],
   );
 });
+
+test("known-lint-gap-form completes on an adversarial backslash run", () => {
+  // Regression: the earlier regex had two branches that could both consume a
+  // backslash, so an unterminated `](<` followed by a run of them made the
+  // engine try every partition — 5s at 22 backslashes, ~18 minutes at a
+  // 102-character line, hanging the gate in CI with no diagnostic. The bound
+  // here is deliberately loose; the failure mode is minutes, not milliseconds.
+  const adversarial = "see [x](<" + "\\".repeat(2000) + " !";
+  const started = Date.now();
+  checkKnownLintGapForm(adversarial + "\n");
+  assert.ok(
+    Date.now() - started < 1000,
+    "regex must match in linear time on a backslash run",
+  );
+});
+
+test("known-lint-gap-form still fires on a well-formed escaped destination", () => {
+  // Guards the fix from over-correcting: excluding `\` from the ordinary class
+  // must not stop a genuine escaped `>` from being consumed as an escape.
+  assert.equal(checkKnownLintGapForm("see [x](<a\\> b>)\n").length, 1);
+});
+

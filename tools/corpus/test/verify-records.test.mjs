@@ -152,3 +152,33 @@ test("ignores a record whose lint_literals is absent or malformed", () => {
     [],
   );
 });
+
+test("a literal is not satisfied by the record's own key or lint config", () => {
+  // NON_CONTENT_FIELDS is partly redundant — isIndexableFieldValue already drops
+  // the array-valued fields by type — but `key`, `file` and `lint_scope` are
+  // load-bearing string fields, and nothing pinned them. A literal that matches
+  // only one of those has not been proven to still describe the record's value.
+  const viaKey = rec("timeout.value", "models.yaml", {
+    value: "x",
+    lint_literals: ["timeout.value"],
+  });
+  assert.equal(checkLintLiteralsStale(viaKey).length, 1, "key must not satisfy a literal");
+
+  const viaScope = rec("a.b", "models.yaml", {
+    value: "x",
+    lint_scope: "claude-code",
+    lint_literals: ["claude-code"],
+  });
+  assert.equal(
+    checkLintLiteralsStale(viaScope).length,
+    1,
+    "lint_scope must not satisfy a literal",
+  );
+
+  const viaFile = rec("a.b", "models-other.yaml", {
+    value: "x",
+    lint_literals: ["models-other.yaml"],
+  });
+  assert.equal(checkLintLiteralsStale(viaFile).length, 1, "file must not satisfy a literal");
+});
+
