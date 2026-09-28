@@ -301,15 +301,16 @@ export function checkRotsTable(text, records) {
 // sit before the closing `)`: a title never triggers the rule by itself,
 // and its presence or absence does not change whether the destination had a
 // space. The `g` flag lets one line report more than one occurrence.
-// The two branches must stay DISJOINT. An earlier form used `(?:\\.|[^>\n])*`, where a
-// backslash could match either branch — `\\.` as a two-character escape, or `[^>\n]` as
-// one ordinary character. On a run of backslashes that cannot complete the match (an
-// unterminated `](<`), that ambiguity makes the engine try every partition of the run:
-// measured 115ms at 18 backslashes, 5s at 22, and ~18 minutes at a 102-character line,
-// which would hang this gate in CI with no diagnostic. Excluding `\` from the ordinary
-// class leaves exactly one way to consume a backslash, so matching stays linear.
+// ESCAPE-BLIND on purpose, and this is the whole point of the rule. It exists to
+// backstop the bare-value scan, so it must model how THAT scan tokenizes a
+// destination — `lint.mjs`'s LINK_DESTINATION angle branch is `<[^>\n]*>`, which
+// treats any `>` as the closer regardless of a preceding backslash. Making this
+// rule escape-AWARE (CommonMark's reading) desynchronized the two: in
+// `[x](<./p 200000 q\>)` lint hid the value and this rule stayed silent, so the
+// value escaped both gates with no diagnostic. Matching lint's parsing also
+// removes the two-branch ambiguity that caused catastrophic backtracking.
 const ANGLE_DESTINATION_WITH_SPACE =
-  /\]\(<(?:\\[^\n]|[^>\\\n])*\s(?:\\[^\n]|[^>\\\n])*>(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?\)/g;
+  /\]\(<[^>\n]*\s[^>\n]*>(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?\)/g;
 
 // Deliberately fence-BLIND, unlike checkTemplateSections and
 // checkEvidenceLabels, which scan only nonFencedLines. That is correct here:

@@ -493,11 +493,13 @@ test("reports a space in the destination even with a parenthesised title", () =>
   assert.equal(issues[0].line, 1);
 });
 
-test("reports a backslash-escaped '>' inside the destination", () => {
-  const issues = checkKnownLintGapForm("see [x](<a\\> b>)\n");
-  assert.equal(issues.length, 1);
-  assert.equal(issues[0].rule, "known-lint-gap-form");
-  assert.equal(issues[0].line, 1);
+test("does not fire where lint's escape-blind parser already ends the destination", () => {
+  // Ruling reversed. This shape was previously asserted to fire, on a CommonMark
+  // reading where `\>` is an escape. But lint's LINK_DESTINATION ends the
+  // destination at the first `>`, so lint does NOT hide a value here and there is
+  // nothing to backstop. Firing would be a false positive against the only parser
+  // that matters.
+  assert.deepEqual(checkKnownLintGapForm("see [x](<a\\> b>)\n"), []);
 });
 
 test("reports a tab used instead of a space inside the destination", () => {
@@ -520,9 +522,16 @@ test("known-lint-gap-form completes on an adversarial backslash run", () => {
   // Regression: the earlier regex had two branches that could both consume a
   // backslash, so an unterminated `](<` followed by a run of them made the
   // engine try every partition — 5s at 22 backslashes, ~18 minutes at a
-  // 102-character line, hanging the gate in CI with no diagnostic. The bound
-  // here is deliberately loose; the failure mode is minutes, not milliseconds.
-  const adversarial = "see [x](<" + "\\".repeat(2000) + " !";
+  // 102-character line, hanging the gate in CI with no diagnostic.
+  //
+  // The size is load-bearing and was got wrong twice. At 2000 the old regex never
+  // returns, and node:test has no default timeout, so the test would HANG rather
+  // than fail — no test at all. At 40 it takes ~740ms on this machine, under the
+  // bound, so the test PASSED against the broken regex — also no test. 46 costs
+  // the broken regex several seconds against a 1s bound and the fixed one 0ms,
+  // a margin wide enough to survive a slower or faster machine. If you change
+  // either number, re-verify by reverting the regex and watching this fail.
+  const adversarial = "see [x](<" + "\\".repeat(46) + " !";
   const started = Date.now();
   checkKnownLintGapForm(adversarial + "\n");
   assert.ok(
@@ -531,9 +540,11 @@ test("known-lint-gap-form completes on an adversarial backslash run", () => {
   );
 });
 
-test("known-lint-gap-form still fires on a well-formed escaped destination", () => {
-  // Guards the fix from over-correcting: excluding `\` from the ordinary class
-  // must not stop a genuine escaped `>` from being consumed as an escape.
-  assert.equal(checkKnownLintGapForm("see [x](<a\\> b>)\n").length, 1);
+test("fires on an odd trailing backslash, the shape lint actually hides", () => {
+  // The regression that escape-awareness introduced: lint's angle branch is
+  // `<[^>\n]*>`, so in this shape lint DOES hide the value while the
+  // escape-aware rule stayed silent — the value escaped both gates. Verified
+  // against findBareValues as the oracle, not against a reading of CommonMark.
+  assert.equal(checkKnownLintGapForm("see [x](<./p 200000 q\\>)\n").length, 1);
 });
 

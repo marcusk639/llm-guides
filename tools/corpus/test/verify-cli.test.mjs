@@ -148,11 +148,26 @@ test("verifyStats reports every counter as a number", () => {
 });
 
 test("verifyStats counts the fixture corpus, not zero", () => {
-  // A stats block of all zeroes would satisfy the shape test above while
-  // proving the rules inspected nothing at all.
+  // A stats block of zeroes satisfies the shape test above while proving the
+  // rules inspected nothing — and `typeof 0 === "number"`, so the shape test
+  // alone let six counters be zeroed without any test noticing, including
+  // evidenceLines and recordReferences, the two that matter most.
+  // Asserted on every counter that is legitimately non-zero on this fixture.
+  // recordsWithLintLiterals, lintLiteralEntries and seedPages are genuinely 0
+  // here — the fixture has no literal-bearing record and no seed page — so
+  // pinning those would encode fixture trivia rather than behavior.
   const stats = verifyStats(ROOT);
-  assert.ok(stats.guides > 0, "guides must be non-zero");
-  assert.ok(stats.records > 0, "records must be non-zero");
-  assert.ok(stats.numberedHeadings > 0, "numberedHeadings must be non-zero");
+  for (const key of [
+    "records",
+    "guides",
+    "recordsChecked",
+    "recordsWithSource",
+    "relatedEntries",
+    "numberedHeadings",
+    "evidenceLines",
+    "recordReferences",
+  ]) {
+    assert.ok(stats[key] > 0, `${key} must be greater than zero on the fixture`);
+  }
 });
 
