@@ -201,30 +201,7 @@ Re-check on refresh, against the pages in section 8, **which win whenever they a
 
 What should not rot: comparing cost per completed task, keeping separate columns for differently defined limits, checking licence before capability, and budgeting open weights by host.
 
-### Did the contract hold for a multi-vendor, mostly-table page?
-
-**Mostly yes: the identifier/value split and row records carried a five-vendor table without any tooling change. It fought back in eight specific places.**
-
-What held:
-
-- **Row records scale across vendors.** One record per model with aligned field names rendered two tables from two tags, and the Claude rows joined the hosted table by adding a `vendor` field and one tag to the existing records, with no duplication and no change to [Claude models](claude-models.md).
-- **The split was easy to apply.** Model names (GPT-6 Astra, Gemini 3.8 Flash, Llama 4 Scout) are identifiers and appear freely in prose; ids, limits, prices, parameter counts and licence names are values and live only in the tables.
-- **Shared literals are harmless.** Several vendors share a price string or limit string; the literal index simply maps it to several record keys, and it is legal inside either table.
-
-Where it fought:
-
-1. **Aligned field names hide different definitions.** Anthropic states a context window, Google an input limit, OpenAI both plus a separate input maximum. The row-record design pushed toward one `context_window` column; honesty required three columns and many blank cells. The contract says nothing about field semantics across record files, so nothing stops a later author from putting Google's input limit in `context_window`.
-2. **Values in the conceptual prose had to be written around.** Sections 3 and 5 explain price thresholds and a dated price change without stating the threshold, date or price, and point at the `notes` column instead. The rule is right, but the prose is vaguer than a reader wants, and the natural alternative (one inline marker per figure) would have meant dozens of extra single-value records.
-3. **Short values escape the closed-world lint.** Literals under three characters are not indexed, so a Llama context-length cell of two characters is unprotected in prose, and so would be any shorthand context size a vendor writes in two characters. The rule held here only by author discipline.
-4. **Some values cannot be linted because they are substrings of identifiers.** The Qwen dense model's parameter count is also part of its name, so listing it as a lint literal would flag every mention of the model name. It was left out of `lint_literals`, weakening R4's "every volatile string" requirement for that row.
-5. **The identifier/value line blurs for licences and status.** Licence names and Preview status are things a reader acts on, so they were treated as values, but licence names are also the names of the things being discussed. A generic licence name as a lint literal could collide with unrelated prose elsewhere in the corpus.
-6. **Presentation was only partly under the page's control at the time of writing.** Row order used to follow data-file load order (by filename), not vendor order — the seed hit this; the table marker's `sort=` attribute now orders rows by a named field (ascending, or descending with a leading `-`; rows missing the field sort last), and this page's tables use `sort=vendor`. The unit rewrite for prices (`$N / MTok`) is a record-authoring convention with nothing to enforce it; and a blank cell cannot say "not stated" versus "not applicable".
-
-7. **Record keys and URLs carry values.** A record key that embeds a model id verbatim (the first OpenAI key was written that way) is flagged when the key is named in this section's table, so the key had to be respelled. Every per-model vendor URL also contains the model id; at the time of writing, the sources section could not link a model page from prose without tripping the lint, so it linked index pages instead and left per-model URLs in the records' `source` fields — the seed hit this; the bare-value scan now skips URLs (bare URLs, autolinks and URL-like link destinations), which makes linking a per-model page from prose possible.
-
-8. **Front-matter sources pass only because front-matter is not scanned.** The page's `sources` list keeps the real per-model Hugging Face URLs, each containing a model id. They pass lint only because the lint starts after the front-matter; the same URLs in the body fail. The contract does not say whether front-matter is meant to be exempt, so this is an accident of the implementation, not a rule.
-
-Nothing here needed a tool change to ship; items 1, 3, 4, 6, 7 and 8 are candidates for the contract amendment.
+Values lint cannot guard: the Llama context-length cells are two characters, below the lint's minimum literal length, so they are not indexed and rely on author discipline to stay correct; the Qwen dense model's parameter count is a substring of its own model name (`Qwen3.8-27B`) and was deliberately left out of `lint_literals` to avoid flagging every mention of the model. Re-check both by hand on refresh.
 
 ## 7. Proofs
 
