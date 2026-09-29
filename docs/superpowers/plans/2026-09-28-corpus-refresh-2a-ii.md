@@ -32,7 +32,7 @@ Every task's requirements implicitly include this section.
 - **`seed: true` is permanent provenance and is never removed**, on any code path, including a refresh that re-verifies every source on the page.
 - **A source that cannot be reached must not bump `verified`.** All-or-nothing: `blocked` writes nothing at all. There is no partial freshness.
 - **`--key` stamps records only.** A key-scoped refresh never moves a page's `verified` and never sets a page's `research:`. See "Decision: what `--key` is allowed to stamp".
-- **Acceptance criterion (spec, verbatim):** "Complete when a refresh of `guides/models/claude-models.md` — hand-driven or audit-driven — has passed both halves of verify, been reviewed and merged by the owner, and left an evidence artifact under `research/models/`." Not when the code is written.
+- **Acceptance criterion (spec revision 4, verbatim):** "Complete when a refresh of any one refresh unit — hand-driven or audit-driven — has passed both halves of verify, been reviewed and merged by the owner, and left an evidence artifact under `research/<topic>/` for that unit's topic." Not when the code is written. The model unit is the expected target, not the required one.
 - **Work on a branch:** `corpus-refresh-2a-ii`, off `master` at `66e2c68`.
 
 ## Review Focus
