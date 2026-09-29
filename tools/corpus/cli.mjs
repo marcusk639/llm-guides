@@ -12,6 +12,23 @@ import {
   checkExpiry,
   checkRecordLintConfig,
 } from "./lint.mjs";
+import {
+  checkDuplicateKeys,
+  checkRecordFields,
+  checkLintLiteralsStale,
+} from "./verify-records.mjs";
+import {
+  checkAppliesToShape,
+  checkRelatedPaths,
+  checkResearchRequired,
+  checkTemplateSections,
+  numberedSections,
+  checkEvidenceLabels,
+  evidenceSegments,
+  checkRotsTable,
+  referencedRecordKeys,
+  checkKnownLintGapForm,
+} from "./verify-pages.mjs";
 import { renderText, normaliseForComparison } from "./render.mjs";
 import { findBlocks } from "./markers.mjs";
 import {
@@ -101,6 +118,88 @@ export function lintCorpus(
   return issues;
 }
 
+// The Verify stage's deterministic half. Strictly read-only: it must never
+// write, because it runs as a CI gate over the tree it is judging.
+export function verifyCorpus(root) {
+  const records = loadRecords(path.join(root, "data"));
+  const issues = [];
+  // Same destructuring as lintCorpus uses for checkDataFiles: `file` names the
+  // data file for the issue path and does not survive onto the issue itself.
+  for (const { file, ...i } of checkDuplicateKeys(records))
+    issues.push({ ...i, path: path.join("data", file) });
+
+  for (const record of records) {
+    for (const i of checkRecordFields(record))
+      issues.push({ ...i, path: path.join("data", record.file) });
+    for (const i of checkLintLiteralsStale(record))
+      issues.push({ ...i, path: path.join("data", record.file) });
+  }
+
+  const exists = (rel) => fs.existsSync(path.join(root, rel));
+  for (const file of guidePaths(root)) {
+    const text = fs.readFileSync(file, "utf8");
+    const { data } = parseFrontmatter(text);
+    const rel = path.relative(root, file);
+    // A deprecated page is one that could not be refreshed. The contract keeps it
+    // readable and still checks its front-matter and bare values, but must not hold
+    // it to authoring rules it cannot satisfy — lintCorpus makes the same carve-out
+    // for expiry. Shape rules still apply.
+    const deprecated = data?.status === "deprecated";
+    for (const i of [
+      ...checkAppliesToShape(data),
+      ...checkRelatedPaths(data, exists),
+      ...checkResearchRequired(data),
+      ...(deprecated ? [] : checkTemplateSections(text)),
+      ...checkEvidenceLabels(text),
+      ...(deprecated ? [] : checkRotsTable(text, records)),
+      ...checkKnownLintGapForm(text),
+    ])
+      issues.push({ ...i, path: rel });
+  }
+  return issues;
+}
+
+// What verify actually looked at. `verify: clean` is also what a rule matching
+// nothing prints, so these counts are how a reader tells a working gate from a
+// silent one. Each later task adds its own counter here.
+export function verifyStats(root) {
+  const records = loadRecords(path.join(root, "data"));
+  const recordsChecked = records.length;
+  const recordsWithSource = records.filter((r) => r.source != null).length;
+  return {
+    records: records.length,
+    guides: guidePaths(root).length,
+    recordsChecked,
+    recordsWithSource,
+    recordsWithLintLiterals: records.filter((r) => Array.isArray(r.lint_literals))
+      .length,
+    lintLiteralEntries: records.reduce(
+      (n, r) => n + (Array.isArray(r.lint_literals) ? r.lint_literals.length : 0),
+      0,
+    ),
+    relatedEntries: guidePaths(root).reduce((n, f) => {
+      const { data } = parseFrontmatter(fs.readFileSync(f, "utf8"));
+      return n + (Array.isArray(data?.related) ? data.related.length : 0);
+    }, 0),
+    seedPages: guidePaths(root).filter(
+      (f) => parseFrontmatter(fs.readFileSync(f, "utf8")).data?.seed === true,
+    ).length,
+    numberedHeadings: guidePaths(root).reduce(
+      (n, f) => n + numberedSections(fs.readFileSync(f, "utf8")).length,
+      0,
+    ),
+    evidenceLines: guidePaths(root).reduce(
+      (n, f) => n + evidenceSegments(fs.readFileSync(f, "utf8")).length,
+      0,
+    ),
+    recordReferences: guidePaths(root).reduce(
+      (n, f) =>
+        n + referencedRecordKeys(fs.readFileSync(f, "utf8"), records).size,
+      0,
+    ),
+  };
+}
+
 export function renderCorpus(root, { write = false } = {}) {
   const records = loadRecords(path.join(root, "data"));
   return guidePaths(root).map((file) => {
@@ -146,7 +245,7 @@ function main(argv) {
   const check = rest.includes("--check");
   const root = rest.find((a) => !a.startsWith("--")) ?? process.cwd();
   const usage = () => {
-    console.error("usage: corpus <render|lint|ledger> [--write] [dir]");
+    console.error("usage: corpus <render|lint|verify|ledger> [--write] [dir]");
     console.error("       corpus render --check [dir]");
     process.exit(2);
   };
@@ -159,6 +258,24 @@ function main(argv) {
       );
     console.log(
       issues.length === 0 ? "lint: clean" : `lint: ${issues.length} issue(s)`,
+    );
+    process.exit(issues.length === 0 ? 0 : 1);
+  } else if (command === "verify") {
+    if (write) usage();
+    if (rest.includes("--stats")) {
+      for (const [k, v] of Object.entries(verifyStats(root)))
+        console.log(`${k}: ${v}`);
+      process.exit(0);
+    }
+    const issues = verifyCorpus(root);
+    for (const i of issues)
+      console.error(
+        `${i.path}${i.line ? `:${i.line}` : ""} [${i.rule}] ${i.message}`,
+      );
+    console.log(
+      issues.length === 0
+        ? "verify: clean"
+        : `verify: ${issues.length} issue(s)`,
     );
     process.exit(issues.length === 0 ? 0 : 1);
   } else if (command === "render") {

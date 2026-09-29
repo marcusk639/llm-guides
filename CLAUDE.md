@@ -75,8 +75,12 @@ together with `--write` prints usage and exits 2).
 | `node tools/corpus/cli.mjs render --check .` | `npm run render:check`      | **The render gate.** Writes nothing; prints `would render: <path>` for each page that would change | 1 if any render issue **or any page would change**, else 0                     |
 | `node tools/corpus/cli.mjs render --write .` | `npm run render -- --write` | Rewrites marker-block content in place; prints `rendered: <path>`                | 1 if any render issue, else 0                                                         |
 | `node tools/corpus/cli.mjs lint .`           | `npm run lint`              | Record lint config, front-matter, bare values, unterminated markers, expiry      | 1 if any issue (`<path>:<line> [<rule>] <message>`), 0 with `lint: clean`             |
+| `node tools/corpus/cli.mjs verify .`         | `npm run verify`            | **Strictly read-only.** Record and page checks lint does not make: duplicate keys, record `source`/`verified`, `applies_to` shape, `related` paths, stale `lint_literals`, template sections, evidence-label spelling, section 6 completeness, lint-gap Form 1, `research:` on non-seed pages | 1 if any issue (same `<path>:<line> [<rule>] <message>` form), 0 with `verify: clean` |
 | `node tools/corpus/cli.mjs ledger --write .` | `npm run ledger -- --write` | Rebuilds `meta/ledger.yaml`; without `--write` only prints `ledger: N entries`   | 0                                                                                     |
 | `npm test`                                   | —                           | `node --test "tools/corpus/test/**/*.test.mjs"`                                  | non-zero on any failing test                                                          |
+
+`verify` is strictly read-only: it never writes to the tree, which is what lets it run
+unconditionally as a CI gate over the same tree it is judging.
 
 There is no proof command. Run a proof by executing its manifest's `command` from its
 own directory, e.g. `node examples/marker-render-idempotence/run.mjs`.
@@ -93,9 +97,10 @@ them.
 2. `node tools/corpus/cli.mjs render --write . && node tools/corpus/cli.mjs lint .`
 3. A Prettier hook reformats Markdown after every write. That is expected; render
    compares formatter-stable forms, so Prettier's table padding and blank lines are not
-   a pending change. Then run the two gates, which are also the CI gates:
+   a pending change. Then run all three gates, which are also the CI gates:
    `node tools/corpus/cli.mjs render --check .` (expect exit 0 and no `would render:`
-   line) and `node tools/corpus/cli.mjs lint .` (expect `lint: clean`, exit 0). Lint
+   line), `node tools/corpus/cli.mjs lint .` (expect `lint: clean`, exit 0), and
+   `node tools/corpus/cli.mjs verify .` (expect `verify: clean`, exit 0). Lint
    treats marker-block content as covered, so only `render --check` catches a block
    whose record was refreshed but whose page was never re-rendered.
 4. If a page was added, removed or deprecated, or its `verified` date or referenced
@@ -198,7 +203,7 @@ unquoted `true`/`false` are booleans and bare numbers are numbers, so quote date
 
 | Field           | Required    | Meaning                                                                                                                                                                                                                                                                                                             |
 | --------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `key`           | yes         | Unique dotted id, e.g. `anthropic.prompt_caching.default_ttl`. Duplicates are not detected (the later one wins in render). **Must not embed a value verbatim** — keys are cited in "Where this rots" and are linted there like any prose; the comparison seed respelled `openai.models.gpt6-astra` for this reason. |
+| `key`           | yes         | Unique dotted id, e.g. `anthropic.prompt_caching.default_ttl`. A duplicate key is reported by `corpus verify` as `record-duplicate-key`; render itself still silently keeps only the last-loaded definition, so the check exists to flag that silent behavior, not because it changed. **Must not embed a value verbatim** — keys are cited in "Where this rots" and are linted there like any prose; the comparison seed respelled `openai.models.gpt6-astra` for this reason. |
 | `value`         | yes         | The value. For a row record, the row's primary id (API model id, repository id).                                                                                                                                                                                                                                    |
 | `display`       | no          | What `corpus:data` renders instead of `value` (unit-qualified or phrased form).                                                                                                                                                                                                                                     |
 | `volatility`    | yes         | Exactly `low`, `medium` or `high`. Drives page cadence. A missing or misspelled value is caught by lint (`record-volatility-invalid`, below) and is otherwise treated as unreferenced for cadence purposes — it never crashes `lint` or `ledger`.                                                                  |
@@ -354,9 +359,21 @@ Every rule name the tools emit, and what to do.
 | `render-headers-mismatch`        | render | `headers` has a different number of labels from `fields`.                                      | Make the lists parallel.                                                                                                                                                            |
 | `render-sort-unknown`            | render | `sort` is malformed (empty, bare `-`) or names a field no selected row has.                    | Fix the field name. A field present on only some rows is fine.                                                                                                                      |
 | `render-missing-value`           | render | A `corpus:data` block's record has neither `display` nor `value`; the block keeps its content. | Add `value` (and `display` if needed) to the record.                                                                                                                                |
+| `record-duplicate-key`           | verify | A record `key` is defined more than once across `data/*.yaml` files; render silently keeps only the last one loaded. | Rename or remove the duplicate, or decide explicitly which definition should win. |
+| `record-source-missing`          | verify | A record has no `source`.                                                                        | Add the canonical URL the value was read from.                                                                                                                                      |
+| `record-verified-missing`        | verify | A record has no `verified` date.                                                                 | Add the date read from `source`, as a quoted `"YYYY-MM-DD"`.                                                                                                                        |
+| `record-verified-invalid`        | verify | A record's `verified` is not a quoted, real calendar date written `YYYY-MM-DD`.                  | Fix and quote the date.                                                                                                                                                              |
+| `lint-literals-stale`            | verify | A `lint_literals` entry is no longer a substring of any field value on its own record — the field it was guarding has drifted. | Refresh `lint_literals` to match the record's current fields.                                                                                                       |
+| `frontmatter-applies-to-shape`   | verify | `applies_to` is present but is not a non-empty list of strings.                                  | Make it a list of strings naming the product/scope, its version, and the date read.                                                                                                 |
+| `related-path-unresolved`        | verify | A `related` entry is not a string, or names a repo path that does not exist.                     | Fix the path; `related` entries are repo-root-relative, not page-relative.                                                                                                          |
+| `research-required`              | verify | The page is neither `seed: true` nor `status: deprecated`, and names no `research:` artifact.    | Add `research:` pointing at the page's grounding under `research/`, or mark it a seed.                                                                                              |
+| `template-sections`              | verify | A numbered `## N.` heading (1–8) is missing, duplicated, out of order, or extra. Skipped for `status: deprecated` pages. An unterminated code fence yields one "detection is unreliable" issue instead of cascading. | Fix the numbered headings, or close the fence.                                                                                          |
+| `evidence-label-invalid`         | verify | On each line containing the `Evidence:` token — scanned from the token to end of line, not only lines beginning with it, so a label after a trailing caveat still counts, and several labels on one line are legal — a bolded label is misspelled, or none of `**Verified**`/`**Documented**`/`**Plausible**` appears. Whether a `**Verified**` claim actually has a shipping proof is deliberately not checked here. Same unterminated-fence carve-out as `template-sections`. | Spell the label exactly; verify a `Verified` claim's proof by hand. |
+| `rots-table-incomplete`          | verify | A page's marker blocks reference record(s) section 6 never mentions — **loose reading**: the key must appear somewhere in section 6, not as its own table row, since a page may legitimately collapse several shared records into one row (comparison.md's Claude row collapses three) — or the page references records but has no "## 6." section. Skipped for `status: deprecated` pages. | Mention the missing key(s) in section 6, or fold them into an existing row's prose.                          |
+| `known-lint-gap-form`            | verify | Form 1 of the known lint gaps: an angle-bracket link destination contains real whitespace, so the bare-value scan reads the whole span as a URL and hides any value inside it. Tolerates a trailing link title and a backslash-escaped `>`; reports every occurrence on a line. | Rewrite the destination so it holds no value, or move the value outside the angle brackets. |
 
-Lint issues from records carry the `data/<file>.yaml` path; lint never runs render, so
-run both.
+Lint issues from records carry the `data/<file>.yaml` path; lint never runs render or
+verify, so run all three.
 
 ## The document contract
 
@@ -371,13 +388,27 @@ Required and lint-enforced: `title`, `summary`, `topic` (a taxonomy topic), `ver
   `"Claude Code CLI 2.1.267, checked against the public hooks reference … on 2026-09-16"`).
 - `sources` — list of URLs. `related` — list of repo paths to other guides (may be `[]`).
 
-Optional: `research` (path to the page's grounding artifact under `research/`). It is
-optional now and omitted on the seeds, because no research artefacts exist yet. It
-becomes required when sub-project 2 (authoring and refresh toolchain) delivers the
-research stage; that change will be made in this file and in `REQUIRED_FIELDS`
-(`tools/corpus/lint.mjs`). Until this file says otherwise, do not treat it as required.
-Also optional: `seed: true` marks a document authored
-before the pipeline existed; `status` (`deprecated`).
+`research` (path to the page's grounding artifact under `research/`) is required for
+any page that is not `seed: true` — enforced by `corpus verify` as `research-required`,
+not by `REQUIRED_FIELDS` (`tools/corpus/lint.mjs`): that array is consumed
+unconditionally, so adding `research` there would fail every existing seed. A
+`status: deprecated` page is exempt for the same reason it is exempt from
+`template-sections` and `rots-table-incomplete` below — it could not be refreshed, so
+it cannot be held to a rule only a refresh satisfies. The carve-out stops there:
+`evidence-label-invalid` and `known-lint-gap-form` still apply to a deprecated page, along
+with every front-matter shape rule, because a misspelled label and a malformed link
+destination are typos fixable without re-verifying anything.
+
+`research` has exactly one meaning — the page's current grounding artifact — whichever
+stage produced it. An initial research run and a refresh are two producers of the same kind
+of thing, and nothing downstream distinguishes them. `research:` has exactly one
+meaning: the page's current grounding artifact, whichever stage — an initial research
+run or a later refresh — produced it; it does not accumulate history.
+
+`seed: true` marks a document authored before the pipeline existed. It is **permanent
+provenance**: a refresh never removes it, even after the page has been re-verified and
+re-dated, because it records how the page originated, not whether it is current.
+`status` (`deprecated`) is the other optional front-matter field.
 
 **`volatility` is never a front-matter field.** Volatility is a property of a claim,
 carried on the `data/` record that backs it, not of a page.
@@ -548,7 +579,12 @@ Not fixed. The first two hide a known value from the bare-value scan (confirmed 
 - A bare URL that runs into following text through `.` or `;` with no space
   (`https://example.com/x;value`): the value is swallowed into the URL span.
 
-Do not write either form. Reviewers check for them by eye.
+Do not write either form. Form 1 (the angle-bracket case) is now caught by `corpus
+verify` as `known-lint-gap-form`, tolerant of a trailing markdown link title and of a
+backslash-escaped `>` inside the destination (treated as non-terminal, so it does not
+end the match early), and reporting every occurrence on a line, not just the first.
+Form 2 remains a human check: whether a run-on URL swallowed a value is not
+mechanically decidable without knowing where the URL was meant to end.
 
 The lint is also exact-string by design, so two further kinds of text escape it:
 
