@@ -1,7 +1,7 @@
 ---
 title: Corpus Refresh Loop — Design
 date: 2026-09-27
-revision: 3
+revision: 4
 status: approved
 scope: sub-project 2a of 5 (authoring and refresh toolchain — freshness loop only)
 ---
@@ -431,9 +431,17 @@ listed. Relocate the retrospective out of section 6 as part of 2a-i, before anyt
 
 ### Acceptance criterion
 
-**Complete when a refresh of `guides/models/claude-models.md` — hand-driven or audit-driven —
-has passed both halves of verify, been reviewed and merged by the owner, and left an evidence
-artifact under `research/models/`.**
+**Complete when a refresh of any one refresh unit — hand-driven or audit-driven — has passed
+both halves of verify, been reviewed and merged by the owner, and left an evidence artifact
+under `research/<topic>/` for that unit's topic.**
+
+The model unit (`guides/models/claude-models.md` with `guides/models/comparison.md`) remains the
+expected target: it is the most volatile unit and the one whose expiry drives the first audit
+run. But the criterion is deliberately **not** pinned to it. Revision 3 named that page alone,
+which put the criterion in contradiction with 2a-ii's own blocked path — refresh a reachable
+unit when a vendor host walls the model pages — since a run taking that path could satisfy the
+loop and fail the sentence. What the criterion tests is that the loop can close in reality, and
+any unit closing it demonstrates that.
 
 Not when the code is written. The deliverable is a loop that has closed once in reality.
 
@@ -532,3 +540,10 @@ the flag lie about which pages predate the toolchain. `research-required` theref
 seed exemption permanently, and its subject is pipeline-authored pages rather than refreshed
 seeds. A verify-agent block now reverts the added `research:` field rather than an imaginary
 graduation.
+
+**Revision 4 (2026-09-28)** — Amended the acceptance criterion to any one refresh unit rather
+than `guides/models/claude-models.md` specifically, with the evidence artifact under that unit's
+own topic. Revision 3's single-page wording contradicted the blocked path that the 2a-ii plan
+added for an unreachable vendor host: a run that refreshed a reachable unit instead closed the
+loop but could not satisfy the criterion as written. The model unit stays the expected target and
+the substance is unchanged — the loop must still close once in reality, not merely compile.
