@@ -35,7 +35,12 @@ This supersedes the previous convention of root-level topic directories
   a proof; anything else is a teaching example.
 - `meta/` — `meta/taxonomy.yaml` (the topic list), the generated `meta/ledger.yaml`, and
   the research prompt library.
-- `tools/corpus/` — the corpus CLI and its tests.
+- `tools/corpus/` — the corpus CLI and its tests. `cli.mjs` dispatches the subcommands;
+  `data.mjs` loads `data/` records and builds the literal index; `render.mjs` finds and
+  fills marker blocks; `lint.mjs` holds the front-matter, bare-value and expiry rules;
+  `verify-records.mjs` and `verify-pages.mjs` hold the record and page verify rules;
+  `ledger.mjs` owns `CADENCE_DAYS`, volatility derivation and expiry; `proofs.mjs`
+  discovers and runs proofs.
 - `local/` — **gitignored.** Harvest output and anything derived from session
   transcripts. Nothing here may enter a committed document.
 
@@ -111,6 +116,19 @@ them.
 Creating a new directory (for example a new `guides/<topic>/` or `examples/<name>/`) can
 make a local hook drop a `.claude/` folder inside it. Delete it before staging, and stage
 by filename.
+
+**Reading and editing the large documents in this repo.** `CLAUDE.md`, the specs and the
+plans are tens of kilobytes, and a local token-optimizer hook rewrites tool output on the
+way back: it folds fenced code bodies into spill-file placeholders and deletes prose
+sentences mid-paragraph, marking neither in a way the reader can act on. Setting
+`TOKEN_OPTIMIZER_MODE=off` does not suppress it. So:
+
+- Read in windows of at most 80 lines (`awk 'NR>=A && NR<=B {print NR": "$0}' FILE`), and
+  re-read in 30-line windows if the output contains `lower-signal sentences removed`.
+- Never transcribe a fenced block from a read. Extract it by line index and run it.
+- Edit these files with a Python read → `assert s.count(old) == 1` → replace → write script
+  run through Bash. The native edit tool refuses files this size, and that path also
+  bypasses the Prettier hook, which only fires on Edit/Write.
 
 ## The central rule: identifiers vs. values
 
