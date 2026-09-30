@@ -6,6 +6,13 @@ import path from "node:path";
 import { loadRecords } from "../data.mjs";
 import { RefreshError, pageFacts, resolveUnit } from "../refresh-units.mjs";
 
+import {
+  MAX_SLUG_PAGES,
+  unitSlug,
+  unitTopic,
+  artifactPathFor,
+} from "../refresh-units.mjs";
+
 const FIX = fileURLToPath(new URL("./fixtures/refresh/", import.meta.url));
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const fixRecords = () => loadRecords(path.join(FIX, "data"));
@@ -78,4 +85,65 @@ test("the live model pages resolve to one unit", () => {
     "data/models-other.yaml",
     "data/models.yaml",
   ]);
+});
+
+test("a slug joins sorted basenames", () => {
+  const unit = resolveUnit(FIX, "guides/gamma/lonely.md", fixRecords());
+  assert.equal(unitSlug(unit), "lonely");
+  const live = resolveUnit(
+    REPO,
+    "guides/models/claude-models.md",
+    repoRecords(),
+  );
+  assert.equal(unitSlug(live), "claude-models-comparison");
+});
+
+test("a slug above MAX_SLUG_PAGES collapses to first-plus-N", () => {
+  const unit = resolveUnit(FIX, "guides/alpha/one.md", fixRecords());
+  assert.equal(unit.pages.length, 4);
+  assert.equal(unit.pages.length > MAX_SLUG_PAGES, true);
+  assert.equal(unitSlug(unit), "gone-plus-3");
+});
+
+// Review Focus 5, first half: the fixture unit spans alpha and beta, and the
+// live corpus spans context and domains. The artifact files under the topic of
+// the page NAMED ON THE COMMAND LINE, so the same unit entered from either end
+// files under either topic — which is intended: the entry page is the one the
+// author asked about.
+test("a cross-topic unit files under the entry page's topic", () => {
+  const fromAlpha = resolveUnit(FIX, "guides/alpha/one.md", fixRecords());
+  assert.deepEqual(fromAlpha.topics, ["alpha", "beta"]);
+  assert.equal(unitTopic(fromAlpha), "alpha");
+  assert.equal(
+    artifactPathFor(fromAlpha, "2026-09-28"),
+    "research/alpha/2026-09-28-gone-plus-3-refresh.md",
+  );
+  const fromBeta = resolveUnit(FIX, "guides/beta/three.md", fixRecords());
+  assert.deepEqual(fromBeta.topics, ["alpha", "beta"]);
+  assert.equal(unitTopic(fromBeta), "beta");
+});
+
+test("the live cross-topic unit really spans two topics", () => {
+  const unit = resolveUnit(
+    REPO,
+    "guides/context/context-management.md",
+    repoRecords(),
+  );
+  assert.deepEqual(unit.topics, ["context", "domains"]);
+  assert.equal(unitTopic(unit), "context");
+});
+
+test("an entry page with no topic cannot name an artifact home", () => {
+  const unit = {
+    entry: "guides/x/y.md",
+    pages: [{ path: "guides/x/y.md", topic: null, status: null, keys: [] }],
+    keys: [],
+    topics: [null],
+    dataFiles: [],
+  };
+  assert.throws(
+    () => artifactPathFor(unit, "2026-09-28"),
+    (err) =>
+      err instanceof RefreshError && err.rule === "refresh-topic-unknown",
+  );
 });

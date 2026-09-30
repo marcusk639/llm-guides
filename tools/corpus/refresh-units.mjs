@@ -87,3 +87,37 @@ export function resolveUnit(root, entry, records) {
     dataFiles,
   };
 }
+
+// Above this many pages a joined slug becomes unreadable and starts colliding
+// with filesystem name limits, so it collapses to first-plus-N.
+export const MAX_SLUG_PAGES = 3;
+
+export function unitSlug(unit) {
+  const names = unit.pages
+    .map((p) => path.basename(p.path, ".md"))
+    .sort((a, b) => a.localeCompare(b));
+  if (names.length > MAX_SLUG_PAGES)
+    return `${names[0]}-plus-${names.length - 1}`;
+  return names.join("-");
+}
+
+// The topic of the page named on the command line, not a merge of the unit's
+// topics: a cross-topic unit has no single home, and the entry page is the one
+// the author asked about. `unit.topics` records the span for the artifact.
+export function unitTopic(unit) {
+  const entry = unit.pages.find((p) => p.path === unit.entry);
+  if (
+    entry === undefined ||
+    typeof entry.topic !== "string" ||
+    entry.topic === ""
+  )
+    throw new RefreshError(
+      "refresh-topic-unknown",
+      `${unit.entry} has no front-matter topic, so the refresh artifact has no home under research/`,
+    );
+  return entry.topic;
+}
+
+export function artifactPathFor(unit, fetched) {
+  return `research/${unitTopic(unit)}/${fetched}-${unitSlug(unit)}-refresh.md`;
+}
