@@ -105,6 +105,16 @@ test("a slug above MAX_SLUG_PAGES collapses to first-plus-N", () => {
   assert.equal(unitSlug(unit), "gone-plus-3");
 });
 
+// The boundary itself: exactly MAX_SLUG_PAGES pages must NOT collapse. The
+// alpha/beta fixture unit above is 4 pages (already over the boundary); this
+// is a separate, isolated 3-page closure (guides/gamma/triad-*) so the
+// boundary is actually exercised rather than only values on either side of it.
+test("a slug of exactly MAX_SLUG_PAGES pages joins every basename, uncollapsed", () => {
+  const unit = resolveUnit(FIX, "guides/gamma/triad-a.md", fixRecords());
+  assert.equal(unit.pages.length, MAX_SLUG_PAGES);
+  assert.equal(unitSlug(unit), "triad-a-triad-b-triad-c");
+});
+
 // Review Focus 5, first half: the fixture unit spans alpha and beta, and the
 // live corpus spans context and domains. The artifact files under the topic of
 // the page NAMED ON THE COMMAND LINE, so the same unit entered from either end
@@ -115,12 +125,15 @@ test("a cross-topic unit files under the entry page's topic", () => {
   assert.deepEqual(fromAlpha.topics, ["alpha", "beta"]);
   assert.equal(unitTopic(fromAlpha), "alpha");
   assert.equal(
-    artifactPathFor(fromAlpha, "2026-09-28"),
+    artifactPathFor(fromAlpha, "2026-09-28", FIX),
     "research/alpha/2026-09-28-gone-plus-3-refresh.md",
   );
   const fromBeta = resolveUnit(FIX, "guides/beta/three.md", fixRecords());
   assert.deepEqual(fromBeta.topics, ["alpha", "beta"]);
   assert.equal(unitTopic(fromBeta), "beta");
+  // Closure symmetry: entering the same unit from either end must yield the
+  // identical page set, not merely the same length or the same topics.
+  assert.deepEqual(fromAlpha.pages, fromBeta.pages);
 });
 
 test("the live cross-topic unit really spans two topics", () => {
@@ -142,8 +155,64 @@ test("an entry page with no topic cannot name an artifact home", () => {
     dataFiles: [],
   };
   assert.throws(
-    () => artifactPathFor(unit, "2026-09-28"),
+    () => artifactPathFor(unit, "2026-09-28", FIX),
     (err) =>
       err instanceof RefreshError && err.rule === "refresh-topic-unknown",
+  );
+});
+
+// Finding 5: artifactPathFor validates the resolved topic against the
+// fixture's own meta/taxonomy.yaml (topics: [alpha, beta, gamma]) rather than
+// trusting an unvalidated front-matter string. Three cases: a real topic
+// resolves normally; a path-traversal string is rejected; a well-formed but
+// unregistered topic is rejected. Mutating the taxonomy check away (e.g.
+// deleting the `if (!topics.includes(topic))` guard) must turn the latter two
+// red.
+test("artifactPathFor resolves a topic listed in the fixture's taxonomy", () => {
+  const unit = resolveUnit(FIX, "guides/gamma/lonely.md", fixRecords());
+  assert.equal(
+    artifactPathFor(unit, "2026-09-28", FIX),
+    "research/gamma/2026-09-28-lonely-refresh.md",
+  );
+});
+
+test("artifactPathFor rejects a path-traversal topic", () => {
+  const unit = {
+    entry: "guides/x/y.md",
+    pages: [
+      {
+        path: "guides/x/y.md",
+        topic: "../../../tmp/evil",
+        status: null,
+        keys: [],
+      },
+    ],
+    keys: [],
+    topics: ["../../../tmp/evil"],
+    dataFiles: [],
+  };
+  assert.throws(
+    () => artifactPathFor(unit, "2026-09-28", FIX),
+    (err) =>
+      err instanceof RefreshError &&
+      err.rule === "refresh-topic-not-in-taxonomy",
+  );
+});
+
+test("artifactPathFor rejects a topic not listed in the taxonomy", () => {
+  const unit = {
+    entry: "guides/x/y.md",
+    pages: [
+      { path: "guides/x/y.md", topic: "nope", status: null, keys: [] },
+    ],
+    keys: [],
+    topics: ["nope"],
+    dataFiles: [],
+  };
+  assert.throws(
+    () => artifactPathFor(unit, "2026-09-28", FIX),
+    (err) =>
+      err instanceof RefreshError &&
+      err.rule === "refresh-topic-not-in-taxonomy",
   );
 });

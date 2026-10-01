@@ -6,6 +6,7 @@
 // the one-hop reading give the same three units.
 import fs from "node:fs";
 import path from "node:path";
+import yaml from "js-yaml";
 import { parseFrontmatter } from "./frontmatter.mjs";
 import { referencedRecordKeys } from "./verify-pages.mjs";
 
@@ -118,6 +119,34 @@ export function unitTopic(unit) {
   return entry.topic;
 }
 
-export function artifactPathFor(unit, fetched) {
-  return `research/${unitTopic(unit)}/${fetched}-${unitSlug(unit)}-refresh.md`;
+// `topic` is a free-text front-matter field, not a validated enum, by the time
+// it reaches here (lint's frontmatter-topic rule runs separately, and refresh
+// runs BEFORE re-linting). Interpolating it unchecked into a path lets a
+// traversal string (`../../../tmp/evil`), a leading slash (`/etc`), or a
+// typo'd/un-registered topic (`a/b`, a misspelling) write the artifact outside
+// research/ or silently nest it — realistically a typo, not an attack, since
+// the operator supplies the page, but the result is the same: a later
+// `research:` pointer that cannot resolve. Checked here, inside the one
+// function that builds the path, so it cannot be bypassed by a caller that
+// skips a separate validation step.
+function loadTaxonomyTopics(root) {
+  const file = path.join(root, "meta", "taxonomy.yaml");
+  if (!fs.existsSync(file)) return [];
+  return (
+    (
+      yaml.load(fs.readFileSync(file, "utf8"), { schema: yaml.JSON_SCHEMA }) ??
+      {}
+    ).topics ?? []
+  );
+}
+
+export function artifactPathFor(unit, fetched, root) {
+  const topic = unitTopic(unit);
+  const topics = loadTaxonomyTopics(root);
+  if (!topics.includes(topic))
+    throw new RefreshError(
+      "refresh-topic-not-in-taxonomy",
+      `${topic} is not a topic listed in meta/taxonomy.yaml, so research/${topic}/ is not a safe artifact home — check for a typo, or register the topic if it is genuinely new`,
+    );
+  return `research/${topic}/${fetched}-${unitSlug(unit)}-refresh.md`;
 }

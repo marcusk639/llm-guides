@@ -36,7 +36,26 @@ export function workOrder(root, unit, records, { key = null } = {}) {
       return { ...p, sectionSix: six };
     });
   const recordsOut = wanted.map((k) => {
-    const r = byKey.get(k) ?? {};
+    const r = byKey.get(k);
+    // An absent record is a distinct fact from one with no source: there is
+    // nothing to even look up, let alone a source to re-read it against.
+    if (r === undefined) {
+      blocking.push({
+        rule: "refresh-record-unknown",
+        path: "(not found in any data/ file)",
+        message: `record ${k} is referenced by this unit but does not exist in any data/ file`,
+      });
+      return {
+        key: k,
+        file: null,
+        source: null,
+        price_source: null,
+        value: null,
+        display: null,
+        volatility: null,
+        verified: null,
+      };
+    }
     if (r.source == null || String(r.source).trim() === "")
       blocking.push({
         rule: "refresh-record-source-missing",

@@ -39,3 +39,27 @@ records:
     volatility: low
     source: https://example.invalid/seven
     verified: "2026-09-16"
+  - key: fix.triad.ten
+    value: "triad-ten"
+    volatility: low
+    source: https://example.invalid/triad-ten
+    verified: "2026-09-16"
+  - key: fix.triad.eleven
+    value: "triad-eleven"
+    volatility: low
+    source: https://example.invalid/triad-eleven
+    verified: "2026-09-16"
+  - key: fix.emptysix.twelve
+    value: "emptysix-twelve"
+    volatility: low
+    source: https://example.invalid/emptysix
+    verified: "2026-09-16"
+  # Finding 2: an explicit empty-string source, distinct from a record with no
+  # `source` key at all (fix.nosource.six above). Both must trip
+  # refresh-record-source-missing; only the == null half was ever exercised
+  # before this record existed.
+  - key: fix.emptysource.eight
+    value: "emptysource-eight"
+    volatility: low
+    source: ""
+    verified: "2026-09-16"

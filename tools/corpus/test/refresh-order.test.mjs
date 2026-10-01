@@ -119,3 +119,86 @@ test("renderWorkOrder names the unit, its records and its blocking issues", () =
   assert.match(text, /^## Blocking before any fetch$/m);
   assert.match(text, /refresh-section-six-missing/);
 });
+
+// Finding 1: the deprecated-page exemption's own rendered text. The unit
+// entered from alpha/one.md includes beta/gone.md (deprecated, no section 6);
+// renderWorkOrder must label it exempt rather than render nothing or render it
+// as if BLOCKING. Mutating that literal string (or swapping it for the
+// BLOCKING fallback) must turn this red.
+test("renderWorkOrder marks a deprecated page's missing section 6 as exempt, not blocking", () => {
+  const text = renderWorkOrder(order("guides/alpha/one.md"));
+  assert.match(text, /^## Section 6 verbatim: guides\/beta\/gone\.md$/m);
+  assert.match(text, /\(deprecated page, no section 6 — exempt\)/);
+});
+
+// Finding 2: the OTHER half of the source guard. fix.nosource.six (used above)
+// has no `source` key at all, exercising only `r.source == null`. This record
+// has an explicit empty-string source, exercising
+// `String(r.source).trim() === ""`. Removing that second disjunct must turn
+// this red while leaving the no-source-key test above green.
+test("a record with an empty-string source blocks the same way as a missing one", () => {
+  const records = [...fixRecords()];
+  const unit = {
+    entry: "guides/gamma/lonely.md",
+    pages: [
+      {
+        path: "guides/gamma/lonely.md",
+        topic: "gamma",
+        status: null,
+        keys: ["fix.emptysource.eight"],
+      },
+    ],
+    keys: ["fix.emptysource.eight"],
+    topics: ["gamma"],
+    dataFiles: ["data/units.yaml"],
+  };
+  const o = workOrder(FIX, unit, records);
+  assert.equal(
+    o.blocking.some((b) => b.rule === "refresh-record-source-missing"),
+    true,
+  );
+});
+
+// Finding 4: a key referenced by the unit but absent from every data/ file is
+// a different fact from one that exists with a missing source, and must raise
+// its own rule with a sensible (non-bare-directory) path, not be
+// misreported as refresh-record-source-missing with path "data/".
+test("a wholly unknown record raises refresh-record-unknown, not refresh-record-source-missing", () => {
+  const records = [...fixRecords()];
+  const unit = {
+    entry: "guides/gamma/lonely.md",
+    pages: [
+      {
+        path: "guides/gamma/lonely.md",
+        topic: "gamma",
+        status: null,
+        keys: ["fix.ghost.nine"],
+      },
+    ],
+    keys: ["fix.ghost.nine"],
+    topics: ["gamma"],
+    dataFiles: [],
+  };
+  const o = workOrder(FIX, unit, records);
+  const unknown = o.blocking.find((b) => b.rule === "refresh-record-unknown");
+  assert.ok(unknown);
+  assert.equal(unknown.path, "(not found in any data/ file)");
+  assert.equal(
+    o.blocking.some((b) => b.rule === "refresh-record-source-missing"),
+    false,
+  );
+});
+
+// Finding 6(a): a present-but-empty section 6 ("" from sectionSixText) is a
+// real checklist of zero items, not a missing one — it must NOT trigger
+// refresh-section-six-missing. Only the null (missing) case was tested
+// before; mutating the null-check to a falsy-check must turn this red.
+test("a present-but-empty section 6 does not block the work order", () => {
+  const o = order("guides/gamma/emptysix.md");
+  const page = o.pages.find((p) => p.path === "guides/gamma/emptysix.md");
+  assert.equal(page.sectionSix, "");
+  assert.equal(
+    o.blocking.some((b) => b.rule === "refresh-section-six-missing"),
+    false,
+  );
+});
