@@ -157,6 +157,90 @@ const PAGE = [
   "",
 ].join("\n");
 
+// Review 2 / F5, with the probed fixture. RECORD_DATE used to allow ANY
+// indentation, so a `verified:`-looking line nested inside a `notes:` block
+// scalar matched first: the record's real date stayed stale under a freshly
+// dated page, the prose was silently rewritten, and the receipt recorded the
+// nested line's old value so --revert restored the corrupted prose and still
+// never touched the real date. All with exit 0 and no diagnostic.
+const NESTED_YAML = [
+  "records:",
+  "  - key: fix.shared.one",
+  "    notes: |",
+  "      how it is dated:",
+  "      verified: 1999-01-01",
+  '    value: "shared-one"',
+  "    volatility: high",
+  "    source: https://example.invalid/one",
+  '    verified: "2026-09-16"',
+  "    tags: [linked]",
+  "",
+].join("\n");
+
+test("a verified: line nested inside a record's block scalar is out of reach", () => {
+  const { text, previous } = setRecordVerified(
+    NESTED_YAML,
+    "fix.shared.one",
+    "2026-10-02",
+  );
+  // The record's OWN date moved, and `previous` is its value, not the prose's.
+  assert.equal(previous, "2026-09-16");
+  assert.equal(text.includes('    verified: "2026-10-02"'), true);
+  // The nested line is byte-identical.
+  assert.equal(text.includes("      verified: 1999-01-01"), true);
+  assert.equal(text.includes("1999-01-01"), true);
+  // And only one line changed in the whole file.
+  const before = NESTED_YAML.split("\n");
+  const after = text.split("\n");
+  assert.equal(after.length, before.length);
+  const changed = before.filter((l, i) => l !== after[i]);
+  assert.deepEqual(changed, ['    verified: "2026-09-16"']);
+});
+
+test("a record with only a nested verified: line fails closed", () => {
+  const noOwnDate = [
+    "records:",
+    "  - key: fix.shared.one",
+    "    notes: |",
+    "      verified: 1999-01-01",
+    '    value: "shared-one"',
+    "",
+  ].join("\n");
+  assert.throws(
+    () => setRecordVerified(noOwnDate, "fix.shared.one", "2026-10-02"),
+    (err) =>
+      err instanceof RefreshError &&
+      err.rule === "refresh-record-verified-missing",
+  );
+});
+
+// Review 2 / F7, second survivor: the page-side anchor is correct today only
+// because nobody has changed it, and nothing would catch the regression. This
+// is the F5 fixture's page analogue.
+test("a verified: line nested inside front-matter is out of reach", () => {
+  const page = [
+    "---",
+    "title: Nested",
+    "summary: |",
+    "  how it is dated:",
+    "  verified: 1999-01-01",
+    "topic: models",
+    "verified: 2026-09-16",
+    "---",
+    "",
+    "# Nested",
+    "",
+  ].join("\n");
+  const { text, previous } = setPageVerified(page, "2026-10-02");
+  assert.equal(previous, "2026-09-16");
+  assert.equal(text.includes("verified: 2026-10-02"), true);
+  assert.equal(text.includes("  verified: 1999-01-01"), true);
+  const before = page.split("\n");
+  const after = text.split("\n");
+  const changed = before.filter((l, i) => l !== after[i]);
+  assert.deepEqual(changed, ["verified: 2026-09-16"]);
+});
+
 test("a page's verified date is bumped in front-matter only", () => {
   const { text, previous } = setPageVerified(PAGE, "2026-09-28");
   assert.equal(previous, "2026-09-16");

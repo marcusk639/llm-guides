@@ -45,13 +45,19 @@ function escapeKey(key) {
 export function recordBlockRange(yamlText, key) {
   const lines = yamlText.split("\n");
   const open = new RegExp(
-    `^\\s*-\\s+key:\\s*(["']?)${escapeKey(key)}\\1\\s*$`,
+    `^(\\s*-\\s+)key:\\s*(["']?)${escapeKey(key)}\\2\\s*$`,
   );
   const anyOpen = /^\s*-\s+key:\s/;
   let start = -1;
+  let indent = "";
   for (let i = 0; i < lines.length; i++) {
-    if (open.test(lines[i])) {
+    const m = open.exec(lines[i]);
+    if (m !== null) {
       start = i;
+      // The record's own fields sit at the column `key:` starts in: for the
+      // usual `  - key: x` that is four spaces. Carried out so the date
+      // pattern can be bound to exactly that depth — see RECORD_DATE's note.
+      indent = " ".repeat(m[1].length);
       break;
     }
   }
@@ -63,13 +69,25 @@ export function recordBlockRange(yamlText, key) {
       break;
     }
   }
-  return { lines, start, end };
+  return { lines, start, end, indent };
 }
 
 // The quote character is captured and re-emitted, so a quoted date stays quoted
 // and an unquoted one stays unquoted: the corpus uses both (records quote,
 // guides do not) and rewriting the style would widen every diff.
-const RECORD_DATE = /^(\s*verified:\s*)(["']?)([^"'\s]*)\2([ \t]*)$/;
+//
+// Bound to the record's OWN field indent, not to `\s*`. An unbounded `\s*`
+// matches a `verified:`-looking line at any depth inside the block — a nested
+// mapping, or a line inside a `notes:` block scalar — and the loop takes the
+// FIRST match, so the record's real date was left stale under a freshly dated
+// page while the prose was silently rewritten, exit 0. `notes` is a documented
+// row-record field and a multi-line one is the natural way to write it.
+// Anything more deeply indented is now structurally out of reach, and a record
+// whose own `verified:` really is absent still falls through to
+// refresh-record-verified-missing, which is the correct fail-closed outcome.
+// setPageVerified's PAGE_DATE anchors the same way, with no indent at all.
+const recordDatePattern = (indent) =>
+  new RegExp(`^(${indent}verified:\\s*)(["']?)([^"'\\s]*)\\2([ \\t]*)$`);
 
 export function setRecordVerified(yamlText, key, date) {
   const range = recordBlockRange(yamlText, key);
@@ -78,7 +96,8 @@ export function setRecordVerified(yamlText, key, date) {
       "refresh-record-not-found",
       `no record with key ${key} in this data file`,
     );
-  const { lines, start, end } = range;
+  const { lines, start, end, indent } = range;
+  const RECORD_DATE = recordDatePattern(indent);
   for (let i = start; i < end; i++) {
     const m = RECORD_DATE.exec(lines[i]);
     if (m === null) continue;
