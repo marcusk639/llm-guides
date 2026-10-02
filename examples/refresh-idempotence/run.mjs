@@ -20,6 +20,14 @@ import { stampUnit, revertUnit } from "../../tools/corpus/refresh-stamp.mjs";
 
 const FETCHED = "2026-09-28";
 const READ = "2026-09-27";
+// THREE distinct dates, deliberately. The proof's second claim is that every
+// date written comes from the artifact and never from the clock, and it can
+// only fail if `today` differs from both of the artifact's dates: passing
+// `{ today: FETCHED }` made the page-side assertion tautological, so sourcing
+// the page date from the clock passed this proof and the whole unit suite.
+// TODAY is later than both, which is also the ordinary case: an artifact filled
+// on Monday and stamped on Friday must still date its pages Monday.
+const TODAY = "2026-09-30";
 
 const PAGE = (title) =>
   [
@@ -162,8 +170,12 @@ function linesNotIn(haystack, needleText) {
 const addedLines = (before, after) => linesNotIn(before, after);
 const removedLines = (before, after) => linesNotIn(after, before);
 
+assert.equal(TODAY > FETCHED, true, "today must be later than fetched");
+assert.equal(TODAY > READ, true, "today must be later than read");
+assert.notEqual(FETCHED, READ, "fetched and read must stay distinct");
+
 const before = readAll();
-stampUnit(root, writeConfirmedArtifact(), { today: FETCHED });
+stampUnit(root, writeConfirmedArtifact(), { today: TODAY });
 const after = readAll();
 
 // 1. Only date lines and added research: lines differ, in BOTH directions.
@@ -192,7 +204,8 @@ for (const rel of TRACKED) {
   }
 }
 
-// 2. The dates written are the artifact's, not the clock's.
+// 2. The dates written are the artifact's, not the clock's. TODAY appears
+// nowhere in the result, which is the half of this claim that had no test.
 assert.equal(
   after["guides/models/one.md"].includes(`verified: ${FETCHED}`),
   true,
@@ -203,6 +216,12 @@ assert.equal(
   true,
   "record verified comes from that entry's read date",
 );
+for (const rel of TRACKED)
+  assert.equal(
+    after[rel].includes(TODAY),
+    false,
+    `${rel}: nothing a refresh writes may come from the clock, and ${TODAY} did`,
+  );
 
 // 3. seed: true survived.
 assert.equal(
@@ -220,12 +239,12 @@ const artifactRel = artifactPathFor(
 const stamped = parseArtifact(
   fs.readFileSync(path.join(root, artifactRel), "utf8"),
 ).data;
-revertUnit(root, stamped, { today: "2026-09-29" });
+revertUnit(root, stamped, { today: TODAY });
 assert.deepEqual(readAll(), before, "revert must restore guides/ and data/");
 
 // 5. Stamping the same confirmed artifact again reproduces the same bytes:
 // idempotent, and independent of when the proof runs.
-stampUnit(root, writeConfirmedArtifact(), { today: FETCHED });
+stampUnit(root, writeConfirmedArtifact(), { today: TODAY });
 assert.deepEqual(readAll(), after, "a second identical refresh is a no-op");
 
 fs.rmSync(root, { recursive: true, force: true });

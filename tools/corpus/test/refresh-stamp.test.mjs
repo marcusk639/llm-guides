@@ -832,6 +832,30 @@ test("a future record read date is refused, and nothing is written", () => {
   assert.equal(read(root, "data/units.yaml"), beforeData);
 });
 
+// Review 2 / F7. The idempotence proof wired `today` to FETCHED, so its
+// "the dates written are the artifact's, not the clock's" assertion could not
+// distinguish the two sources and `setPageVerified(text, today)` passed both
+// gates. This pins the page half directly, with all three dates distinct: an
+// artifact filled on one day and stamped on a later one must still date every
+// page the day it was fetched, or `expires = verified + cadence` overstates
+// freshness by the gap.
+test("a page's date is the artifact's fetched even when today is later", () => {
+  const root = sandbox();
+  const artifact = prepared(root, { read: "2026-09-27" });
+  assert.equal(artifact.fetched, "2026-09-28");
+  stampUnit(root, artifact, { today: "2026-09-30" });
+  for (const rel of ["guides/alpha/one.md", "guides/alpha/two.md"]) {
+    assert.equal(read(root, rel).includes("verified: 2026-09-28"), true);
+    assert.equal(read(root, rel).includes("2026-09-30"), false);
+  }
+  // And the record half, which keeps its own read date rather than either.
+  assert.equal(
+    read(root, "data/units.yaml").includes('verified: "2026-09-27"'),
+    true,
+  );
+  assert.equal(read(root, "data/units.yaml").includes("2026-09-30"), false);
+});
+
 test("a record read earlier than fetched still stamps normally", () => {
   const root = sandbox();
   const artifact = prepared(root, { read: "2026-09-20" });
