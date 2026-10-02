@@ -8,7 +8,7 @@ import { RefreshError } from "./refresh-units.mjs";
 import fs from "node:fs";
 import nodePath from "node:path";
 import { parseFrontmatter } from "./frontmatter.mjs";
-import { validateArtifact, withReceipt } from "./refresh-artifact.mjs";
+import { validateArtifact, withReceipt, withRevertMark } from "./refresh-artifact.mjs";
 
 // Three capture groups so the body can be rebuilt byte-exactly: the opening
 // fence, the body without its trailing newline, and the closing fence. Mirrors
@@ -251,3 +251,64 @@ export function stampUnit(
     fs.writeFileSync(nodePath.join(root, rel), text);
   return { receipt, written: [...pending.keys()].sort() };
 }
+
+// The undo a verify-agent block needs, with no git involved: the receipt alone
+// says what was written and what it replaced, so a blocked branch can be made
+// harmless to merge before the pull request is opened.
+export function revertUnit(
+  root,
+  artifact,
+  { today = new Date().toISOString().slice(0, 10) } = {},
+) {
+  const receipt = artifact.stamped;
+  if (receipt == null)
+    throw new RefreshError(
+      "refresh-no-receipt",
+      "artifact carries no stamped: receipt, so there is nothing to revert",
+    );
+  const pending = new Map();
+  const readPending = (rel) =>
+    pending.has(rel)
+      ? pending.get(rel)
+      : fs.readFileSync(nodePath.join(root, rel), "utf8");
+
+  for (const r of receipt.records ?? []) {
+    const probe = setRecordVerified(
+      readPending(r.file),
+      r.key,
+      r.previous_verified,
+    );
+    // `previous` is what was on disk a moment ago. If it is not the date this
+    // receipt wrote, another unit has landed on the same file and reverting
+    // would clobber its work.
+    if (probe.previous !== r.new_verified)
+      throw new RefreshError(
+        "refresh-revert-drift",
+        `record ${r.key} in ${r.file} now reads verified ${probe.previous}, not the ${r.new_verified} this receipt wrote; another unit has already changed it`,
+      );
+    pending.set(r.file, probe.text);
+  }
+
+  for (const p of receipt.pages ?? []) {
+    const bumped = setPageVerified(readPending(p.path), p.previous_verified);
+    if (bumped.previous !== artifact.fetched)
+      throw new RefreshError(
+        "refresh-revert-drift",
+        `${p.path} now reads verified ${bumped.previous}, not the ${artifact.fetched} this receipt wrote`,
+      );
+    let out = bumped.text;
+    if (p.research_added) out = removePageResearch(out).text;
+    else if (p.previous_research != null)
+      out = setPageResearch(out, p.previous_research).text;
+    pending.set(p.path, out);
+  }
+
+  pending.set(
+    artifact.path,
+    withRevertMark(readPending(artifact.path), today),
+  );
+  for (const [rel, text] of pending)
+    fs.writeFileSync(nodePath.join(root, rel), text);
+  return { restored: [...pending.keys()].sort() };
+}
+

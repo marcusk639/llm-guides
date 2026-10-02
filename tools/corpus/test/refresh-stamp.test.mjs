@@ -596,3 +596,119 @@ test("a key-scoped artifact widened by hand is refused before anything is writte
   );
   assert.equal(read(root, "data/units.yaml"), before);
 });
+
+
+import { revertUnit } from "../refresh-stamp.mjs";
+
+const TRACKED = [
+  "guides/alpha/one.md",
+  "guides/alpha/two.md",
+  "guides/beta/three.md",
+  "guides/beta/gone.md",
+  "guides/gamma/lonely.md",
+  "guides/gamma/nosix.md",
+  "data/units.yaml",
+];
+
+const snapshot = (root) =>
+  Object.fromEntries(TRACKED.map((rel) => [rel, read(root, rel)]));
+
+// The whole point: a blocked branch must be harmless to merge. guides/ and
+// data/ come back byte-exact. The artifact itself is allowed to change — it
+// keeps what was checked, which is what the next attempt needs.
+//
+// This exercises BOTH setPageResearch paths, which is why two.md carries a
+// quoted `research:` in the fixture: one.md and three.md take the insert path
+// (research_added: true, removed on revert) and two.md takes the replace path
+// (research_added: false, previous value and its quoting restored on revert).
+// Without a page in the second state the test structurally cannot see a replace
+// branch that dropped the quote character.
+test("stamp then revert is a byte-exact round trip over guides/ and data/", () => {
+  const root = sandbox();
+  const before = snapshot(root);
+  const artifact = prepared(root);
+  const { receipt } = stampUnit(root, artifact, { today: "2026-09-28" });
+  assert.notDeepEqual(snapshot(root), before);
+  const byPath = new Map(receipt.pages.map((p) => [p.path, p]));
+  assert.equal(byPath.get("guides/alpha/one.md").research_added, true);
+  assert.equal(byPath.get("guides/alpha/one.md").previous_research, null);
+  // Both halves of the claim: the replace path was taken, and it is what the
+  // revert below has to put back byte-for-byte.
+  assert.equal(byPath.get("guides/alpha/two.md").research_added, false);
+  assert.equal(
+    byPath.get("guides/alpha/two.md").previous_research,
+    "research/alpha/prior.md",
+  );
+  const stamped = parseArtifact(read(root, artifact.path)).data;
+  const { restored } = revertUnit(root, stamped, { today: "2026-09-29" });
+  assert.deepEqual(snapshot(root), before);
+  assert.equal(restored.includes(artifact.path), true);
+});
+
+test("a revert marks the artifact blocked and keeps what was checked", () => {
+  const root = sandbox();
+  const artifact = prepared(root);
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  const stamped = parseArtifact(read(root, artifact.path)).data;
+  revertUnit(root, stamped, { today: "2026-09-29" });
+  const after = parseArtifact(read(root, artifact.path)).data;
+  assert.equal(after.verdict, "blocked");
+  assert.equal("stamped" in after, false);
+  // The revert date and the stamp date are both kept, under distinct keys.
+  assert.equal(after.reverted.at, "2026-09-29");
+  assert.equal(after.reverted.stamped_at, "2026-09-28");
+  assert.equal(stamped.stamped.at, "2026-09-28");
+  assert.deepEqual(after.reverted.records, stamped.stamped.records);
+  // The artifact stays on disk: what was checked and what was found is exactly
+  // what the next attempt needs.
+  assert.equal(fs.existsSync(nodePath.join(root, artifact.path)), true);
+});
+
+test("an artifact with no receipt has nothing to revert", () => {
+  const root = sandbox();
+  const artifact = prepared(root);
+  assert.throws(
+    () => revertUnit(root, artifact, { today: "2026-09-29" }),
+    (err) => err instanceof RefreshError && err.rule === "refresh-no-receipt",
+  );
+});
+
+// A key-scoped stamp touched no page, so its revert must restore the record and
+// still touch no page. revertUnit needs no key_scoped branch for this: it walks
+// receipt.pages, and a key-scoped receipt has none.
+test("a key-scoped stamp reverts the record and still touches no page", () => {
+  const root = sandbox();
+  const before = snapshot(root);
+  const artifact = preparedKeyScoped(root);
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  assert.notDeepEqual(snapshot(root), before);
+  const stamped = parseArtifact(read(root, artifact.path)).data;
+  revertUnit(root, stamped, { today: "2026-09-29" });
+  assert.deepEqual(snapshot(root), before);
+  const after = parseArtifact(read(root, artifact.path)).data;
+  assert.deepEqual(after.reverted.pages, []);
+  assert.equal(after.reverted.stamped_at, "2026-09-28");
+  assert.equal(after.reverted.at, "2026-09-29");
+});
+
+// Two units can share a data file. A revert must never clobber a date another
+// unit already landed there.
+test("a revert refuses on drift and writes nothing", () => {
+  const root = sandbox();
+  const artifact = prepared(root);
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  const stamped = parseArtifact(read(root, artifact.path)).data;
+  // Someone else moved fix.shared.one on afterwards.
+  fs.writeFileSync(
+    nodePath.join(root, "data/units.yaml"),
+    setRecordVerified(read(root, "data/units.yaml"), "fix.shared.one", "2026-10-05").text,
+  );
+  const before = read(root, "data/units.yaml");
+  const beforePage = read(root, "guides/alpha/one.md");
+  assert.throws(
+    () => revertUnit(root, stamped, { today: "2026-09-29" }),
+    (err) => err instanceof RefreshError && err.rule === "refresh-revert-drift",
+  );
+  assert.equal(read(root, "data/units.yaml"), before);
+  assert.equal(read(root, "guides/alpha/one.md"), beforePage);
+});
