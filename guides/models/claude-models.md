@@ -8,12 +8,16 @@ summary: >-
 topic: models
 verified: 2026-09-16
 applies_to:
-  - "Claude API (first-party) as documented on platform.claude.com on 2026-09-16"
-  - "Current models only: Claude Fable 5.1, Claude Opus 5, Claude Sonnet 5, Claude Haiku 4.5"
+  - "Claude API (first-party) as documented on platform.claude.com on 2026-09-16; the Anthropic model lineup, legacy status and prices re-read 2026-10-02"
+  - "Current models: Claude Fable 5.1, Claude Opus 5.5, Claude Sonnet 5.5, Claude Haiku 4.5"
+  - "Legacy models still served: Claude Opus 5, Claude Sonnet 5"
 sources:
   - https://platform.claude.com/docs/en/models/overview
   - https://platform.claude.com/docs/en/about-claude/pricing
   - https://platform.claude.com/docs/en/api/models/list
+  - https://platform.claude.com/docs/en/about-claude/model-deprecations
+  - https://platform.claude.com/docs/en/models/opus-5/overview
+  - https://platform.claude.com/docs/en/models/sonnet-5/overview
 related:
   - guides/context/context-management.md
 seed: true
@@ -48,17 +52,26 @@ The output includes legacy models that are still served, not just the four below
 The current lineup, as published on the verification date. Prices are base USD per million tokens (MTok) on the Claude API:
 
 <!-- corpus:table fields=name,api_id,api_alias,context_window,max_output,input_price,output_price headers="Model,API ID,API alias,Context window,Max output,Input price,Output price" tag=claude-current -->
-
-| Model            | API ID                    | API alias        | Context window | Max output  | Input price | Output price |
-| ---------------- | ------------------------- | ---------------- | -------------- | ----------- | ----------- | ------------ |
-| Claude Fable 5.1 | claude-fable-5-1          | claude-fable-5-1 | 1M tokens      | 128K tokens | $10 / MTok  | $50 / MTok   |
-| Claude Opus 5    | claude-opus-5             | claude-opus-5    | 1M tokens      | 128K tokens | $5 / MTok   | $25 / MTok   |
-| Claude Sonnet 5  | claude-sonnet-5           | claude-sonnet-5  | 1M tokens      | 128K tokens | $2 / MTok   | $10 / MTok   |
-| Claude Haiku 4.5 | claude-haiku-4-5-20251001 | claude-haiku-4-5 | 200K tokens    | 64K tokens  | $1 / MTok   | $5 / MTok    |
-
+| Model | API ID | API alias | Context window | Max output | Input price | Output price |
+| --- | --- | --- | --- | --- | --- | --- |
+| Claude Fable 5.1 | claude-fable-5-1 | claude-fable-5-1 | 1M tokens | 128K tokens | $10 / MTok | $50 / MTok |
+| Claude Opus 5.5 | claude-opus-5-5 | claude-opus-5-5 | 1M tokens | 128K tokens | $4 / MTok | $20 / MTok |
+| Claude Sonnet 5.5 | claude-sonnet-5-5 | claude-sonnet-5-5 | 1M tokens | 128K tokens | $2 / MTok | $10 / MTok |
+| Claude Haiku 4.5 | claude-haiku-4-5-20251001 | claude-haiku-4-5 | 200K tokens | 64K tokens | $1 / MTok | $5 / MTok |
 <!-- /corpus:table -->
 
 If the table and the [models overview](https://platform.claude.com/docs/en/models/overview) or [pricing page](https://platform.claude.com/docs/en/about-claude/pricing) disagree, those pages win.
+
+Two previous-generation models are still served. The overview's current lineup no longer lists them, but each one's own page marks it Active (legacy) with a committed retirement date, and the pricing page still rates them under "Additional models". They are listed here because a reader pinned to one needs to know how long it has:
+
+<!-- corpus:table fields=name,api_id,context_window,max_output,input_price,output_price,retirement headers="Model,API ID,Context window,Max output,Input price,Output price,Retirement" tag=claude-legacy sort=name -->
+| Model | API ID | Context window | Max output | Input price | Output price | Retirement |
+| --- | --- | --- | --- | --- | --- | --- |
+| Claude Opus 5 | claude-opus-5 | 1M tokens | 128K tokens | $5 / MTok | $25 / MTok | Not sooner than July 24, 2027 |
+| Claude Sonnet 5 | claude-sonnet-5 | 1M tokens | 128K tokens | $2 / MTok | $10 / MTok | Not sooner than June 30, 2027 |
+<!-- /corpus:table -->
+
+A legacy model is not a deprecated one: the [deprecations page](https://platform.claude.com/docs/en/about-claude/model-deprecations) defines Legacy as "will no longer receive updates and may be deprecated in the future", and Deprecated as carrying a recommended replacement and an assigned retirement date. Both rows above are still Active.
 
 ## 3. How it actually works
 
@@ -70,17 +83,17 @@ If the table and the [models overview](https://platform.claude.com/docs/en/model
 
 **Prices are per token, split by direction.** Output tokens cost several times more than input tokens on every current model. Discounts and surcharges stack on the base price: the Batch API discounts both directions, prompt-cache reads are billed at a fraction of base input (with a lower fraction on Claude Fable 5.1 than on the others), and cache writes cost more than base input. The exact multipliers are on the [pricing page](https://platform.claude.com/docs/en/about-claude/pricing); this page deliberately does not copy them.
 
-**The lineup has tiers, and the vendor describes them.** In the overview's own words: Fable 5.1 is "for demanding reasoning and long-horizon agentic work", Opus 5 "for complex agentic coding and enterprise work", Sonnet 5 "the best combination of speed and intelligence", Haiku 4.5 "the fastest model with near-frontier intelligence". Its comparative-latency row runs Slower, Moderate, Fast, Fastest in that order.
+**The lineup has tiers, and the vendor describes them.** In the overview's own words: Fable 5.1 is "for demanding reasoning and long-horizon agentic work", Opus 5.5 "for long-running agentic coding and knowledge work", Sonnet 5.5 "the best combination of speed and intelligence", Haiku 4.5 "the fastest model with near-frontier intelligence". Its comparative-latency row runs Slower, Moderate, Fast, Fastest in that order.
 
 ## 4. Patterns that hold up
 
 Each recipe carries one evidence label, applied as defined in the corpus contract's [evidence labels](../../CLAUDE.md#evidence-labels) and [source tiers](../../CLAUDE.md#source-tiers). Nothing on this page is **Verified**: no proof in this repository backs these claims.
 
-### 4.1 Start with Opus 5; move up or down only on evidence
+### 4.1 Start with Opus 5.5; move up or down only on evidence
 
-Anthropic's own advice is to start with Claude Opus 5 for most workloads, and to use Claude Fable 5.1 for demanding reasoning and long-horizon agentic work, or when evals on Opus 5 at higher effort still fall short.
+Anthropic's own advice is to start with Claude Opus 5.5 for most workloads, and to use Claude Fable 5.1 for demanding reasoning and long-horizon agentic work, or when evals on Claude Opus 5.5 at higher effort still fall short.
 
-Evidence: **Documented** — [models overview](https://platform.claude.com/docs/en/models/overview), read 2026-09-16.
+Evidence: **Documented** — [models overview](https://platform.claude.com/docs/en/models/overview), read 2026-10-02.
 
 ### 4.2 Read limits from the Models API, not from a doc page (including this one)
 
@@ -127,24 +140,27 @@ Evidence: **Documented** — [pricing: long context pricing](https://platform.cl
 
 ## 6. Where this rots
 
-**Nearly all of this page rots**, and faster than any other page in the corpus. Every row of the table is a high-volatility record; the page's derived review cadence is the shortest the ledger allows. Verified 2026-09-16.
+**Nearly all of this page rots**, and faster than any other page in the corpus. Every row of both tables is a high-volatility record; the page's derived review cadence is the shortest the ledger allows. Verified 2026-09-16; the lineup and both legacy rows re-read 2026-10-02. The page date is deliberately not moved: this pass corrected the lineup, it did not re-work the untracked claims below.
 
 | Claim                                      | Record                       | Volatility | Why it moves                                                          |
 | ------------------------------------------ | ---------------------------- | ---------- | --------------------------------------------------------------------- |
 | Claude Fable 5.1 ID, alias, limits, prices | `anthropic.models.fable-5-1` | high       | New releases, repricing, and lineup changes                           |
-| Claude Opus 5 ID, alias, limits, prices    | `anthropic.models.opus-5`    | high       | Same                                                                  |
-| Claude Sonnet 5 ID, alias, limits, prices  | `anthropic.models.sonnet-5`  | high       | Same; its price already changed status once (introductory → standard) |
+| Claude Opus 5.5 ID, alias, limits, prices  | `anthropic.models.opus-5-5`  | high       | Current Opus; replaced Opus 5 in the overview's lineup                |
+| Claude Sonnet 5.5 ID, alias, limits, prices | `anthropic.models.sonnet-5-5` | high      | Current Sonnet; replaced Sonnet 5 in the overview's lineup            |
+| Claude Opus 5 ID, limits, prices, retirement | `anthropic.models.opus-5`  | high       | Legacy but still served; retirement date is a commitment that can move |
+| Claude Sonnet 5 ID, limits, prices, retirement | `anthropic.models.sonnet-5` | high    | Same; its price already changed status once (introductory → standard)  |
 | Claude Haiku 4.5 ID, alias, limits, prices | `anthropic.models.haiku-4-5` | high       | Oldest model in the lineup, with the nearest retirement commitment    |
 
 Re-check on refresh, against the [models overview](https://platform.claude.com/docs/en/models/overview) and [pricing page](https://platform.claude.com/docs/en/about-claude/pricing) — **those pages are the authority whenever they and this page disagree**:
 
-- which models the overview calls current (a new model means a new record and a new row, and a demoted one means removing its `claude-current` tag);
+- which models the overview calls current (a new model means a new record and a new row, and a demoted one means moving it from the `claude-current` tag to `claude-legacy`, not deleting it — a legacy model is still served and readers may be pinned to it);
+- whether either legacy model has moved from Active to Deprecated or Retired on the [deprecations page](https://platform.claude.com/docs/en/about-claude/model-deprecations), and whether its retirement date moved;
 - every field in every record;
 - the untracked claims in sections 3–5: the vendor's tier descriptions and recommendation, the tokenizer note, Haiku 4.5's thinking and effort support, the batch output beta header, platform availability, the long-context pricing rule, and the Sonnet 5 pricing note.
 
 What should not rot: the ID/alias/snapshot model, the window-vs-output distinction, reading limits from the Models API, and comparing cost per completed task.
 
-Deliberately absent: cache, batch, fast-mode, data-residency, and tool-use prices; platform-specific IDs; knowledge cutoffs; retirement dates. All are on the linked pages and would multiply this page's rot surface.
+Deliberately absent: cache, batch, fast-mode, data-residency, and tool-use prices; platform-specific IDs; knowledge cutoffs; and the retirement dates of the four current models. Retirement is carried only for the two legacy rows, where it is the fact that decides whether to migrate. All the rest are on the linked pages and would multiply this page's rot surface.
 
 ## 7. Proofs
 
