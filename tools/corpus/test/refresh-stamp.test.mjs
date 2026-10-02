@@ -712,3 +712,28 @@ test("a revert refuses on drift and writes nothing", () => {
   assert.equal(read(root, "data/units.yaml"), before);
   assert.equal(read(root, "guides/alpha/one.md"), beforePage);
 });
+
+// The record-level guard above protects data/*.yaml, which is shared between
+// refresh units. This is the other half: a hand edit to a PAGE's verified
+// date between stamp and revert, with no data file touched at all, so only
+// the page-level guard can catch it.
+test("a revert refuses on page drift and writes nothing", () => {
+  const root = sandbox();
+  const artifact = prepared(root);
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  const stamped = parseArtifact(read(root, artifact.path)).data;
+  // Someone hand-edited the page's verified date afterwards.
+  fs.writeFileSync(
+    nodePath.join(root, "guides/alpha/one.md"),
+    read(root, "guides/alpha/one.md").replace(
+      "verified: 2026-09-28",
+      "verified: 2026-10-15",
+    ),
+  );
+  const before = snapshot(root);
+  assert.throws(
+    () => revertUnit(root, stamped, { today: "2026-09-29" }),
+    (err) => err instanceof RefreshError && err.rule === "refresh-revert-drift",
+  );
+  assert.deepEqual(snapshot(root), before);
+});
