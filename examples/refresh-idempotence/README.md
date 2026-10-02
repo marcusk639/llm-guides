@@ -23,3 +23,13 @@ stated figures match the record, and stamps it. Then it checks five things:
 5. Stamping the same artifact again reproduces the same bytes.
 
 It does not touch the real corpus and makes no network calls.
+
+**What it does not cover.** Both of its `stampUnit` calls start from a page with no
+`research:` field — the second runs after the `--revert` in check 4 — so
+`setPageResearch`'s update-in-place branch, which replaces an *existing*
+`research:` value, is never exercised here. Check 1 asserts a `research:` line is
+added and that none disappears, which is the first-refresh case only. The
+update-in-place branch is guarded by the `refresh-stamp` unit tests instead
+("an existing research: value is replaced, not duplicated", and the quoted-value
+test). Do not read this proof as covering a second refresh of an already-stamped
+page.

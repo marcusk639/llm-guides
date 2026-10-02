@@ -747,3 +747,14 @@ The lint is also exact-string by design, so two further kinds of text escape it:
 | F3      | No templated code snippets: a value cannot be interpolated into a fenced example.                                         | Fetch values at runtime or take them as input; keep fences free of known values.                                                                                                                                        |
 | F5      | `corpus:data` cannot select one field of a row record.                                                                    | Point prose at the table ("see the Input price column") or describe the relation without the figure; add a separate single-value record only if the figure is essential, and list both records under "Where this rots". |
 | F14     | Safety-relevant identifiers cannot be flagged for priority re-checking.                                                   | List them first in "Where this rots" with why they matter for safety.                                                                                                                                                   |
+
+**A refresh that fails part-way leaves no marker.** `refresh --stamp` is
+all-or-nothing at the transform layer — every new file body is computed in memory
+and nothing is written until all of them succeed — but the final write loop is not
+multi-file atomic. If an `fs` write fails part-way (a permission error, a vanished
+file), earlier files are already stamped. The artifact's receipt is written **last**,
+so the failure mode is "pages stamped, no receipt", and its only evidence is the
+receipt's absence: nothing positively flags a half-stamped unit. Re-running the
+identical `--stamp` self-heals, because every per-file write is a deterministic
+function of the artifact. A half-stamped unit cannot be undone by `--revert`,
+which needs the receipt — recover by retrying the stamp, not by reverting.
