@@ -83,9 +83,9 @@ Hosted models, as published on the verification date. Prices are base paid-tier 
 | Google | Gemini 3.8 Flash | gemini-3.8-flash |  | 1,048,576 tokens | 65,536 tokens | $0.75 / MTok | $3.75 / MTok | Paid-tier prices shown apply through 2026-12-31; from 2027-01-01 the listed prices are $1.50 / MTok input and $7.50 / MTok output. Output price includes thinking tokens. |
 | Google | Gemini 3.1 Pro Preview | gemini-3.1-pro-preview |  | 1,048,576 tokens | 65,536 tokens | $2 / MTok | $12 / MTok | Preview model. Prices shown are for prompts up to 200k tokens; longer prompts are $4 / MTok input and $18 / MTok output. Output price includes thinking tokens. |
 | Google | Gemini 3.5 Flash-Lite | gemini-3.5-flash-lite |  | 1,048,576 tokens | 65,536 tokens | $0.30 / MTok | $2.50 / MTok | Input price covers text, image, video and audio. Output price includes thinking tokens. |
-| OpenAI | GPT-6 Astra | gpt-6-astra | 1,050,000 tokens | 922,000 tokens | 128,000 tokens | $10 / MTok | $50 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
-| OpenAI | GPT-5.6 Terra | gpt-5.6-terra | 1,050,000 tokens | 922,000 tokens | 128,000 tokens | $2 / MTok | $12 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
-| OpenAI | GPT-5.6 Luna | gpt-5.6-luna | 1,050,000 tokens | 922,000 tokens | 128,000 tokens | $0.20 / MTok | $1.20 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
+| OpenAI | GPT-6 Astra | gpt-6-astra | 1,050,000 tokens |  | 128,000 tokens | $10 / MTok | $50 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
+| OpenAI | GPT-5.6 Terra | gpt-5.6-terra | 1,050,000 tokens |  | 128,000 tokens | $2 / MTok | $12 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
+| OpenAI | GPT-5.6 Luna | gpt-5.6-luna | 1,050,000 tokens |  | 128,000 tokens | $0.20 / MTok | $1.20 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
 <!-- /corpus:table -->
 
 Open-weight models, as stated in each official model card on the verification date. There is no price column: what you pay depends on where and how you run the weights.
@@ -103,7 +103,7 @@ If a table and the vendor page it came from disagree, the vendor page wins. Sect
 
 ## 3. How it actually works
 
-**"Context" is not one column across vendors.** Anthropic's overview states a context window. Google's model pages state an input token limit and an output token limit, with no separate window. OpenAI's model pages state all three: a context window, a maximum input, and a maximum output, and the input maximum is smaller than the window. The table keeps these in separate columns rather than forcing one number per model, which is why cells are blank. Do not read Google's input limit and Anthropic's context window as the same measurement.
+**"Context" is not one column across vendors.** Anthropic's overview states a context window. Google's model pages state an input token limit and an output token limit, with no separate window. OpenAI's model pages state a context window and a maximum output, but no separate maximum input. The table keeps these in separate columns rather than forcing one number per model, which is why cells are blank. A blank cell means the vendor publishes no such figure — not that it is unlimited, and not that it may be derived: subtracting a max output from a context window yields a number the vendor never stated. Do not read Google's input limit and Anthropic's context window as the same measurement.
 
 **Model ids behave differently per vendor.** OpenAI's model pages name a "default snapshot" per model. Google's pages list a version per model labelled Stable or Preview, and document a separate model-version pattern page. Anthropic's overview states that every current Claude id is a pinned snapshot (see [Claude models](claude-models.md)). The id string alone does not tell you whether it will change under you; each vendor's own page does.
 
@@ -197,7 +197,7 @@ Re-check on refresh, against the pages in section 8, **which win whenever they a
 
 What should not rot: comparing cost per completed task, keeping separate columns for differently defined limits, checking licence before capability, and budgeting open weights by host.
 
-Values lint cannot guard: the Llama context-length cells are two characters, below the lint's minimum literal length, so they are not indexed and rely on author discipline to stay correct; the Qwen dense model's parameter count is a substring of its own model name (`Qwen3.8-27B`) and was deliberately left out of `lint_literals` to avoid flagging every mention of the model. Re-check both by hand on refresh.
+A blank cell is a claim too: the claim that the vendor states nothing there. On refresh, re-check that the OpenAI and Anthropic rows still publish no separate input limit, rather than filling the cell by arithmetic. Values lint cannot guard: the Llama context-length cells are two characters, below the lint's minimum literal length, so they are not indexed and rely on author discipline to stay correct; the Qwen dense model's parameter count is a substring of its own model name (`Qwen3.8-27B`) and was deliberately left out of `lint_literals` to avoid flagging every mention of the model. Re-check both by hand on refresh.
 
 ## 7. Proofs
 

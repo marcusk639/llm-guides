@@ -35,7 +35,6 @@ records:
     name: GPT-6 Astra
     api_id: gpt-6-astra
     context_window: 1,050,000 tokens
-    max_input: 922,000 tokens
     max_output: 128,000 tokens
     input_price: $10 / MTok
     output_price: $50 / MTok
@@ -43,7 +42,6 @@ records:
     lint_literals:
       - gpt-6-astra
       - 1,050,000 tokens
-      - 922,000 tokens
       - 128,000 tokens
       - $10 / MTok
       - $50 / MTok
@@ -59,7 +57,6 @@ records:
     name: GPT-5.6 Terra
     api_id: gpt-5.6-terra
     context_window: 1,050,000 tokens
-    max_input: 922,000 tokens
     max_output: 128,000 tokens
     input_price: $2 / MTok
     output_price: $12 / MTok
@@ -67,7 +64,6 @@ records:
     lint_literals:
       - gpt-5.6-terra
       - 1,050,000 tokens
-      - 922,000 tokens
       - 128,000 tokens
       - $2 / MTok
       - $12 / MTok
@@ -83,7 +79,6 @@ records:
     name: GPT-5.6 Luna
     api_id: gpt-5.6-luna
     context_window: 1,050,000 tokens
-    max_input: 922,000 tokens
     max_output: 128,000 tokens
     input_price: $0.20 / MTok
     output_price: $1.20 / MTok
@@ -91,7 +86,6 @@ records:
     lint_literals:
       - gpt-5.6-luna
       - 1,050,000 tokens
-      - 922,000 tokens
       - 128,000 tokens
       - $0.20 / MTok
       - $1.20 / MTok
