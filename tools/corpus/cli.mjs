@@ -37,6 +37,17 @@ import {
   expiryFor,
   isValidIsoDate,
 } from "./ledger.mjs";
+import {
+  RefreshError,
+  resolveUnit,
+  artifactPathFor,
+} from "./refresh-units.mjs";
+import { workOrder, renderWorkOrder } from "./refresh-order.mjs";
+import {
+  parseArtifact,
+  renderArtifactSkeleton,
+} from "./refresh-artifact.mjs";
+import { stampUnit, revertUnit } from "./refresh-stamp.mjs";
 
 function guidePaths(root) {
   const dir = path.join(root, "guides");
@@ -239,14 +250,128 @@ export function ledgerCorpus(root, { write = false } = {}) {
   return ledger;
 }
 
+// Returns its output rather than printing it, so the whole command is testable
+// without spawning a process. main() does the printing and the exiting.
+//
+// Every option is a --flag=value, never a positional: main() resolves the
+// corpus root as the first argument that does not start with "--", so a bare
+// page path would be swallowed as the root and silently point the command at a
+// directory that is not a corpus.
+export function refreshCorpus(
+  root,
+  argv,
+  { today = new Date().toISOString().slice(0, 10) } = {},
+) {
+  const out = [];
+  const err = [];
+  const flag = (name) => {
+    const hit = argv.find(
+      (a) => a === `--${name}` || a.startsWith(`--${name}=`),
+    );
+    if (hit === undefined) return undefined;
+    const eq = hit.indexOf("=");
+    return eq === -1 ? true : hit.slice(eq + 1);
+  };
+  // Every usage exit says which rule was broken. main() prints `err` above the
+  // generic usage block; none of the refresh rules can be emitted for a usage
+  // error, so this reason line is the only channel a user has.
+  const usageError = (reason) => {
+    err.push(`refresh: ${reason}`);
+    return { code: 2, out, err };
+  };
+  const page = flag("page");
+  const modes = ["order", "skeleton", "stamp", "revert"].filter(
+    (m) => flag(m) !== undefined,
+  );
+  if (typeof page !== "string" || page === "")
+    return usageError(
+      "--page=<guides/topic/page.md> is required, and takes a value; it is a flag, never a positional, because the first non-flag argument is the corpus root",
+    );
+  if (modes.length > 1)
+    return usageError(
+      `pass one mode, not ${modes.length}: --order, --skeleton, --stamp or --revert (got ${modes.map((m) => `--${m}`).join(" ")})`,
+    );
+  if (flag("write") !== undefined || flag("check") !== undefined)
+    return usageError(
+      "--write and --check belong to render, not to refresh; refresh writes when the mode says so",
+    );
+  const mode = modes[0] ?? "order";
+  const key = typeof flag("key") === "string" ? flag("key") : null;
+  const artifactRel =
+    typeof flag("artifact") === "string" ? flag("artifact") : null;
+  if ((mode === "stamp" || mode === "revert") && artifactRel === null)
+    return usageError(
+      `--${mode} needs --artifact=<research/topic/...-refresh.md>: the artifact is what carries the verdicts and the receipt`,
+    );
+
+  try {
+    const records = loadRecords(path.join(root, "data"));
+    const unit = resolveUnit(root, page, records);
+    if (mode === "order" || mode === "skeleton") {
+      const order = workOrder(root, unit, records, { key });
+      if (mode === "order") out.push(renderWorkOrder(order));
+      for (const b of order.blocking)
+        err.push(`${b.path} [${b.rule}] ${b.message}`);
+      if (order.blocking.length > 0) return { code: 1, out, err };
+      if (mode === "skeleton") {
+        const rel = artifactPathFor(unit, today, root);
+        fs.mkdirSync(path.join(root, path.dirname(rel)), { recursive: true });
+        fs.writeFileSync(
+          path.join(root, rel),
+          renderArtifactSkeleton(order, {
+            fetched: today,
+            artifactPath: rel,
+          }),
+        );
+        out.push(`refresh: wrote ${rel}`);
+      }
+      return { code: 0, out, err };
+    }
+
+    const artifactAbs = path.join(root, artifactRel);
+    if (!fs.existsSync(artifactAbs))
+      throw new RefreshError(
+        "refresh-artifact-not-found",
+        `--artifact=${artifactRel} does not exist`,
+      );
+    const { data } = parseArtifact(fs.readFileSync(artifactAbs, "utf8"));
+    if (data?.path !== artifactRel)
+      throw new RefreshError(
+        "refresh-artifact-path-mismatch",
+        `--artifact=${artifactRel} but the artifact's own path field says ${JSON.stringify(data?.path)}`,
+      );
+    if (mode === "stamp") {
+      const { receipt, written } = stampUnit(root, data, { today });
+      for (const w of written) out.push(`refresh: stamped ${w}`);
+      out.push(`refresh: receipt at ${receipt.at}`);
+    } else {
+      const { restored } = revertUnit(root, data, { today });
+      for (const r of restored) out.push(`refresh: reverted ${r}`);
+    }
+    // refresh never regenerates meta/ledger.yaml. One file, one writer: the
+    // ledger is rebuilt on master after a merge, which is what lets corpus
+    // verify be a strictly read-only CI gate.
+    return { code: 0, out, err };
+  } catch (e) {
+    if (!(e instanceof RefreshError)) throw e;
+    err.push(`${page} [${e.rule}] ${e.message}`);
+    return { code: 1, out, err };
+  }
+}
+
 function main(argv) {
   const [command, ...rest] = argv;
   const write = rest.includes("--write");
   const check = rest.includes("--check");
   const root = rest.find((a) => !a.startsWith("--")) ?? process.cwd();
   const usage = () => {
-    console.error("usage: corpus <render|lint|verify|ledger> [--write] [dir]");
+    console.error(
+      "usage: corpus <render|lint|verify|ledger|refresh> [--write] [dir]",
+    );
     console.error("       corpus render --check [dir]");
+    console.error(
+      "       corpus refresh --page=<guides/...> [--order|--skeleton|--stamp|--revert] [--artifact=<research/...>] [--key=<record.key>] [dir]",
+    );
     process.exit(2);
   };
   if (check && (command !== "render" || write)) usage();
@@ -299,6 +424,17 @@ function main(argv) {
     console.log(
       `ledger: ${ledger.entries.length} entries${write ? " written" : ""}`,
     );
+  } else if (command === "refresh") {
+    const { code, out, err: errs } = refreshCorpus(root, rest);
+    // A usage error prints its reason ABOVE the usage block, not instead of it:
+    // usage() exits 2 itself, so the reason has to be written first.
+    if (code === 2) {
+      for (const line of errs) console.error(line);
+      usage();
+    }
+    for (const line of out) console.log(line);
+    for (const line of errs) console.error(line);
+    process.exit(code);
   } else {
     usage();
   }
