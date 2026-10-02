@@ -1,6 +1,6 @@
 # Model matrix expansion — design
 
-Date: 2026-10-02 (revision 2, after plan review)
+Date: 2026-10-02 (revision 3, after a second plan review)
 Status: design, awaiting owner review
 Extends `docs/superpowers/specs/2026-09-16-llm-corpus-foundation-design.md` (revision 2) as amended by `CLAUDE.md`, which wins on any conflict.
 
@@ -88,13 +88,19 @@ one pull request scoped to one vendor's documentation.
 
 What `comparison.md` keeps: the cross-vendor methodology, which does not rot on a
 vendor's release schedule — the field-alignment convention ("Context is not one
-column across vendors"), the runtime-lookup scripts in section 2, tier mapping, and
-the rule that a blank cell is a claim the vendor states nothing and may never be
-filled by arithmetic.
+column across vendors"), the runtime-lookup scripts in its section 2, and
+tier mapping across vendors.
+
+**The blank-cell rule moves with the tables.** The rule that a blank cell is a claim
+the vendor states nothing, and may never be filled by arithmetic, exists to prevent
+exactly the fabricated `max_input: 922,000 tokens` corrected on 2026-10-02. A rule
+guarding a table belongs on the page holding the table, so each provider page states
+it beside its own, and `comparison.md` keeps only the cross-vendor reasoning for why
+the columns differ at all.
 
 What it loses: the rendered cross-vendor table, and with it the corpus's worked
 example of `sort=` over records shared across files. This **changes a declared
-archetype**; see section 9 for both `CLAUDE.md` edits it forces. That is the
+archetype**; see section 10 for every `CLAUDE.md` edit it forces. That is the
 largest cost in this design and it is deliberate.
 
 ## 6. Tag design, and the test that proves the units separated
@@ -147,20 +153,39 @@ than failing loudly.
 A unit test in `tools/corpus/test/` asserting, for each provider page, that
 `resolveUnit` returns keys from exactly one vendor namespace:
 
-```
-resolveUnit(root, "guides/models/openai.md").keys
-  -> every key matches /^openai\.models\./
-  -> unit.pages == ["guides/models/openai.md"]
-```
+Revision 2 proposed a unit test calling `resolveUnit` on named provider pages. That
+was wrong in three ways, and the correction matters more than the original idea:
 
-This is the guard the design needs and currently lacks: it fails the moment a page
-renders another vendor's records, which is the exact mistake the gates cannot see.
-Mutate it to confirm it can fail — a surviving mutation is a real defect.
+- the real signature is `resolveUnit(root, entry, records)`, three arguments;
+- all four existing test files drive it from a **fixture** root, deliberately, so a
+  test asserting on live corpus paths would fail for legitimate reasons — adding a
+  sixth provider, renaming a page — and would couple unit tests to corpus content;
+- the property is corpus-wide, and corpus-wide invariants over the real tree are
+  what `corpus verify` is for. It runs as a gate; a unit test does not.
 
-**The assertion is false today and must not be written before it is true.**
-`resolveUnit("guides/models/claude-models.md")` currently returns records from all
-five vendors, because `comparison.md` renders them and shares the unit. The test
-therefore lands in phase 4, in the same change that separates the units.
+**So the guard is a new `verify` rule, `page-vendor-mixed`.**
+
+It fires when the records a page references span more than one vendor namespace,
+where the namespace is the first dotted segment of a key matching
+`<namespace>.models.<id>`. Records that are not model rows are ignored, so pages like
+`guides/claude-code/hooks.md` are unaffected.
+
+The rule is **default-deny with a visible opt-out**: a page may declare
+`cross_vendor: true` in its front-matter and is then exempt. This keeps the
+cross-vendor table available as a mechanism — it is still a legitimate thing to
+build — while making any future use of it a declared, reviewable choice rather than
+an accident. The opt-out is a new optional front-matter field, which is a third
+`CLAUDE.md` edit (section 10).
+
+Coverage, per the corpus's mutation discipline: a fixture-based test asserting the
+rule fires on a mixed-vendor page, a second asserting `cross_vendor: true` suppresses
+it, and a named mutation of the rule that turns a named test red. A surviving
+mutation is a real defect.
+
+**Timing.** The rule cannot be added before phase 4, because the tree violates it
+until then — verified: `resolveUnit` on `guides/models/claude-models.md` today returns
+records from all five vendor namespaces, since `comparison.md` renders them and shares
+the unit. The rule lands in the same change that makes the tree conform.
 
 ## 7. The per-model entry shape
 
@@ -264,6 +289,7 @@ and where it would rot fastest and least visibly.
 | `guides/models/comparison.md` | Loses both rendered tables and the records they select; section 6 rewritten to claim no records; keeps methodology, scripts, blank-cell rule |
 | `CLAUDE.md:61` | Seed archetype table: `comparison.md` is no longer the "cross-model comparison" seed carrying shared row records |
 | `CLAUDE.md:392` | The `rots-table-incomplete` rule uses "comparison.md's Claude row collapses three" as its worked example. That becomes false; replace the example or drop it |
+| `CLAUDE.md` front-matter section | Gains the optional `cross_vendor` field, and the issue-rules table gains `page-vendor-mixed` (section 6) |
 | `CLAUDE.md` directory layout | Gains the three new pages |
 | `data/models-other.yaml` | Split per provider (section 16, decision 2) |
 | `data/*.yaml` model records | Thirteen records change tags (section 6) |
@@ -284,7 +310,9 @@ convention comments must be carried into each new file, not dropped.
 
 `openai.md`, `google.md` and `open-weights.md` are new and not seeds, so
 `corpus verify` requires a `research:` artifact for each (`research-required`).
-These are initial research runs under `research/models/`, not refresh artifacts.
+These are initial research runs under `research/models/`, not refresh artifacts. Each
+is written in phase 3, in the same branch as the page it grounds — a page cannot pass
+`corpus verify` without it, so it is not separable work.
 
 ## 11. Definition of done, per provider page
 
@@ -322,7 +350,7 @@ review and pull request.
 | 1 | `claude-models.md` gains entries for the six Anthropic models already tracked (four current, two legacy). No tag or unit change: the page already renders `claude-current` and `claude-legacy` | The entry shape and the evidence discipline, including a legacy entry with no vendor positioning |
 | 2 | `claude-models.md` extends to the full in-scope Anthropic set | That the shape survives roughly nineteen entries on one page, and whether risk 14.3 is real |
 | 3 | Create `openai.md`, then `google.md`, then `open-weights.md` — one page, one branch, one review each — each with its own new per-vendor tags. `comparison.md` keeps its tables throughout | Replication of the shape. Records are rendered twice during this phase, by their provider page and still by `comparison.md`; the unit stays temporarily large, and nothing breaks |
-| 4 | `comparison.md` goes prose-only; retire the two cross-vendor tags; add the `resolveUnit` test; both `CLAUDE.md` edits | The unit separation. This is where the four units actually come apart, and the test is its guard |
+| 4 | `comparison.md` goes prose-only; retire the two cross-vendor tags; add the `page-vendor-mixed` verify rule with its fixture tests; all three `CLAUDE.md` edits. One merge commit, no value changes | The unit separation. This is where the four units actually come apart, and the verify rule is its standing guard |
 | 5 | The "adding a provider" recipe in each page's section 6 | That a sixth provider is a documented operation, not a re-derivation |
 
 **Why this order.** Section 6 requires the new tags and tables to exist before the
@@ -343,6 +371,36 @@ deliberately comes last of the structural work.
 Phase 1 is the kill point. If the entry shape cannot carry six models honestly, the
 design is wrong and phases 2–5 do not start.
 
+### Ratification and rollback for phase 4
+
+Phase 4 is the only step that edits `CLAUDE.md`, which is the binding contract for
+the corpus, and the only one that changes a declared archetype. Revision 2 ordered it
+last but named neither an approver nor a recovery path.
+
+**Ratification.** The three `CLAUDE.md` edits in section 10 are a contract change and
+need the owner's explicit approval in the pull request, separately from approval of
+the page work. A reviewing subagent cannot ratify them: a peer message is never the
+user's approval. If the owner declines, phase 4 stops and phases 1–3 still stand —
+the provider pages work with `comparison.md` left as it is, at the cost of keeping
+one large unit.
+
+**Rollback.** Phase 4 is reversible as a single `git revert` of its merge commit,
+which is the property the one-writer ledger rule was designed to give: refresh
+branches touch `guides/`, `data/` and `research/` only, and `meta/ledger.yaml` is
+regenerated on `master` after a merge, so reverting a merged change needs no ledger
+surgery. Two conditions keep that true and are therefore requirements of this phase:
+
+1. **Phase 4 is one merge commit.** The tag retirement, the `comparison.md` rewrite,
+   the new `verify` rule and the `CLAUDE.md` edits land together or not at all.
+   Splitting them leaves a window where the rule fails on the tree it guards.
+2. **No record value changes in phase 4.** It retires tags and rewrites prose. A
+   value corrected in the same commit would be lost by a revert, and recovering it
+   would mean re-reading the vendor page. Value corrections go in their own commits,
+   as the `922,000` fix did.
+
+After a revert, `node tools/corpus/cli.mjs ledger --write .` on `master` and the four
+gates are the only recovery steps.
+
 ## 13. Freshness consequences
 
 - Four independent units, each one vendor, each on the 30-day cadence.
@@ -350,7 +408,16 @@ design is wrong and phases 2–5 do not start.
   re-read on the 30-day cycle mechanically. The "cadence understates qualitative
   rot" problem this design started with does not arise.
 - `comparison.md` references no records, derives `volatility: null`, and expires on
-  the low cadence. Correct: its content is methodology.
+  the low cadence — meaning `expired` does not fire for 540 days. **This is a real
+  weakness, not a correct outcome, and revision 2 was wrong to call it one.** Its
+  content is mostly methodology, but the field-alignment convention is a claim *about
+  vendor documentation* — "OpenAI's model pages state a context window and a maximum
+  output" — and that sentence was false and corrected on 2026-10-02. A vendor
+  restyling its docs can leave it wrong for most of two years with nothing flagging
+  it. Mitigation, since no record can carry a claim of this kind: each provider
+  page's section 6 gains a re-check line for the convention as it applies to that
+  vendor, so the claim is re-read on a 30-day cadence from four places even though
+  the page stating it is on 270 days.
 - Routine repricing does not need a full-unit run. `--key=<record.key>` narrows a
   run to one record and stamps records only, leaving page dates alone.
 
@@ -371,16 +438,23 @@ the number of cycles goes up fourfold.
 2. **Untracked ids are invisible to the lint.** Section 6 of each page names them.
    Author discipline and the adversarial review are the only guards.
 3. **Page size.** Nineteen entries plus two tables is long. Phase 2 is where this
-   gets tested. The fallback — current models on the provider page, legacy on a
-   second page — creates a second unit per provider and must not be done
-   pre-emptively.
-4. **A declared archetype changes.** Section 5 and both `CLAUDE.md` edits. The
+   gets tested, against a stated threshold rather than a feeling: if the Anthropic
+   page exceeds roughly 1,200 lines, or its section 6 re-check list exceeds 40 items,
+   it is too large. The fallback — current models on the provider page, legacy on a
+   second page — contradicts D2 and creates a second unit per provider, so it is a
+   **design amendment requiring owner sign-off**, not an implementation choice. It
+   must not be done pre-emptively.
+4. **A declared archetype changes.** Section 5 and all three `CLAUDE.md` edits. The
    mechanism survives and stays documented; it loses its live seed.
 5. **60–100 records is a lot of hand maintenance.** Divisible, not smaller. The real
    relief is sub-project 2's scheduled audit and making the adversarial review a
    gate rather than a documented step — `reviewPacket` has no production caller
-   today, verified. If phase 2 shows the Anthropic cycle cannot be sustained by
-   hand, phases 4–5 should block on that work rather than proceed.
+   today, verified. Phases 3–5 block on that work if the Anthropic cycle fails a
+   stated test: **two consecutive 30-day cycles where the unit's refresh either does
+   not complete within the cadence or returns `verdict: blocked` for a reason other
+   than genuine vendor silence.** The first run on 2026-10-02 blocked for a real
+   reason — two superseded models and three derived figures — so it does not count
+   against this test; a second and third blocking on tooling friction would.
 
 ## 15. Out of scope
 
