@@ -10,9 +10,9 @@ summary: >-
 topic: models
 verified: 2026-09-16
 applies_to:
-  - "Anthropic Claude API, OpenAI API and Google Gemini API documentation as published on 2026-09-16"
+  - "Anthropic Claude API, OpenAI API and Google Gemini API documentation as published on 2026-09-16; the Anthropic rows re-read 2026-10-02, when Claude Opus 5.5 replaced Claude Opus 5 in the hosted table"
   - "Hugging Face model cards in the meta-llama and Qwen organisations as published on 2026-09-16"
-  - "Rows: Claude Fable 5.1, Claude Opus 5, Claude Haiku 4.5; GPT-6 Astra, GPT-5.6 Terra, GPT-5.6 Luna; Gemini 3.8 Flash, Gemini 3.1 Pro Preview, Gemini 3.5 Flash-Lite; Llama 4 Maverick, Llama 4 Scout; Qwen3.8-2.4T-A95B, Qwen3.8-27B"
+  - "Rows: Claude Fable 5.1, Claude Opus 5.5, Claude Haiku 4.5; GPT-6 Astra, GPT-5.6 Terra, GPT-5.6 Luna; Gemini 3.8 Flash, Gemini 3.1 Pro Preview, Gemini 3.5 Flash-Lite; Llama 4 Maverick, Llama 4 Scout; Qwen3.8-2.4T-A95B, Qwen3.8-27B"
 sources:
   - https://platform.claude.com/docs/en/models/overview
   - https://platform.claude.com/docs/en/about-claude/pricing
@@ -75,32 +75,28 @@ The output includes many models this page leaves out (older, preview, audio, ima
 Hosted models, as published on the verification date. Prices are base paid-tier USD per million tokens (MTok), rewritten into one unit so the rows line up; token counts keep each vendor's own wording. A blank cell means the vendor's page does not state that value, not that it is zero or unlimited.
 
 <!-- corpus:table fields=vendor,name,api_id,context_window,max_input,max_output,input_price,output_price,notes headers="Vendor,Model,API ID,Context window,Max input,Max output,Input price,Output price,Notes" sort=vendor tag=comparison-hosted -->
-
-| Vendor    | Model                  | API ID                    | Context window   | Max input        | Max output     | Input price  | Output price | Notes                                                                                                                                                                     |
-| --------- | ---------------------- | ------------------------- | ---------------- | ---------------- | -------------- | ------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Anthropic | Claude Fable 5.1       | claude-fable-5-1          | 1M tokens        |                  | 128K tokens    | $10 / MTok   | $50 / MTok   |                                                                                                                                                                           |
-| Anthropic | Claude Opus 5          | claude-opus-5             | 1M tokens        |                  | 128K tokens    | $5 / MTok    | $25 / MTok   |                                                                                                                                                                           |
-| Anthropic | Claude Haiku 4.5       | claude-haiku-4-5-20251001 | 200K tokens      |                  | 64K tokens     | $1 / MTok    | $5 / MTok    |                                                                                                                                                                           |
-| Google    | Gemini 3.8 Flash       | gemini-3.8-flash          |                  | 1,048,576 tokens | 65,536 tokens  | $0.75 / MTok | $3.75 / MTok | Paid-tier prices shown apply through 2026-12-31; from 2027-01-01 the listed prices are $1.50 / MTok input and $7.50 / MTok output. Output price includes thinking tokens. |
-| Google    | Gemini 3.1 Pro Preview | gemini-3.1-pro-preview    |                  | 1,048,576 tokens | 65,536 tokens  | $2 / MTok    | $12 / MTok   | Preview model. Prices shown are for prompts up to 200k tokens; longer prompts are $4 / MTok input and $18 / MTok output. Output price includes thinking tokens.           |
-| Google    | Gemini 3.5 Flash-Lite  | gemini-3.5-flash-lite     |                  | 1,048,576 tokens | 65,536 tokens  | $0.30 / MTok | $2.50 / MTok | Input price covers text, image, video and audio. Output price includes thinking tokens.                                                                                   |
-| OpenAI    | GPT-6 Astra            | gpt-6-astra               | 1,050,000 tokens | 922,000 tokens   | 128,000 tokens | $10 / MTok   | $50 / MTok   | Prompts above 272K input tokens are billed at higher rates for the whole request.                                                                                         |
-| OpenAI    | GPT-5.6 Terra          | gpt-5.6-terra             | 1,050,000 tokens | 922,000 tokens   | 128,000 tokens | $2 / MTok    | $12 / MTok   | Prompts above 272K input tokens are billed at higher rates for the whole request.                                                                                         |
-| OpenAI    | GPT-5.6 Luna           | gpt-5.6-luna              | 1,050,000 tokens | 922,000 tokens   | 128,000 tokens | $0.20 / MTok | $1.20 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request.                                                                                         |
-
+| Vendor | Model | API ID | Context window | Max input | Max output | Input price | Output price | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Anthropic | Claude Fable 5.1 | claude-fable-5-1 | 1M tokens |  | 128K tokens | $10 / MTok | $50 / MTok |  |
+| Anthropic | Claude Opus 5.5 | claude-opus-5-5 | 1M tokens |  | 128K tokens | $4 / MTok | $20 / MTok |  |
+| Anthropic | Claude Haiku 4.5 | claude-haiku-4-5-20251001 | 200K tokens |  | 64K tokens | $1 / MTok | $5 / MTok |  |
+| Google | Gemini 3.8 Flash | gemini-3.8-flash |  | 1,048,576 tokens | 65,536 tokens | $0.75 / MTok | $3.75 / MTok | Paid-tier prices shown apply through 2026-12-31; from 2027-01-01 the listed prices are $1.50 / MTok input and $7.50 / MTok output. Output price includes thinking tokens. |
+| Google | Gemini 3.1 Pro Preview | gemini-3.1-pro-preview |  | 1,048,576 tokens | 65,536 tokens | $2 / MTok | $12 / MTok | Preview model. Prices shown are for prompts up to 200k tokens; longer prompts are $4 / MTok input and $18 / MTok output. Output price includes thinking tokens. |
+| Google | Gemini 3.5 Flash-Lite | gemini-3.5-flash-lite |  | 1,048,576 tokens | 65,536 tokens | $0.30 / MTok | $2.50 / MTok | Input price covers text, image, video and audio. Output price includes thinking tokens. |
+| OpenAI | GPT-6 Astra | gpt-6-astra | 1,050,000 tokens | 922,000 tokens | 128,000 tokens | $10 / MTok | $50 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
+| OpenAI | GPT-5.6 Terra | gpt-5.6-terra | 1,050,000 tokens | 922,000 tokens | 128,000 tokens | $2 / MTok | $12 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
+| OpenAI | GPT-5.6 Luna | gpt-5.6-luna | 1,050,000 tokens | 922,000 tokens | 128,000 tokens | $0.20 / MTok | $1.20 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
 <!-- /corpus:table -->
 
 Open-weight models, as stated in each official model card on the verification date. There is no price column: what you pay depends on where and how you run the weights.
 
 <!-- corpus:table fields=vendor,name,model_id,parameters,context_length,licence headers="Vendor,Model,Model ID,Parameters,Context length,Licence" sort=vendor tag=comparison-open-weight -->
-
-| Vendor       | Model             | Model ID                                      | Parameters                      | Context length                                         | Licence                             |
-| ------------ | ----------------- | --------------------------------------------- | ------------------------------- | ------------------------------------------------------ | ----------------------------------- |
-| Alibaba Qwen | Qwen3.8-2.4T-A95B | Qwen/Qwen3.8-2.4T-A95B                        | 2.4T in total and 95B activated | 262,144 natively and extensible up to 1,010,000 tokens | Qwen3.8-Max License                 |
-| Alibaba Qwen | Qwen3.8-27B       | Qwen/Qwen3.8-27B                              | 27B                             | 262,144 natively and extensible up to 1,000,000 tokens | Apache License 2.0                  |
-| Meta         | Llama 4 Maverick  | meta-llama/Llama-4-Maverick-17B-128E-Instruct | 17B (Activated), 400B (Total)   | 1M                                                     | Llama 4 Community License Agreement |
-| Meta         | Llama 4 Scout     | meta-llama/Llama-4-Scout-17B-16E-Instruct     | 17B (Activated), 109B (Total)   | 10M                                                    | Llama 4 Community License Agreement |
-
+| Vendor | Model | Model ID | Parameters | Context length | Licence |
+| --- | --- | --- | --- | --- | --- |
+| Alibaba Qwen | Qwen3.8-2.4T-A95B | Qwen/Qwen3.8-2.4T-A95B | 2.4T in total and 95B activated | 262,144 natively and extensible up to 1,010,000 tokens | Qwen3.8-Max License |
+| Alibaba Qwen | Qwen3.8-27B | Qwen/Qwen3.8-27B | 27B | 262,144 natively and extensible up to 1,000,000 tokens | Apache License 2.0 |
+| Meta | Llama 4 Maverick | meta-llama/Llama-4-Maverick-17B-128E-Instruct | 17B (Activated), 400B (Total) | 1M | Llama 4 Community License Agreement |
+| Meta | Llama 4 Scout | meta-llama/Llama-4-Scout-17B-16E-Instruct | 17B (Activated), 109B (Total) | 10M | Llama 4 Community License Agreement |
 <!-- /corpus:table -->
 
 If a table and the vendor page it came from disagree, the vendor page wins. Section 8 lists every page.
@@ -190,7 +186,7 @@ Evidence: **Plausible** — inferred from the cards' native-versus-extended cont
 | Llama 4 Scout row          | `meta.models.llama-4-scout`                                                           | high       | Same                                                        |
 | Qwen3.8-2.4T-A95B row      | `qwen.models.qwen3-8-2-4t-a95b`                                                       | high       | Fast Qwen release cadence; licence terms                    |
 | Qwen3.8-27B row            | `qwen.models.qwen3-8-27b`                                                             | high       | Same                                                        |
-| Claude rows                | `anthropic.models.fable-5-1`, `anthropic.models.opus-5`, `anthropic.models.haiku-4-5` | high       | Owned by [Claude models](claude-models.md); refreshed there |
+| Claude rows                | `anthropic.models.fable-5-1`, `anthropic.models.opus-5-5`, `anthropic.models.haiku-4-5` | high       | Owned by [Claude models](claude-models.md); refreshed there. The hosted row tracks the current Opus; Opus 5 is now legacy and is listed on that page, not here |
 
 Re-check on refresh, against the pages in section 8, **which win whenever they and this page disagree**:
 
