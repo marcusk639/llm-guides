@@ -119,6 +119,30 @@ test("an unquoted date stays unquoted and a quoted one keeps its quotes", () => 
   );
 });
 
+// Mutation testing (fix round 1, Important 1) showed PAGE_DATE/RECORD_DATE's
+// trailing-whitespace capture (m[4]) is dropped by every existing fixture, since
+// none has whitespace after the date. Pin it here for the record path.
+test("a record's verified date preserves trailing whitespace after it", () => {
+  const trailing = "records:\n  - key: a.c\n    verified: 2026-09-16  \n";
+  assert.equal(
+    setRecordVerified(trailing, "a.c", "2026-09-28").text,
+    "records:\n  - key: a.c\n    verified: 2026-09-28  \n",
+  );
+});
+
+// Opportunistic (fix round 1, Minor): escapeKey's metacharacter escaping is
+// otherwise unexercised. A literal "." in a key must not act as a regex
+// wildcard — querying "a.b" must not match an unrelated key "aXb" that only
+// differs at that position.
+test("a literal '.' in a key is not treated as a regex wildcard", () => {
+  const yaml = "records:\n  - key: aXb\n    verified: 2026-09-16\n";
+  assert.throws(
+    () => setRecordVerified(yaml, "a.b", "2026-09-28"),
+    (err) =>
+      err instanceof RefreshError && err.rule === "refresh-record-not-found",
+  );
+});
+
 const PAGE = [
   "---",
   "title: One",
@@ -218,4 +242,88 @@ test("a quoted research: value keeps its quotes and its trailing whitespace", ()
   // And restoring the previous value reproduces the original bytes exactly.
   const back = setPageResearch(first.text, "research/alpha/prior.md");
   assert.equal(back.text, PAGE_QUOTED_RESEARCH);
+});
+
+// Mutation testing (fix round 1, Important 1) showed PAGE_DATE's quote-char
+// (m[2]) and trailing-whitespace (m[4]) captures are both dropped by every
+// existing page fixture, since PAGE's verified: is unquoted with no trailing
+// whitespace. Mirrors PAGE_QUOTED_RESEARCH's style, which already covers this
+// for setPageResearch's replace path.
+const PAGE_QUOTED_VERIFIED = [
+  "---",
+  "title: Three",
+  "topic: alpha",
+  'verified: "2026-09-16"  ',
+  "sources:",
+  "  - https://example.invalid/three",
+  "seed: true",
+  "---",
+  "",
+  "# Three",
+  "",
+].join("\n");
+
+test("a quoted page verified: date keeps its quotes and its trailing whitespace", () => {
+  const { text, previous } = setPageVerified(PAGE_QUOTED_VERIFIED, "2026-09-28");
+  assert.equal(previous, "2026-09-16");
+  assert.equal(text.includes('verified: "2026-09-28"  '), true);
+});
+
+// Mutation testing (fix round 1, Important 2) showed setPageResearch's
+// verifiedAt+1 insertion branch is unexercised: both brief fixtures carry
+// seed: true, so only the seedAt branch is ever hit. This is the common case
+// going forward — seed: true marks only documents authored before the
+// refresh pipeline existed, so a page the refresh loop creates will not carry
+// it.
+const PAGE_NO_SEED = [
+  "---",
+  "title: Four",
+  "topic: alpha",
+  "verified: 2026-09-16",
+  "sources:",
+  "  - https://example.invalid/four",
+  "---",
+  "",
+  "# Four",
+  "",
+].join("\n");
+
+test("research: is inserted immediately after verified: when there is no seed: line", () => {
+  const { text, added } = setPageResearch(
+    PAGE_NO_SEED,
+    "research/alpha/2026-09-28-four-refresh.md",
+  );
+  assert.equal(added, true);
+  assert.match(
+    text,
+    /verified: 2026-09-16\nresearch: research\/alpha\/2026-09-28-four-refresh\.md\n/,
+  );
+});
+
+// The remaining fallback (neither seed: nor verified:) is reachable:
+// setPageResearch only requires a parsable --- front-matter block, not any
+// particular field inside it, so a page missing both still reaches the
+// lines.length branch rather than being rejected earlier.
+const PAGE_NO_SEED_NO_VERIFIED = [
+  "---",
+  "title: Five",
+  "topic: alpha",
+  "sources:",
+  "  - https://example.invalid/five",
+  "---",
+  "",
+  "# Five",
+  "",
+].join("\n");
+
+test("research: is appended at the end of front-matter when neither seed: nor verified: is present", () => {
+  const { text, added } = setPageResearch(
+    PAGE_NO_SEED_NO_VERIFIED,
+    "research/alpha/2026-09-28-five-refresh.md",
+  );
+  assert.equal(added, true);
+  assert.match(
+    text,
+    /sources:\n  - https:\/\/example\.invalid\/five\nresearch: research\/alpha\/2026-09-28-five-refresh\.md\n---/,
+  );
 });
