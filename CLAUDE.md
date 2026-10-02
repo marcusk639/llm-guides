@@ -69,7 +69,7 @@ renderer, and ledger generator are required, because the freshness guarantee is 
 property of the corpus as a whole, not of any single document.
 
 Node 22 or later. The CLI is `tools/corpus/cli.mjs`:
-`node tools/corpus/cli.mjs <render|lint|ledger> [--write] [dir]` or
+`node tools/corpus/cli.mjs <render|lint|verify|ledger|refresh> [--write] [dir]` or
 `node tools/corpus/cli.mjs render --check [dir]` (`dir` defaults to the current
 directory; any other command, `--check` on a command other than `render`, or `--check`
 together with `--write` prints usage and exits 2).
@@ -81,6 +81,7 @@ together with `--write` prints usage and exits 2).
 | `node tools/corpus/cli.mjs render --write .` | `npm run render -- --write` | Rewrites marker-block content in place; prints `rendered: <path>`                | 1 if any render issue, else 0                                                         |
 | `node tools/corpus/cli.mjs lint .`           | `npm run lint`              | Record lint config, front-matter, bare values, unterminated markers, expiry      | 1 if any issue (`<path>:<line> [<rule>] <message>`), 0 with `lint: clean`             |
 | `node tools/corpus/cli.mjs verify .`         | `npm run verify`            | **Strictly read-only.** Record and page checks lint does not make: duplicate keys, record `source`/`verified`, `applies_to` shape, `related` paths, stale `lint_literals`, template sections, evidence-label spelling, section 6 completeness, lint-gap Form 1, `research:` on non-seed pages | 1 if any issue (same `<path>:<line> [<rule>] <message>` form), 0 with `verify: clean` |
+| `node tools/corpus/cli.mjs refresh --page=<guides/...> .` | — | Re-verify one refresh unit against its sources. `--order` (the default) prints the work order; `--skeleton` writes a fail-closed artifact under `research/<topic>/`; `--stamp --artifact=<path>` bumps dates and sets `research:`, all-or-nothing; `--revert --artifact=<path>` restores the prior bytes from the artifact's receipt. `--key=<record.key>` narrows a run to one record and then stamps **records only** — no page `verified`, no `research:`. Writes `guides/`, `data/` and `research/` — **never `meta/ledger.yaml`**. | 2 on a usage error, 1 on a blocking issue, else 0 |
 | `node tools/corpus/cli.mjs ledger --write .` | `npm run ledger -- --write` | Rebuilds `meta/ledger.yaml`; without `--write` only prints `ledger: N entries`   | 0                                                                                     |
 | `npm test`                                   | —                           | `node --test "tools/corpus/test/**/*.test.mjs"`                                  | non-zero on any failing test                                                          |
 
@@ -110,7 +111,8 @@ them.
    whose record was refreshed but whose page was never re-rendered.
 4. If a page was added, removed or deprecated, or its `verified` date or referenced
    records changed, run `node tools/corpus/cli.mjs ledger --write .` and commit
-   `meta/ledger.yaml`.
+   `meta/ledger.yaml`. `ledger --write` stays for hand edits and for the post-merge
+   regeneration on `master`; it is never run on a refresh branch.
 5. If tool code changed, `npm test`.
 
 Creating a new directory (for example a new `guides/<topic>/` or `examples/<name>/`) can
@@ -389,6 +391,46 @@ Every rule name the tools emit, and what to do.
 | `evidence-label-invalid`         | verify | On each line containing the `Evidence:` token — scanned from the token to end of line, not only lines beginning with it, so a label after a trailing caveat still counts, and several labels on one line are legal — a bolded label is misspelled, or none of `**Verified**`/`**Documented**`/`**Plausible**` appears. Whether a `**Verified**` claim actually has a shipping proof is deliberately not checked here. Same unterminated-fence carve-out as `template-sections`. | Spell the label exactly; verify a `Verified` claim's proof by hand. |
 | `rots-table-incomplete`          | verify | A page's marker blocks reference record(s) section 6 never mentions — **loose reading**: the key must appear somewhere in section 6, not as its own table row, since a page may legitimately collapse several shared records into one row (comparison.md's Claude row collapses three) — or the page references records but has no "## 6." section. Skipped for `status: deprecated` pages. | Mention the missing key(s) in section 6, or fold them into an existing row's prose.                          |
 | `known-lint-gap-form`            | verify | Form 1 of the known lint gaps: an angle-bracket link destination contains real whitespace, so the bare-value scan reads the whole span as a URL and hides any value inside it. Tolerates a trailing link title and a backslash-escaped `>`; reports every occurrence on a line. | Rewrite the destination so it holds no value, or move the value outside the angle brackets. |
+| `refresh-page-unknown`            | refresh | `--page` names no guide under `guides/`.                                                             | Pass a repo-root-relative path; it is a `--page=` flag, never a positional. |
+| `refresh-topic-unknown`           | refresh | The entry page has no front-matter `topic`, so the artifact has no home under `research/`.           | Give the page a taxonomy `topic`. |
+| `refresh-topic-not-in-taxonomy`   | refresh | The entry page's `topic` is set but is not one of the topics listed in `meta/taxonomy.yaml`, so `research/<topic>/` is not a safe artifact home. | Fix the typo, or register the topic in `meta/taxonomy.yaml` if it is genuinely new. |
+| `refresh-section-six-missing`     | refresh | A non-deprecated page in the unit has no `## 6.` section, so its checklist is empty.                 | Write section 6. An empty checklist is not "nothing to check". |
+| `refresh-record-unknown`          | refresh | A record key the unit references does not exist in any `data/` file.                                | Fix the key, or add the missing record. |
+| `refresh-record-source-missing`   | refresh | A referenced record has no `source`, so there is nothing to re-read it against.                       | Add the canonical URL the value was read from. |
+| `refresh-key-out-of-unit`         | refresh | `--key` names a record the unit does not reference.                                                  | `--key` narrows a unit; enter from a page that references the record. |
+| `refresh-record-not-found`        | refresh | The data file holds no record with that key.                                                         | Fix the key, or the artifact entry's `file`. |
+| `refresh-record-verified-missing` | refresh | A record block has no `verified:` line **at its own field indent**. A `verified:`-looking line nested more deeply — inside a `notes:` block scalar, say — does not count and is never rewritten. | Add `verified:` as a field of the record; skipping it would leave a stale record date under a freshly dated page. |
+| `refresh-frontmatter-missing`     | refresh | A page in the unit has no `---` front-matter.                                                        | Add front-matter. |
+| `refresh-page-verified-missing`   | refresh | A page's front-matter has no `verified:` line.                                                        | Add it. |
+| `refresh-artifact-shape`          | refresh | The artifact's front-matter is not a mapping.                                                        | Regenerate it with `--skeleton`. |
+| `refresh-artifact-kind`           | refresh | The artifact's `kind` is not `refresh`.                                                               | Set `kind: refresh`. |
+| `refresh-artifact-field`          | refresh | A required artifact field is missing, a record entry lacks `file`, or a reachable record lacks `url`. | Fill the named field. |
+| `refresh-record-file-escapes-data` | refresh | A record entry's `file` is a non-empty string but does not resolve to a `.yaml` file inside `data/`. Checked by **containment** — the path is resolved and must land under `data/` — not by a `startsWith("data/")` prefix test, which `data/../../x.yaml` passes while resolving above the corpus root. Enforced by `validateArtifact` and, independently, inside `stampUnit` and `revertUnit`, so the revert path does not inherit its safety from stamp-time validation. | Name the `data/` file the record actually lives in; regenerate the artifact with `--skeleton`, which fills `file` from the loaded record. |
+| `refresh-artifact-date`           | refresh | `fetched`, or a record entry's `read`, is not a real date written `YYYY-MM-DD`.                        | Fix the date. |
+| `refresh-artifact-verdict`        | refresh | A unit or record verdict is outside its vocabulary.                                                   | Use `confirmed`/`changed`/`blocked`, or `confirmed`/`corrected`/`unreachable`. |
+| `refresh-verdict-incoherent`      | refresh | A record is `unreachable` while the unit verdict is not `blocked`.                                     | Set the unit verdict to `blocked`; an unreachable source must not bump `verified`. |
+| `refresh-artifact-coverage`       | refresh | A record in `unit_keys` has no verdict entry.                                                         | Give every record in the unit a verdict, or refresh silently under-checks it under a fresh date. |
+| `refresh-artifact-not-found`      | refresh | `--artifact=<path>` names a file that does not exist on disk.                                         | Pass the path `--skeleton` wrote, or run `--skeleton` first. |
+| `refresh-skeleton-exists`         | refresh | `--skeleton` would overwrite an artifact already at the deterministic path `research/<topic>/<today>-<slug>-refresh.md`, discarding whatever an operator has filled in. There is no `--force`. | Fill in the artifact that is already there, or delete it deliberately before regenerating. |
+| `refresh-skeleton-would-destroy-receipt` | refresh | The same path already holds an artifact carrying a `stamped:` receipt. Overwriting it would delete the only record of what to undo while leaving every bumped date on disk — the unrecoverable half-stamp state, reached from an exit-0 success path. Refused **unconditionally**: no flag overrides it. | `--revert` that artifact first, or restore the tree from version control. |
+| `refresh-artifact-path-mismatch`  | refresh | `--artifact` disagrees with the artifact's own `path` field.                                           | Pass the path the artifact names. |
+| `refresh-blocked`                 | refresh | `--stamp` on a `blocked` artifact. Nothing was written.                                               | Resolve the unreachable sources, or deprecate the page. |
+| `refresh-already-stamped`         | refresh | `--stamp` on an artifact that already carries a `stamped:` receipt.                                    | `--revert` first. |
+| `refresh-date-in-future`          | refresh | `artifact.fetched`, a record entry's `read`, or — on `--revert` — any `previous_verified`/`new_verified` in the receipt, is a date after today. | Fix the date; a future date would push `expires` out and let the page silently escape staleness detection, and `lint` would report clean because a far-future date is still a real calendar date. |
+| `refresh-record-already-dated`   | refresh | A record's pending text already reads the stamp's target `verified` date before this run wrote it — a prior stamp attempt wrote the record but crashed before leaving a `stamped:` receipt. | Restore the record from git before retrying; stamping again would read the half-written date as "previous" and make it unrecoverable. |
+| `refresh-page-already-dated`      | refresh | Same hazard, page side: a page's pending text already reads the stamp's target `verified` date before this run wrote it. | Restore the page from git before retrying, for the same reason. |
+| `refresh-record-drifted`          | refresh | A record's on-disk `verified` is no longer the date `--skeleton` recorded in that entry's `was`. Catches the half-stamp retry on **any** day — `refresh-record-already-dated` is exact equality against the stamp's own target date, so it only ever saw a same-day retry — and also catches a concurrent edit by another unit sharing the data file, which had no stamp-side check at all. | Restore the record from version control, or regenerate the artifact with `--skeleton` so its snapshot matches what is actually on disk. |
+| `refresh-page-drifted`            | refresh | Same comparison, page side: a page's on-disk `verified` is no longer the date `--skeleton` recorded in `unit_was`. | Restore the page from version control, or regenerate the artifact. |
+| `refresh-research-unresolved`     | refresh | The artifact's own `path` does not exist on disk. `checkResearchRequired` only checks the string is non-empty, so this is the only guard. | Write the artifact before stamping. |
+| `refresh-artifact-frontmatter`    | refresh | `--stamp` or `--revert` on an artifact with no `---` front-matter to carry or move the receipt.        | Regenerate the artifact with `--skeleton`. |
+| `refresh-record-out-of-unit`      | refresh | A record entry names a key outside `unit_keys`.                                                        | Do not widen a unit's footprint into another unit's records. |
+| `refresh-key-scope-widened`       | refresh | A `key_scoped: true` artifact carries more than one key in `unit_keys`.                                | `--key` narrows to exactly one record; the artifact was widened by hand after `--skeleton`. Regenerate it. |
+| `refresh-unit-widened`            | refresh | `--stamp` or `--revert` resolved the page's real unit and found the artifact's own `unit_keys` or `unit` — or, on `--revert`, the receipt's own `pages`/`records` — naming a record key or page the real unit does not contain. | Do not add a key or page the entry page's real unit does not reference; regenerate the artifact with `--skeleton` instead. This is why `--page` is required on `--revert`. |
+| `refresh-unit-narrowed`           | refresh | `--stamp` or `--revert` resolved the page's real unit and found the artifact's `unit_keys` or `unit` MISSING a record key or page the real unit does contain — the narrowing half of `refresh-unit-widened`. Deleting an unreachable record from `unit_keys` and from `records` satisfies `refresh-artifact-coverage` vacuously, so this is the only check that sees it. A `key_scoped: true` artifact is exempt on `unit_keys` only, and must then carry exactly one key (`refresh-key-scope-widened`). | Do not drop a record or page from the artifact: freshness is all-or-nothing, so an unreachable record forces `verdict: blocked`. Regenerate the artifact with `--skeleton`. |
+| `refresh-no-receipt`              | refresh | `--revert` on an artifact with no `stamped:` receipt.                                                  | There is nothing to revert. |
+| `refresh-receipt-shape`           | refresh | A `stamped:` receipt `--revert` is working from is not a mapping, its `pages`/`records` are not lists, an entry has no `path`/`key`, or a `previous_verified`/`new_verified` is not a real date written `YYYY-MM-DD`. Nothing distinguishes a machine-written receipt from a hand-written one, so the receipt is validated rather than trusted. | Do not hand-write a receipt. `--revert` only undoes what `--stamp` wrote; restore the tree from version control instead. |
+| `refresh-revert-drift`            | refresh | A page or record no longer carries the date the receipt wrote.                                         | Another unit has landed on the same file; resolve by hand rather than clobbering it. |
+| `refresh-review-diff-failed`      | refresh | `git diff <baseRef> -- guides data` failed.                                                            | Check the base ref exists on the branch. |
 
 Lint issues from records carry the `data/<file>.yaml` path; lint never runs render or
 verify, so run all three.
@@ -421,7 +463,9 @@ destination are typos fixable without re-verifying anything.
 stage produced it. An initial research run and a refresh are two producers of the same kind
 of thing, and nothing downstream distinguishes them. `research:` has exactly one
 meaning: the page's current grounding artifact, whichever stage — an initial research
-run or a later refresh — produced it; it does not accumulate history.
+run or a later refresh — produced it; it does not accumulate history. `refresh --stamp`
+is what sets it on an existing page, and `refresh --revert` removes it again if that
+run added it; `seed: true` is untouched either way.
 
 `seed: true` marks a document authored before the pipeline existed. It is **permanent
 provenance**: a refresh never removes it, even after the page has been re-verified and
@@ -558,6 +602,113 @@ claims stay Documented or Plausible.
   body. Deprecated pages stay readable, are excluded from the ledger and expiry, are still
   linted for front-matter and bare values, and are never silently deleted.
 
+### Refresh units and the one-writer ledger
+
+**A refresh unit is a page plus every page that shares one of its records, closed
+transitively.** If A shares a record with B and B shares another with C, C is in
+the unit: otherwise B and C would both edit that record on two branches and
+neither could see the other's bump. One unit, one branch, one pull request — the
+two model pages are therefore one unit.
+
+**`--key=<record.key>` narrows a unit to one repriced record, never widens one, and
+stamps records only.** A key-scoped run moves that record's `verified` and nothing
+else: no page's `verified` and no page's `research:`. A page's `verified` asserts the
+whole of its section 6 was worked — every record, every identifier tied to
+`applies_to`, every value the lint cannot guard, every dated study — and a key-scoped
+run works one item on that list, so moving the page date would claim work that did not
+happen. The artifact records the narrowing as `key_scoped: true`, `stampUnit` skips
+pages entirely when it is set, and `refresh-key-scope-widened` refuses a key-scoped
+artifact carrying more than one key. The visible consequence is that a page's
+`verified` can sit older than a record's; that is the honest state, and nothing in
+`lint`, `verify` or `ledger` compares the two.
+
+**Two units may share a `data/*.yaml` file, and that is allowed.** Units group by
+record, not by file, so `data/claude-code.yaml` is written by both the `hooks.md`
+unit and the `context-management.md` + `software-engineering.md` unit. This is safe
+only because record edits are **single-line surgical replacements, never a YAML
+round trip**: the hunks are disjoint and git auto-merges them. A round trip would
+also strip the contract-required comments at the top of `data/models.yaml` and
+`data/models-other.yaml`. Two guards back it up: `refresh-record-out-of-unit`
+refuses to write a record outside the unit's own key set, and
+`refresh-revert-drift` refuses a revert whose record no longer carries the date the
+receipt wrote. Do not "fix" this by grouping units per file — `software-engineering.md`
+bridges `data/context.yaml` and `data/claude-code.yaml`, so that would merge three
+pages across three topics into one pull request.
+
+**The ledger is regenerated only on `master`, after a merge, never on a refresh
+branch.** One file, one writer. Refresh branches touch `guides/`, `data/` and
+`research/` only. This is what lets `corpus verify` be strictly read-only, and it
+makes reverting a bad merged refresh a clean single-commit operation.
+
+**The evidence artifact.** Each run writes
+`research/<topic>/<YYYY-MM-DD>-<unit-slug>-refresh.md`, under the topic of the page
+named on the command line — a cross-topic unit has no single home, and the entry
+page is the one the author asked about. The slug joins the pages' sorted basenames,
+collapsing to `<first>-plus-N` above three pages. That path is
+**deterministic**, so `--skeleton` never overwrites: a second run on the same unit
+on the same day stops with `refresh-skeleton-exists`, and one whose target carries
+a `stamped:` receipt stops with `refresh-skeleton-would-destroy-receipt`, which has
+no override because discarding a live receipt is what makes a stamp unrevertible.
+Two distinct units can also collide on one path, since the slug collapses above
+three pages. Its front-matter is
+machine-readable: `kind: refresh`, `unit`, `entry`, `topic`, `topics`, `slug`,
+`path`, `fetched`, `verdict`, `key_scoped`, `unit_keys`, `unit_was`, and one `records`
+entry per record carrying `key`, `file`, `verdict`, `url`, `stated`, `read` and `was`.
+`unit_was` and each entry's `was` are the **snapshot** `--skeleton` took: the date that
+page or record carried when the work order was built. Do not hand-edit them — `--stamp`
+requires the file to still agree (`refresh-page-drifted`, `refresh-record-drifted`), and
+`validateArtifact` requires a real date for every unit page and every record, so a
+deleted snapshot fails rather than silently disabling the check. The same unit
+entered from its other end files its artifact under that page's topic instead; both
+artifacts name the same `unit` and the same `entry`, so neither is lost and either can
+be found from either page. **Narrative belongs
+in the pull request body, not in the artifact** — conflating a refresh log with a
+grounding artifact would make `research-required` satisfiable by a log. Nothing
+under `research/` is linted, because `guidePaths` walks `guides/` only, which is why
+the artifact may state figures verbatim.
+
+**Two verdict vocabularies.** A unit verdict is `confirmed`, `changed` or
+`blocked`. A record verdict is `confirmed`, `corrected` or `unreachable`. Any
+`unreachable` record forces the unit to `blocked`, and **a blocked unit writes
+nothing at all** — there is no partial freshness. A page's `verified` becomes the
+artifact's `fetched`; each record's `verified` becomes that entry's own `read`,
+which is the date that source was actually read.
+
+**A rotted `source` URL is `changed`, not `blocked`.** Source URLs rot faster than
+values, so the common case is that the figure is still published and only the address
+moved — including a host that answers a scripted fetch with a challenge page, which
+returns 200 with prose that reads like content and must never be taken for a
+confirmation. Repoint the record's `source` in `data/`, re-fetch, cite the new URL in
+the artifact's `url`, and say in the pull request body what was repointed and from
+what: `data/` changed, so the unit verdict is `changed`. `unreachable` is reserved for
+a figure the vendor no longer publishes anywhere, where there is nothing to repoint
+to; that blocks, and where a whole page can no longer be refreshed the answer is
+`status: deprecated` with a reason and a replacement link. The verify agent treats a
+repointed `source` as the claim most worth attacking, because it is the one that lets
+a run escape a blocked outcome.
+
+**A block must be harmless to merge.** When the verify agent blocks,
+`refresh --revert` restores every page and record date to its prior value and
+removes any `research:` the refresh added, from the artifact's `stamped:` receipt
+alone — no git needed. **The receipt is validated, not trusted.** Nothing
+distinguishes a `stamped:` mapping stampUnit wrote from one typed by hand, and
+the artifact is the one file this pipeline is designed to have hand-edited, so
+`--revert` applies the same gates `--stamp` does: `validateArtifact` on the
+carrying artifact, `refresh-receipt-shape` on the receipt's own entries,
+`refresh-record-file-escapes-data` on every `file` it names,
+`refresh-date-in-future` on every date it would write, and the unit guard
+(`refresh-unit-widened`) against the unit `--page` resolves to. The artifact stays on disk, marked `verdict: blocked` with
+the receipt moved to `reverted:`, because what was checked and what was found is
+exactly what the next attempt needs. The pull request then opens as a **draft**,
+labelled, findings in the body: never silently skipped, never auto-merged.
+
+**Prompts live in `meta/prompts/`.** `meta/prompts/refresh.md` carries the fetching
+and verdict procedure; `meta/prompts/verify-agent.md` carries the adversarial rubric
+and the blocking semantics. The agent's review packet is the branch diff over
+`guides` and `data` only — `research/` is excluded, because a reviewer shown the
+reasoning it is meant to audit tends to ratify it. The agent runs **before** the
+pull request body is composed.
+
 ## Domain playbook shape
 
 Domain playbooks (`guides/domains/`) use the eight-part template with a fixed inner
@@ -625,3 +776,29 @@ The lint is also exact-string by design, so two further kinds of text escape it:
 | F3      | No templated code snippets: a value cannot be interpolated into a fenced example.                                         | Fetch values at runtime or take them as input; keep fences free of known values.                                                                                                                                        |
 | F5      | `corpus:data` cannot select one field of a row record.                                                                    | Point prose at the table ("see the Input price column") or describe the relation without the figure; add a separate single-value record only if the figure is essential, and list both records under "Where this rots". |
 | F14     | Safety-relevant identifiers cannot be flagged for priority re-checking.                                                   | List them first in "Where this rots" with why they matter for safety.                                                                                                                                                   |
+
+**A refresh that fails part-way leaves no marker.** `refresh --stamp` is
+all-or-nothing at the transform layer — every new file body is computed in memory
+and nothing is written until all of them succeed — but the final write loop is not
+multi-file atomic. If an `fs` write fails part-way (a permission error, a vanished
+file), earlier files are already stamped. The artifact's receipt is written **last**,
+so the failure mode is "pages stamped, no receipt", and its only evidence is the
+receipt's absence: nothing positively flags a half-stamped unit.
+
+**Do not retry the stamp, and do not expect `--revert` to help — restore from git.**
+`--stamp` reads each prior `verified` from what is *on disk now*, so after a partial
+write the already-stamped files would report the new date as their previous one, the
+receipt would record `previous_verified` equal to `new_verified`, and `--revert` would
+exit 0 claiming success with the original dates gone. Four guards now refuse that
+instead. A same-day retry stops at `refresh-record-already-dated` or
+`refresh-page-already-dated`. A retry on a **later** day — the realistic one, where the
+operator investigates overnight and re-runs, so every date advances and the equality
+test goes quiet — stops at `refresh-record-drifted` or `refresh-page-drifted`, because
+the on-disk date no longer matches the snapshot `--skeleton` took. Do not diagnose a
+half-stamp by checking whether `previous_verified` equals `new_verified`: on a
+next-day retry they differ by a day while recoverability is already gone. `--revert`
+still cannot help by itself, because a half-stamped unit has no receipt; the prior
+dates exist only in git. `--skeleton` will not paper over it either — it refuses to
+overwrite an existing artifact at all (`refresh-skeleton-exists`), and refuses
+unconditionally if that artifact carries a receipt
+(`refresh-skeleton-would-destroy-receipt`).

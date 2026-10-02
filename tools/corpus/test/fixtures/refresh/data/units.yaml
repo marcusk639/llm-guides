@@ -1,0 +1,65 @@
+# Fixture records for the refresh tests. Deliberately spread across two files
+# so a unit can span data files the way the live corpus does.
+records:
+  - key: fix.shared.one
+    value: "shared-one"
+    volatility: high
+    source: https://example.invalid/one
+    verified: "2026-09-16"
+    tags: [linked]
+  - key: fix.bridge.two
+    value: "bridge-two"
+    volatility: medium
+    source: https://example.invalid/two
+    verified: "2026-09-16"
+  - key: fix.tail.three
+    value: "tail-three"
+    volatility: low
+    source: https://example.invalid/three
+    verified: "2026-09-16"
+  - key: fix.alone.four
+    value: "alone-four"
+    volatility: low
+    source: https://example.invalid/four
+    verified: "2026-09-16"
+  - key: fix.noverified.five
+    value: "noverified-five"
+    volatility: low
+    source: https://example.invalid/five
+  - key: fix.nosource.six
+    value: "nosource-six"
+    volatility: low
+    verified: "2026-09-16"
+  # Reserved for Task 3's guides/gamma/nosix.md. It is referenced by that page
+  # and by nothing else, so nosix.md stays a unit of ONE and lonely.md keeps its
+  # own "unit of one" and "lonely" slug assertions below. Declaring it here
+  # rather than in Task 3 means Task 3 adds a file and amends no committed test.
+  - key: fix.solo.seven
+    value: "solo-seven"
+    volatility: low
+    source: https://example.invalid/seven
+    verified: "2026-09-16"
+  - key: fix.triad.ten
+    value: "triad-ten"
+    volatility: low
+    source: https://example.invalid/triad-ten
+    verified: "2026-09-16"
+  - key: fix.triad.eleven
+    value: "triad-eleven"
+    volatility: low
+    source: https://example.invalid/triad-eleven
+    verified: "2026-09-16"
+  - key: fix.emptysix.twelve
+    value: "emptysix-twelve"
+    volatility: low
+    source: https://example.invalid/emptysix
+    verified: "2026-09-16"
+  # Finding 2: an explicit empty-string source, distinct from a record with no
+  # `source` key at all (fix.nosource.six above). Both must trip
+  # refresh-record-source-missing; only the == null half was ever exercised
+  # before this record existed.
+  - key: fix.emptysource.eight
+    value: "emptysource-eight"
+    volatility: low
+    source: ""
+    verified: "2026-09-16"

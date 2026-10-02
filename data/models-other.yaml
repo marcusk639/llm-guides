@@ -206,6 +206,7 @@ records:
     lint_fields: [model_id, parameters, context_length, licence]
     volatility: high
     source: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B
+    licence_source: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B/blob/main/LICENSE
     verified: "2026-09-16"
     tags: [comparison-open-weight]
   - key: qwen.models.qwen3-8-27b
@@ -222,5 +223,6 @@ records:
       - Apache License 2.0
     volatility: high
     source: https://huggingface.co/Qwen/Qwen3.8-27B
+    licence_source: https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/LICENSE
     verified: "2026-09-16"
     tags: [comparison-open-weight]
