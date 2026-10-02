@@ -592,6 +592,81 @@ test("a unit cannot be narrowed by deleting a page from the artifact's unit list
   assert.deepEqual(snapshot(root), before);
 });
 
+// Review 2 / F12 (SK1). The artifact path is deterministic, so a second
+// --skeleton on the same unit on the same day used to overwrite the operator's
+// filled-in verdicts, urls and stated figures and exit 0.
+test("--skeleton refuses to overwrite an existing artifact", () => {
+  const root = sandbox();
+  const rel = skeletonFor(
+    root,
+    "guides/alpha/one.md",
+    "research/alpha/2026-09-28-gone-plus-3-refresh.md",
+  );
+  rewriteArtifact(root, rel, (data) => ({
+    ...data,
+    verdict: "confirmed",
+    records: confirmEvery(data.records).map((r) => ({
+      ...r,
+      stated: "the figure I actually read",
+    })),
+  }));
+  const filled = fs.readFileSync(path.join(root, rel), "utf8");
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--skeleton"],
+    { today: "2026-09-28" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-skeleton-exists");
+  assert.equal(fs.readFileSync(path.join(root, rel), "utf8"), filled);
+});
+
+// Review 2 / F12 (SK2), the serious half. Re-running --skeleton after a
+// successful stamp deleted the receipt while leaving every bumped date on disk,
+// which is exactly the unrecoverable half-stamp state — produced not by a
+// partial write failure but by an ordinary, exit-0, successful command.
+test("--skeleton refuses unconditionally when the artifact carries a receipt", () => {
+  const root = sandbox();
+  const rel = skeletonFor(
+    root,
+    "guides/alpha/one.md",
+    "research/alpha/2026-09-28-gone-plus-3-refresh.md",
+  );
+  rewriteArtifact(root, rel, (data) => ({
+    ...data,
+    verdict: "confirmed",
+    records: confirmEvery(data.records),
+  }));
+  const stamped = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--stamp", `--artifact=${rel}`],
+    { today: "2026-09-28" },
+  );
+  assert.equal(stamped.code, 0);
+  const receiptBefore = parseArtifact(
+    fs.readFileSync(path.join(root, rel), "utf8"),
+  ).data.stamped;
+  assert.notEqual(receiptBefore, undefined);
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--skeleton"],
+    { today: "2026-09-28" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-skeleton-would-destroy-receipt");
+  // The receipt survives, so --revert is still available: the whole point.
+  assert.deepEqual(
+    parseArtifact(fs.readFileSync(path.join(root, rel), "utf8")).data.stamped,
+    receiptBefore,
+  );
+  const reverted = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--revert", `--artifact=${rel}`],
+    { today: "2026-09-29" },
+  );
+  assert.equal(reverted.code, 0);
+});
+
 // Review 2 / F3. --revert used to validate nothing: it never called
 // validateArtifact, applied no date check and carried no unit guard, on the
 // premise that it works only from a machine-written receipt. A `stamped:`

@@ -371,6 +371,32 @@ export function refreshCorpus(
       if (order.blocking.length > 0) return { code: 1, out, err };
       if (mode === "skeleton") {
         const rel = artifactPathFor(unit, today, root);
+        // The artifact path is deterministic, so every --skeleton run on the
+        // same unit on the same day targets the same file — and re-running
+        // --skeleton is ordinary: regenerating the work order, or restarting
+        // the pipeline after a review block, both do it. Overwriting silently
+        // destroys either the operator's filled-in evidence or, worse, a live
+        // receipt: that converts a revertible stamp into the half-stamp state
+        // CLAUDE.md describes as having no recovery except restoring the prior
+        // tree from version control, and does it on an exit-0 success path.
+        // unitSlug also collapses any unit above MAX_SLUG_PAGES to
+        // `<first>-plus-N`, so two distinct units can collide on one path.
+        const abs = path.join(root, rel);
+        if (fs.existsSync(abs)) {
+          const prior = parseArtifact(fs.readFileSync(abs, "utf8")).data;
+          // Unconditional, with no --force escape: there is no legitimate
+          // reason to discard a receipt that still describes live on-disk
+          // changes, because --revert is the only thing that can undo them.
+          if (prior?.stamped != null)
+            throw new RefreshError(
+              "refresh-skeleton-would-destroy-receipt",
+              `${rel} already carries a stamped: receipt; overwriting it would make --revert impossible while leaving the bumped dates on disk — --revert it first, or restore the tree from version control`,
+            );
+          throw new RefreshError(
+            "refresh-skeleton-exists",
+            `${rel} already exists; fill it in, or delete it deliberately before regenerating`,
+          );
+        }
         fs.mkdirSync(path.join(root, path.dirname(rel)), { recursive: true });
         fs.writeFileSync(
           path.join(root, rel),

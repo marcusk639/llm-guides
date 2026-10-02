@@ -411,6 +411,8 @@ Every rule name the tools emit, and what to do.
 | `refresh-verdict-incoherent`      | refresh | A record is `unreachable` while the unit verdict is not `blocked`.                                     | Set the unit verdict to `blocked`; an unreachable source must not bump `verified`. |
 | `refresh-artifact-coverage`       | refresh | A record in `unit_keys` has no verdict entry.                                                         | Give every record in the unit a verdict, or refresh silently under-checks it under a fresh date. |
 | `refresh-artifact-not-found`      | refresh | `--artifact=<path>` names a file that does not exist on disk.                                         | Pass the path `--skeleton` wrote, or run `--skeleton` first. |
+| `refresh-skeleton-exists`         | refresh | `--skeleton` would overwrite an artifact already at the deterministic path `research/<topic>/<today>-<slug>-refresh.md`, discarding whatever an operator has filled in. There is no `--force`. | Fill in the artifact that is already there, or delete it deliberately before regenerating. |
+| `refresh-skeleton-would-destroy-receipt` | refresh | The same path already holds an artifact carrying a `stamped:` receipt. Overwriting it would delete the only record of what to undo while leaving every bumped date on disk — the unrecoverable half-stamp state, reached from an exit-0 success path. Refused **unconditionally**: no flag overrides it. | `--revert` that artifact first, or restore the tree from version control. |
 | `refresh-artifact-path-mismatch`  | refresh | `--artifact` disagrees with the artifact's own `path` field.                                           | Pass the path the artifact names. |
 | `refresh-blocked`                 | refresh | `--stamp` on a `blocked` artifact. Nothing was written.                                               | Resolve the unreachable sources, or deprecate the page. |
 | `refresh-already-stamped`         | refresh | `--stamp` on an artifact that already carries a `stamped:` receipt.                                    | `--revert` first. |
@@ -640,7 +642,13 @@ makes reverting a bad merged refresh a clean single-commit operation.
 `research/<topic>/<YYYY-MM-DD>-<unit-slug>-refresh.md`, under the topic of the page
 named on the command line — a cross-topic unit has no single home, and the entry
 page is the one the author asked about. The slug joins the pages' sorted basenames,
-collapsing to `<first>-plus-N` above three pages. Its front-matter is
+collapsing to `<first>-plus-N` above three pages. That path is
+**deterministic**, so `--skeleton` never overwrites: a second run on the same unit
+on the same day stops with `refresh-skeleton-exists`, and one whose target carries
+a `stamped:` receipt stops with `refresh-skeleton-would-destroy-receipt`, which has
+no override because discarding a live receipt is what makes a stamp unrevertible.
+Two distinct units can also collide on one path, since the slug collapses above
+three pages. Its front-matter is
 machine-readable: `kind: refresh`, `unit`, `entry`, `topic`, `topics`, `slug`,
 `path`, `fetched`, `verdict`, `key_scoped`, `unit_keys`, and one `records` entry per
 record carrying `key`, `file`, `verdict`, `url`, `stated` and `read`. The same unit
