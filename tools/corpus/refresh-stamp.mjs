@@ -5,6 +5,10 @@
 // file would conflict on every concurrent run. Record-scoped line edits are
 // disjoint by construction and git auto-merges them.
 import { RefreshError } from "./refresh-units.mjs";
+import fs from "node:fs";
+import nodePath from "node:path";
+import { parseFrontmatter } from "./frontmatter.mjs";
+import { validateArtifact, withReceipt } from "./refresh-artifact.mjs";
 
 // Three capture groups so the body can be rebuilt byte-exactly: the opening
 // fence, the body without its trailing newline, and the closing fence. Mirrors
@@ -138,4 +142,112 @@ export function removePageResearch(pageText) {
   if (at === -1) return { text: pageText, removed: false };
   lines.splice(at, 1);
   return { text: rebuild(fm, lines), removed: true };
+}
+
+// All-or-nothing. Every new file body is computed in memory first; only when
+// every edit has succeeded does anything reach disk, and the artifact's receipt
+// is the last write. A partial stamp is the one outcome that would leave the
+// corpus asserting freshness it cannot revert.
+export function stampUnit(
+  root,
+  artifact,
+  { today = new Date().toISOString().slice(0, 10) } = {},
+) {
+  const issues = validateArtifact(artifact);
+  if (issues.length > 0)
+    throw new RefreshError(
+      issues[0].rule,
+      `artifact is not stampable: ${issues[0].message}`,
+    );
+  if (artifact.verdict === "blocked")
+    throw new RefreshError(
+      "refresh-blocked",
+      "verdict is blocked; a refresh that could not reach a source must not bump verified, so nothing was written",
+    );
+  if (artifact.stamped != null)
+    throw new RefreshError(
+      "refresh-already-stamped",
+      "artifact already carries a stamped: receipt; revert it before stamping again",
+    );
+  // checkResearchRequired only checks research: is a non-empty string, and no
+  // research-path-unresolved rule exists, so this is the only place a path that
+  // does not resolve can be refused.
+  if (!fs.existsSync(nodePath.join(root, artifact.path)))
+    throw new RefreshError(
+      "refresh-research-unresolved",
+      `artifact path ${artifact.path} does not exist under ${root}; research: must point at a file that resolves`,
+    );
+
+  const unitKeys = new Set(artifact.unit_keys);
+  const pending = new Map();
+  const readPending = (rel) =>
+    pending.has(rel)
+      ? pending.get(rel)
+      : fs.readFileSync(nodePath.join(root, rel), "utf8");
+
+  const recordReceipts = [];
+  for (const entry of artifact.records) {
+    if (!unitKeys.has(entry.key))
+      throw new RefreshError(
+        "refresh-record-out-of-unit",
+        `record ${entry.key} is not in unit_keys; a unit must not widen its footprint into another unit's records`,
+      );
+    // The record's date is the date THIS entry was read, not today: two sources
+    // in one unit can legitimately be read on different days, and using the
+    // entry's own date also makes the idempotence proof time-independent.
+    const { text, previous } = setRecordVerified(
+      readPending(entry.file),
+      entry.key,
+      entry.read,
+    );
+    pending.set(entry.file, text);
+    recordReceipts.push({
+      key: entry.key,
+      file: entry.file,
+      previous_verified: previous,
+      new_verified: entry.read,
+    });
+  }
+
+  const pageReceipts = [];
+  // --key is surgical: "one record repriced, no page-wide sweep". A page's
+  // `verified` asserts its WHOLE section 6 was worked — every record, every
+  // identifier tied to applies_to, every value the lint cannot guard, every
+  // dated study — and a key-scoped run worked one item on that list. So a
+  // key-scoped artifact stamps records only, and the receipt's empty `pages`
+  // list is what makes revertUnit correct here without a second branch.
+  if (artifact.key_scoped === true) {
+    if (artifact.unit_keys.length !== 1)
+      throw new RefreshError(
+        "refresh-key-scope-widened",
+        `a key_scoped artifact must carry exactly one key, got ${artifact.unit_keys.length}; --key narrows a unit to one record, so this artifact was widened by hand after --skeleton`,
+      );
+  } else {
+    for (const rel of artifact.unit) {
+      const text = readPending(rel);
+      const { data } = parseFrontmatter(text);
+      // A deprecated page belongs to the unit — its records are shared and were
+      // fetched once for the whole unit — but it could not be refreshed, so it
+      // never gets a fresh date or a research: field.
+      if (data?.status === "deprecated") continue;
+      const bumped = setPageVerified(text, artifact.fetched);
+      const set = setPageResearch(bumped.text, artifact.path);
+      pending.set(rel, set.text);
+      pageReceipts.push({
+        path: rel,
+        previous_verified: bumped.previous,
+        research_added: set.added,
+        previous_research: set.previous,
+      });
+    }
+  }
+
+  const receipt = { at: today, pages: pageReceipts, records: recordReceipts };
+  pending.set(
+    artifact.path,
+    withReceipt(readPending(artifact.path), receipt),
+  );
+  for (const [rel, text] of pending)
+    fs.writeFileSync(nodePath.join(root, rel), text);
+  return { receipt, written: [...pending.keys()].sort() };
 }

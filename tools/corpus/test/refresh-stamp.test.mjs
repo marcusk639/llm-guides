@@ -327,3 +327,272 @@ test("research: is appended at the end of front-matter when neither seed: nor ve
     /sources:\n  - https:\/\/example\.invalid\/five\nresearch: research\/alpha\/2026-09-28-five-refresh\.md\n---/,
   );
 });
+
+import fs from "node:fs";
+import os from "node:os";
+import nodePath from "node:path";
+import { fileURLToPath } from "node:url";
+import { loadRecords } from "../data.mjs";
+import { resolveUnit, artifactPathFor } from "../refresh-units.mjs";
+import { workOrder } from "../refresh-order.mjs";
+import {
+  parseArtifact,
+  dumpArtifact,
+  renderArtifactSkeleton,
+  validateArtifact,
+} from "../refresh-artifact.mjs";
+import { stampUnit } from "../refresh-stamp.mjs";
+
+const FIXTURE = fileURLToPath(new URL("./fixtures/refresh/", import.meta.url));
+
+// Stamp and revert mutate files, so every test works on a throwaway copy.
+function sandbox() {
+  const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), "refresh-"));
+  fs.cpSync(FIXTURE, dir, { recursive: true });
+  return dir;
+}
+
+// Builds a filled-in, stampable artifact on disk and returns its parsed data.
+function prepared(root, { verdict = "confirmed", read = "2026-09-28" } = {}) {
+  const records = loadRecords(nodePath.join(root, "data"));
+  const unit = resolveUnit(root, "guides/alpha/one.md", records);
+  const order = workOrder(root, unit, records);
+  const artifactPath = artifactPathFor(unit, "2026-09-28", root);
+  const skeleton = renderArtifactSkeleton(order, {
+    fetched: "2026-09-28",
+    artifactPath,
+  });
+  const { data, body } = parseArtifact(skeleton);
+  const filled = {
+    ...data,
+    verdict,
+    records: data.records.map((r) => ({
+      ...r,
+      verdict: verdict === "blocked" ? "unreachable" : "confirmed",
+      url: "https://example.invalid/one",
+      stated: "unchanged",
+      read,
+    })),
+  };
+  fs.mkdirSync(nodePath.join(root, nodePath.dirname(artifactPath)), {
+    recursive: true,
+  });
+  fs.writeFileSync(
+    nodePath.join(root, artifactPath),
+    dumpArtifact(filled, body),
+  );
+  return filled;
+}
+
+// The same, narrowed with --key. fix.tail.three is referenced by three.md and
+// gone.md, so a page-wide sweep here would be visible on both.
+function preparedKeyScoped(root, { read = "2026-09-28" } = {}) {
+  const records = loadRecords(nodePath.join(root, "data"));
+  const unit = resolveUnit(root, "guides/alpha/one.md", records);
+  const order = workOrder(root, unit, records, { key: "fix.tail.three" });
+  const artifactPath = artifactPathFor(unit, "2026-09-28", root);
+  const { data, body } = parseArtifact(
+    renderArtifactSkeleton(order, {
+      fetched: "2026-09-28",
+      artifactPath,
+    }),
+  );
+  const filled = {
+    ...data,
+    verdict: "confirmed",
+    records: data.records.map((r) => ({
+      ...r,
+      verdict: "confirmed",
+      url: "https://example.invalid/three",
+      stated: "unchanged",
+      read,
+    })),
+  };
+  fs.mkdirSync(nodePath.join(root, nodePath.dirname(artifactPath)), {
+    recursive: true,
+  });
+  fs.writeFileSync(
+    nodePath.join(root, artifactPath),
+    dumpArtifact(filled, body),
+  );
+  return filled;
+}
+
+const read = (root, rel) => fs.readFileSync(nodePath.join(root, rel), "utf8");
+
+test("a confirmed stamp bumps pages to fetched and records to their read date", () => {
+  const root = sandbox();
+  const artifact = prepared(root, { read: "2026-09-27" });
+  const { receipt, written } = stampUnit(root, artifact, {
+    today: "2026-09-28",
+  });
+  assert.equal(read(root, "guides/alpha/one.md").includes("verified: 2026-09-28"), true);
+  // The record takes the date it was actually read, not today.
+  assert.equal(
+    read(root, "data/units.yaml").includes('verified: "2026-09-27"'),
+    true,
+  );
+  assert.equal(receipt.at, "2026-09-28");
+  assert.equal(written.includes(artifact.path), true);
+});
+
+// Review Focus 2: verify-pages.mjs:54-66 only checks research: is a non-empty
+// string, and there is no research-path-unresolved rule, so stampUnit is the
+// only thing that can refuse a path that does not resolve.
+test("a research: path that does not resolve is refused, and nothing is written", () => {
+  const root = sandbox();
+  const artifact = prepared(root);
+  fs.rmSync(nodePath.join(root, artifact.path));
+  const before = read(root, "guides/alpha/one.md");
+  assert.throws(
+    () => stampUnit(root, artifact, { today: "2026-09-28" }),
+    (err) =>
+      err instanceof RefreshError &&
+      err.rule === "refresh-research-unresolved",
+  );
+  assert.equal(read(root, "guides/alpha/one.md"), before);
+});
+
+// Review Focus 3, second half: blocked writes nothing at all.
+test("a blocked artifact writes nothing", () => {
+  const root = sandbox();
+  const artifact = prepared(root, { verdict: "blocked" });
+  const beforePage = read(root, "guides/alpha/one.md");
+  const beforeData = read(root, "data/units.yaml");
+  assert.throws(
+    () => stampUnit(root, artifact, { today: "2026-09-28" }),
+    (err) => err instanceof RefreshError && err.rule === "refresh-blocked",
+  );
+  assert.equal(read(root, "guides/alpha/one.md"), beforePage);
+  assert.equal(read(root, "data/units.yaml"), beforeData);
+});
+
+test("an incoherent artifact is refused before anything is written", () => {
+  const root = sandbox();
+  const artifact = prepared(root);
+  artifact.records[0] = { ...artifact.records[0], verdict: "unreachable" };
+  const before = read(root, "data/units.yaml");
+  assert.throws(
+    () => stampUnit(root, artifact, { today: "2026-09-28" }),
+    (err) =>
+      err instanceof RefreshError &&
+      err.rule === "refresh-verdict-incoherent",
+  );
+  assert.equal(read(root, "data/units.yaml"), before);
+});
+
+// Review Focus 4: a deprecated page belongs to the unit but never gets a fresh
+// date or a research: field.
+test("a deprecated unit member gets neither a bumped date nor a research: field", () => {
+  const root = sandbox();
+  const artifact = prepared(root);
+  const before = read(root, "guides/beta/gone.md");
+  const { receipt } = stampUnit(root, artifact, { today: "2026-09-28" });
+  assert.equal(read(root, "guides/beta/gone.md"), before);
+  assert.equal(
+    receipt.pages.some((p) => p.path === "guides/beta/gone.md"),
+    false,
+  );
+  // Every other member of the unit was stamped.
+  assert.deepEqual(
+    receipt.pages.map((p) => p.path).sort(),
+    ["guides/alpha/one.md", "guides/alpha/two.md", "guides/beta/three.md"],
+  );
+});
+
+test("a record outside unit_keys is refused before anything is written", () => {
+  const root = sandbox();
+  const artifact = prepared(root);
+  artifact.records = [
+    ...artifact.records,
+    {
+      key: "fix.alone.four",
+      file: "data/units.yaml",
+      verdict: "confirmed",
+      url: "https://example.invalid/four",
+      stated: "unchanged",
+      read: "2026-09-28",
+    },
+  ];
+  const before = read(root, "data/units.yaml");
+  assert.throws(
+    () => stampUnit(root, artifact, { today: "2026-09-28" }),
+    (err) =>
+      err instanceof RefreshError && err.rule === "refresh-record-out-of-unit",
+  );
+  assert.equal(read(root, "data/units.yaml"), before);
+});
+
+test("stamping twice is refused: the receipt is already there", () => {
+  const root = sandbox();
+  const artifact = prepared(root);
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  const again = parseArtifact(read(root, artifact.path)).data;
+  assert.throws(
+    () => stampUnit(root, again, { today: "2026-09-28" }),
+    (err) =>
+      err instanceof RefreshError && err.rule === "refresh-already-stamped",
+  );
+});
+
+test("seed: true survives a stamp", () => {
+  const root = sandbox();
+  stampUnit(root, prepared(root), { today: "2026-09-28" });
+  assert.equal(read(root, "guides/alpha/one.md").includes("seed: true"), true);
+});
+
+// Review Focus 3(b): one record repriced, no page-wide sweep. The record's date
+// moves; not one page's does, and no research: appears anywhere.
+test("a key-scoped stamp moves the record and no page at all", () => {
+  const root = sandbox();
+  const pagesBefore = Object.fromEntries(
+    [
+      "guides/alpha/one.md",
+      "guides/alpha/two.md",
+      "guides/beta/three.md",
+      "guides/beta/gone.md",
+    ].map((rel) => [rel, read(root, rel)]),
+  );
+  const { receipt } = stampUnit(root, preparedKeyScoped(root), {
+    today: "2026-09-28",
+  });
+  for (const [rel, before] of Object.entries(pagesBefore))
+    assert.equal(read(root, rel), before, `${rel} must not move`);
+  assert.deepEqual(receipt.pages, []);
+  assert.deepEqual(
+    receipt.records.map((r) => r.key),
+    ["fix.tail.three"],
+  );
+  assert.equal(
+    read(root, "data/units.yaml").includes('verified: "2026-09-28"'),
+    true,
+  );
+});
+
+// Widened coherently, so no other guard catches it: unit_keys and records agree,
+// so validateArtifact's coverage rule passes and every key is in unit_keys, so
+// refresh-record-out-of-unit passes too. Only the key-scope guard is left.
+test("a key-scoped artifact widened by hand is refused before anything is written", () => {
+  const root = sandbox();
+  const artifact = preparedKeyScoped(root);
+  artifact.unit_keys = [...artifact.unit_keys, "fix.shared.one"];
+  artifact.records = [
+    ...artifact.records,
+    {
+      key: "fix.shared.one",
+      file: "data/units.yaml",
+      verdict: "confirmed",
+      url: "https://example.invalid/one",
+      stated: "unchanged",
+      read: "2026-09-28",
+    },
+  ];
+  assert.deepEqual(validateArtifact(artifact), []);
+  const before = read(root, "data/units.yaml");
+  assert.throws(
+    () => stampUnit(root, artifact, { today: "2026-09-28" }),
+    (err) =>
+      err instanceof RefreshError && err.rule === "refresh-key-scope-widened",
+  );
+  assert.equal(read(root, "data/units.yaml"), before);
+});
