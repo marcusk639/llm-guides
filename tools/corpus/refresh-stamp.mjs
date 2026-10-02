@@ -200,6 +200,15 @@ export function stampUnit(
       entry.key,
       entry.read,
     );
+    // `previous` is read off the pending text, which a half-written retry can
+    // have already bumped. If it already reads today's target date, a prior
+    // stamp left no receipt to revert from, and silently treating this as a
+    // fresh stamp would make the record's true prior date unrecoverable.
+    if (previous === entry.read)
+      throw new RefreshError(
+        "refresh-record-already-dated",
+        `${entry.key} in ${entry.file} already reads verified ${entry.read}; a previous stamp left no receipt — restore from git before retrying`,
+      );
     pending.set(entry.file, text);
     recordReceipts.push({
       key: entry.key,
@@ -231,6 +240,14 @@ export function stampUnit(
       // never gets a fresh date or a research: field.
       if (data?.status === "deprecated") continue;
       const bumped = setPageVerified(text, artifact.fetched);
+      // Same hazard as the record case above: `bumped.previous` is read off
+      // pending text, so a half-written retry would otherwise see its own
+      // prior write and treat it as the page's true previous date.
+      if (bumped.previous === artifact.fetched)
+        throw new RefreshError(
+          "refresh-page-already-dated",
+          `${rel} already reads verified ${artifact.fetched}; a previous stamp left no receipt — restore from git before retrying`,
+        );
       const set = setPageResearch(bumped.text, artifact.path);
       pending.set(rel, set.text);
       pageReceipts.push({

@@ -341,6 +341,18 @@ export function refreshCorpus(
         `--artifact=${artifactRel} but the artifact's own path field says ${JSON.stringify(data?.path)}`,
       );
     if (mode === "stamp") {
+      for (const k of data.unit_keys ?? [])
+        if (!unit.keys.includes(k))
+          throw new RefreshError(
+            "refresh-unit-widened",
+            `${k} is not referenced by the unit rooted at ${page}`,
+          );
+      for (const rel of data.unit ?? [])
+        if (!unit.pages.some((p) => p.path === rel))
+          throw new RefreshError(
+            "refresh-unit-widened",
+            `${rel} is not a page of this unit`,
+          );
       const { receipt, written } = stampUnit(root, data, { today });
       for (const w of written) out.push(`refresh: stamped ${w}`);
       out.push(`refresh: receipt at ${receipt.at}`);

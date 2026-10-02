@@ -290,3 +290,138 @@ test("the spawned CLI prints the reason for a refresh usage error", () => {
     "reason line must print above the usage block",
   );
 });
+
+
+// C1: resolveUnit computes the REAL unit a page belongs to, but the stamp
+// path used to hand stampUnit only the artifact's own self-declared
+// unit_keys/unit fields, so an artifact hand-widened to claim another unit's
+// record key passed every self-referential check (they only compare the
+// artifact against itself) and would stamp that record's verified date while
+// the unit that actually owns it was never touched. This must be caught at
+// the real refreshCorpus/CLI entry point -- a unit test of stampUnit alone
+// cannot see this class of bug, because stampUnit is handed the already-
+// trusted data either way.
+test("a unit cannot be widened by claiming another unit's record key at stamp time", () => {
+  const root = sandbox();
+  const skeletonRun = refreshCorpus(
+    root,
+    ["--page=guides/gamma/lonely.md", "--skeleton"],
+    { today: "2026-09-28" },
+  );
+  assert.equal(skeletonRun.code, 0);
+  const rel = "research/gamma/2026-09-28-lonely-refresh.md";
+  const { data, body } = parseArtifact(
+    fs.readFileSync(path.join(root, rel), "utf8"),
+  );
+  // Hand-widen: claim fix.shared.one, a record owned by the alpha/beta unit,
+  // consistently in both unit_keys and records, so the artifact's own
+  // self-referential checks (validateArtifact's coverage rule and
+  // refresh-record-out-of-unit) see no disagreement -- exactly the shape the
+  // vacuous guard let through.
+  const widened = {
+    ...data,
+    verdict: "confirmed",
+    unit_keys: [...data.unit_keys, "fix.shared.one"],
+    records: [
+      ...data.records.map((r) => ({
+        ...r,
+        verdict: "confirmed",
+        url: "https://example.invalid/four",
+        stated: "unchanged",
+      })),
+      {
+        key: "fix.shared.one",
+        file: "data/units.yaml",
+        verdict: "confirmed",
+        url: "https://example.invalid/one",
+        stated: "unchanged",
+        read: "2026-09-28",
+      },
+    ],
+  };
+  fs.writeFileSync(
+    path.join(root, rel),
+    `---\n${JSON.stringify(widened, null, 2)}\n---\n${body}`,
+  );
+  const before = {
+    one: fs.readFileSync(path.join(root, "guides/alpha/one.md"), "utf8"),
+    two: fs.readFileSync(path.join(root, "guides/alpha/two.md"), "utf8"),
+    three: fs.readFileSync(path.join(root, "guides/beta/three.md"), "utf8"),
+    lonely: fs.readFileSync(path.join(root, "guides/gamma/lonely.md"), "utf8"),
+    data: fs.readFileSync(path.join(root, "data/units.yaml"), "utf8"),
+  };
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/gamma/lonely.md", "--stamp", `--artifact=${rel}`],
+    { today: "2026-09-28" },
+  );
+  assert.equal(r.code, 1);
+  assert.match(r.err.join("\n"), /refresh-unit-widened/);
+  assert.equal(
+    fs.readFileSync(path.join(root, "guides/alpha/one.md"), "utf8"),
+    before.one,
+  );
+  assert.equal(
+    fs.readFileSync(path.join(root, "guides/alpha/two.md"), "utf8"),
+    before.two,
+  );
+  assert.equal(
+    fs.readFileSync(path.join(root, "guides/beta/three.md"), "utf8"),
+    before.three,
+  );
+  assert.equal(
+    fs.readFileSync(path.join(root, "guides/gamma/lonely.md"), "utf8"),
+    before.lonely,
+  );
+  assert.equal(
+    fs.readFileSync(path.join(root, "data/units.yaml"), "utf8"),
+    before.data,
+  );
+});
+
+// Same guard, the other half: claiming an unrelated PAGE (not a record key)
+// in `unit` would otherwise bump that page's verified: date and research:
+// field even though it shares no record with this unit at all.
+test("a unit cannot be widened by claiming another unit's page at stamp time", () => {
+  const root = sandbox();
+  const skeletonRun = refreshCorpus(
+    root,
+    ["--page=guides/gamma/lonely.md", "--skeleton"],
+    { today: "2026-09-28" },
+  );
+  assert.equal(skeletonRun.code, 0);
+  const rel = "research/gamma/2026-09-28-lonely-refresh.md";
+  const { data, body } = parseArtifact(
+    fs.readFileSync(path.join(root, rel), "utf8"),
+  );
+  const widened = {
+    ...data,
+    verdict: "confirmed",
+    unit: [...data.unit, "guides/alpha/one.md"],
+    records: data.records.map((r) => ({
+      ...r,
+      verdict: "confirmed",
+      url: "https://example.invalid/four",
+      stated: "unchanged",
+    })),
+  };
+  fs.writeFileSync(
+    path.join(root, rel),
+    `---\n${JSON.stringify(widened, null, 2)}\n---\n${body}`,
+  );
+  const before = fs.readFileSync(
+    path.join(root, "guides/alpha/one.md"),
+    "utf8",
+  );
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/gamma/lonely.md", "--stamp", `--artifact=${rel}`],
+    { today: "2026-09-28" },
+  );
+  assert.equal(r.code, 1);
+  assert.match(r.err.join("\n"), /refresh-unit-widened/);
+  assert.equal(
+    fs.readFileSync(path.join(root, "guides/alpha/one.md"), "utf8"),
+    before,
+  );
+});

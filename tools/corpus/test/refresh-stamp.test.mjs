@@ -598,6 +598,51 @@ test("a key-scoped artifact widened by hand is refused before anything is writte
 });
 
 
+// C2: stampUnit derives `previous` from the pending/on-disk text at the moment
+// it runs, not from a receipt. If an earlier stamp attempt crashed after
+// writing the record file but before writing the artifact's receipt, a retry
+// must not read its own half-finished write back as "the previous date" --
+// that would make the stamp look like a no-op and destroy the true prior date.
+test("retrying a stamp whose record file was already bumped is refused, not silently re-dated", () => {
+  const root = sandbox();
+  const artifact = prepared(root, { read: "2026-09-28" });
+  const dataPath = nodePath.join(root, "data/units.yaml");
+  const { text } = setRecordVerified(
+    fs.readFileSync(dataPath, "utf8"),
+    "fix.shared.one",
+    "2026-09-28",
+  );
+  fs.writeFileSync(dataPath, text);
+  const before = read(root, "data/units.yaml");
+  assert.throws(
+    () => stampUnit(root, artifact, { today: "2026-09-28" }),
+    (err) =>
+      err instanceof RefreshError &&
+      err.rule === "refresh-record-already-dated",
+  );
+  assert.equal(read(root, "data/units.yaml"), before);
+});
+
+// Same hazard, page side: a half-written retry must not read its own prior
+// bump of a page's verified: line back as that page's true previous date.
+test("retrying a stamp whose page was already bumped is refused, not silently re-dated", () => {
+  const root = sandbox();
+  const artifact = prepared(root);
+  const pagePath = nodePath.join(root, "guides/alpha/one.md");
+  const { text } = setPageVerified(
+    fs.readFileSync(pagePath, "utf8"),
+    artifact.fetched,
+  );
+  fs.writeFileSync(pagePath, text);
+  const before = read(root, "guides/alpha/one.md");
+  assert.throws(
+    () => stampUnit(root, artifact, { today: "2026-09-28" }),
+    (err) =>
+      err instanceof RefreshError && err.rule === "refresh-page-already-dated",
+  );
+  assert.equal(read(root, "guides/alpha/one.md"), before);
+});
+
 import { revertUnit } from "../refresh-stamp.mjs";
 
 const TRACKED = [
