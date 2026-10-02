@@ -643,6 +643,48 @@ test("retrying a stamp whose page was already bumped is refused, not silently re
   assert.equal(read(root, "guides/alpha/one.md"), before);
 });
 
+// I1: a future artifact.fetched or record read must be refused before
+// anything is written -- it would push expires out and escape staleness
+// detection entirely. Covers both halves plus the legitimate earlier-read case.
+
+test("a future artifact.fetched is refused, and nothing is written", () => {
+  const root = sandbox();
+  const artifact = prepared(root, { read: "2026-09-27" });
+  artifact.fetched = "2026-09-29";
+  const beforePage = read(root, "guides/alpha/one.md");
+  const beforeData = read(root, "data/units.yaml");
+  assert.throws(
+    () => stampUnit(root, artifact, { today: "2026-09-28" }),
+    (err) => err instanceof RefreshError && err.rule === "refresh-date-in-future",
+  );
+  assert.equal(read(root, "guides/alpha/one.md"), beforePage);
+  assert.equal(read(root, "data/units.yaml"), beforeData);
+});
+
+test("a future record read date is refused, and nothing is written", () => {
+  const root = sandbox();
+  const artifact = prepared(root, { read: "2026-09-29" });
+  const beforePage = read(root, "guides/alpha/one.md");
+  const beforeData = read(root, "data/units.yaml");
+  assert.throws(
+    () => stampUnit(root, artifact, { today: "2026-09-28" }),
+    (err) => err instanceof RefreshError && err.rule === "refresh-date-in-future",
+  );
+  assert.equal(read(root, "guides/alpha/one.md"), beforePage);
+  assert.equal(read(root, "data/units.yaml"), beforeData);
+});
+
+test("a record read earlier than fetched still stamps normally", () => {
+  const root = sandbox();
+  const artifact = prepared(root, { read: "2026-09-20" });
+  const { receipt } = stampUnit(root, artifact, { today: "2026-09-28" });
+  assert.equal(
+    read(root, "data/units.yaml").includes('verified: "2026-09-20"'),
+    true,
+  );
+  assert.equal(receipt.records[0].new_verified, "2026-09-20");
+});
+
 import { revertUnit } from "../refresh-stamp.mjs";
 
 const TRACKED = [

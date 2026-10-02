@@ -169,6 +169,16 @@ export function stampUnit(
       "refresh-already-stamped",
       "artifact already carries a stamped: receipt; revert it before stamping again",
     );
+  // Dates are "YYYY-MM-DD" strings, so a plain string comparison against
+  // today is correct and avoids timezone hazards. A future fetched pushes
+  // `expires = verified + cadence` out by however far into the future it is,
+  // so the page would silently escape staleness detection rather than merely
+  // carry a wrong date.
+  if (artifact.fetched > today)
+    throw new RefreshError(
+      "refresh-date-in-future",
+      `artifact.fetched is ${artifact.fetched}, after today (${today})`,
+    );
   // checkResearchRequired only checks research: is a non-empty string, and no
   // research-path-unresolved rule exists, so this is the only place a path that
   // does not resolve can be refused.
@@ -191,6 +201,14 @@ export function stampUnit(
       throw new RefreshError(
         "refresh-record-out-of-unit",
         `record ${entry.key} is not in unit_keys; a unit must not widen its footprint into another unit's records`,
+      );
+    // Same future-date hazard as artifact.fetched above. A record read
+    // earlier than fetched is normal (two sources in one unit can be read on
+    // different days); only a date after today is wrong.
+    if (entry.read > today)
+      throw new RefreshError(
+        "refresh-date-in-future",
+        `record ${entry.key}'s read is ${entry.read}, after today (${today})`,
       );
     // The record's date is the date THIS entry was read, not today: two sources
     // in one unit can legitimately be read on different days, and using the
