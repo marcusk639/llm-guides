@@ -110,9 +110,9 @@ records:
     was: '2026-09-16'
   - key: openai.models.gpt6-astra
     file: data/models-other.yaml
-    verdict: confirmed
+    verdict: unreachable
     url: https://developers.openai.com/api/docs/models/gpt-6-astra
-    stated: 'gpt-6-astra; input $10.00, cached input $1.00, cache writes $12.50, output $50.00 per 1M; context 1,050,000 (not a round 1M); max output 128,000; knowledge cutoff Apr 30 2026; >272K input priced 2x input, 1.5x output.'
+    stated: 'gpt-6-astra; input $10.00, cached input $1.00, cache writes $12.50, output $50.00 per 1M; context 1,050,000 (not a round 1M); max output 128,000; knowledge cutoff Apr 30 2026; >272K input priced 2x input, 1.5x output. CORRECTED BY VERIFY AGENT: the record''s max_input: 922,000 tokens is NOT STATED and is derived arithmetic (1,050,000 context window minus 128,000 max output = 922,000 exactly). data/models-other.yaml:15 states the convention ''max_input - only where the vendor states an input limit'' and :19 ''Cells are left blank when the vendor page does not state the value.'' Same defect as gpt-5-6-luna and gpt-5-6-terra; all three carry the figure in lint_literals, so the lint guards a value the vendor never published.'
     read: '2026-10-02'
     was: '2026-09-16'
   - key: qwen.models.qwen3-8-2-4t-a95b
