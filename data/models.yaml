@@ -64,7 +64,6 @@ records:
     max_output: 128K tokens
     input_price: $5 / MTok
     output_price: $25 / MTok
-    lifecycle: Active (legacy)
     retirement: Not sooner than July 24, 2027
     lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price, retirement]
     volatility: high
@@ -82,7 +81,6 @@ records:
     max_output: 128K tokens
     input_price: $2 / MTok
     output_price: $10 / MTok
-    lifecycle: Active (legacy)
     retirement: Not sooner than June 30, 2027
     lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price, retirement]
     volatility: high

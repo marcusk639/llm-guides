@@ -10,7 +10,7 @@ summary: >-
 topic: models
 verified: 2026-09-16
 applies_to:
-  - "Anthropic Claude API, OpenAI API and Google Gemini API documentation as published on 2026-09-16"
+  - "Anthropic Claude API, OpenAI API and Google Gemini API documentation as published on 2026-09-16; the Anthropic rows re-read 2026-10-02, when Claude Opus 5.5 replaced Claude Opus 5 in the hosted table"
   - "Hugging Face model cards in the meta-llama and Qwen organisations as published on 2026-09-16"
   - "Rows: Claude Fable 5.1, Claude Opus 5.5, Claude Haiku 4.5; GPT-6 Astra, GPT-5.6 Terra, GPT-5.6 Luna; Gemini 3.8 Flash, Gemini 3.1 Pro Preview, Gemini 3.5 Flash-Lite; Llama 4 Maverick, Llama 4 Scout; Qwen3.8-2.4T-A95B, Qwen3.8-27B"
 sources:

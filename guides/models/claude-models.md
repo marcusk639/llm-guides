@@ -62,7 +62,7 @@ The current lineup, as published on the verification date. Prices are base USD p
 
 If the table and the [models overview](https://platform.claude.com/docs/en/models/overview) or [pricing page](https://platform.claude.com/docs/en/about-claude/pricing) disagree, those pages win.
 
-Two previous-generation models are still served. The overview's current lineup no longer lists them, but each one's own page marks it Active (legacy) with a committed retirement date, and the pricing page still rates them under "Additional models". They are listed here because a reader pinned to one needs to know how long it has:
+The two models this page previously tracked as current are now legacy, and both are still served. The overview's current lineup no longer lists either one, but each one's own page marks it Active (legacy) with a committed retirement date, and the pricing page still rates them under "Additional models". They are kept here because a reader who pinned to one needs to know how long it has. **They are not the whole legacy lineup** — the vendor lists considerably more legacy models than these two, as section 5 notes; the rest are out of scope for this page and section 6 says so:
 
 <!-- corpus:table fields=name,api_id,context_window,max_output,input_price,output_price,retirement headers="Model,API ID,Context window,Max output,Input price,Output price,Retirement" tag=claude-legacy sort=name -->
 | Model | API ID | Context window | Max output | Input price | Output price | Retirement |
@@ -71,7 +71,7 @@ Two previous-generation models are still served. The overview's current lineup n
 | Claude Sonnet 5 | claude-sonnet-5 | 1M tokens | 128K tokens | $2 / MTok | $10 / MTok | Not sooner than June 30, 2027 |
 <!-- /corpus:table -->
 
-A legacy model is not a deprecated one: the [deprecations page](https://platform.claude.com/docs/en/about-claude/model-deprecations) defines Legacy as "will no longer receive updates and may be deprecated in the future", and Deprecated as carrying a recommended replacement and an assigned retirement date. Both rows above are still Active.
+A legacy model is not a deprecated one: the [deprecations page](https://platform.claude.com/docs/en/about-claude/model-deprecations) defines Legacy as "will no longer receive updates and may be deprecated in the future", and Deprecated as carrying a recommended replacement and an assigned retirement date. Both rows above are listed as Active, read 2026-10-02. That status is prose, not a record field: it is a qualitative availability fact, so the lint cannot guard it.
 
 ## 3. How it actually works
 
@@ -131,7 +131,7 @@ Evidence: **Documented** — [pricing: long context pricing](https://platform.cl
 
 - **Haiku 4.5 is a different API shape.** The overview lists its thinking mode as Extended (the manual `budget_tokens` mode) rather than Adaptive, and effort as "Not supported". Code written for the larger models' adaptive thinking and `effort` does not transfer unchanged ([models overview](https://platform.claude.com/docs/en/models/overview)).
 - **Max output is not the same on every API.** The table's output cap is the synchronous Messages API limit. On the Message Batches API some models accept a larger cap behind the `output-300k-2026-03-24` beta header; Haiku 4.5 is not in that list ([models overview](https://platform.claude.com/docs/en/models/overview)).
-- **Platform IDs differ from Claude API IDs.** Amazon Bedrock uses its own ID form, Google Cloud writes the dated Haiku snapshot with a different separator, and not every model is on every platform: on the verification date the overview listed no Claude Platform on AWS ID for Claude Opus 5. Copy platform IDs from the overview's per-platform rows, never by transforming a Claude API ID ([models overview](https://platform.claude.com/docs/en/models/overview)).
+- **Platform IDs differ from Claude API IDs.** Amazon Bedrock uses its own ID form, Google Cloud writes the dated Haiku snapshot with a different separator, and not every model is on every platform. Copy platform IDs from the overview's per-platform rows, or from the model's own page, never by transforming a Claude API ID ([models overview](https://platform.claude.com/docs/en/models/overview)).
 - **Partner clouds price separately.** Base prices here are Claude API rates. On Amazon Bedrock and Google Cloud the cloud provider sets and invoices the price ([pricing: cloud platform pricing](https://platform.claude.com/docs/en/about-claude/pricing)).
 - **"Current" is not "only".** Several earlier models are listed as legacy but still available (for example Claude Fable 5, Claude Opus 4.8, Claude Sonnet 4.6). The Models API returns them, so "take the first model in the list" is not the same as "use the recommended model". Limited-availability models (the Claude Mythos line) appear on the pricing page but not in the overview's comparison, and are omitted here.
 - **Prices can change without a new model.** The pricing page records that Claude Sonnet 5's launch pricing was introductory, and that a scheduled increase on 2026-09-01 was cancelled, making the launch price standard. A price you verified last month is not guaranteed this month.
@@ -140,7 +140,7 @@ Evidence: **Documented** — [pricing: long context pricing](https://platform.cl
 
 ## 6. Where this rots
 
-**Nearly all of this page rots**, and faster than any other page in the corpus. Every row of both tables is a high-volatility record; the page's derived review cadence is the shortest the ledger allows. Verified 2026-09-16; the lineup and both legacy rows re-read 2026-10-02. The page date is deliberately not moved: this pass corrected the lineup, it did not re-work the untracked claims below.
+**Nearly all of this page rots**, and faster than any other page in the corpus. Every row of both tables is a high-volatility record; the page's derived review cadence is the shortest the ledger allows. Verified 2026-09-16; the lineup, both legacy rows, section 3's vendor tier descriptions and section 4.1's recommendation were re-read 2026-10-02. The page date is deliberately not moved, because the rest of the untracked list below — the tokenizer note, Haiku 4.5's thinking and effort support, the batch output beta header, platform availability, the long-context pricing rule and the Sonnet 5 pricing note — was not re-worked.
 
 | Claim                                      | Record                       | Volatility | Why it moves                                                          |
 | ------------------------------------------ | ---------------------------- | ---------- | --------------------------------------------------------------------- |
@@ -154,13 +154,15 @@ Evidence: **Documented** — [pricing: long context pricing](https://platform.cl
 Re-check on refresh, against the [models overview](https://platform.claude.com/docs/en/models/overview) and [pricing page](https://platform.claude.com/docs/en/about-claude/pricing) — **those pages are the authority whenever they and this page disagree**:
 
 - which models the overview calls current (a new model means a new record and a new row, and a demoted one means moving it from the `claude-current` tag to `claude-legacy`, not deleting it — a legacy model is still served and readers may be pinned to it);
-- whether either legacy model has moved from Active to Deprecated or Retired on the [deprecations page](https://platform.claude.com/docs/en/about-claude/model-deprecations), and whether its retirement date moved;
+- whether either legacy row has moved from Active to Deprecated or Retired on the [deprecations page](https://platform.claude.com/docs/en/about-claude/model-deprecations), and whether its retirement date moved;
+- whether the vendor's legacy group has grown or shrunk. It holds more models than the two tracked here, so a new entry does not automatically earn a row — but a tracked row leaving Active does need one;
+- the legacy rows' `Active (legacy)` status, which is prose and not lint-guarded, so nothing fails if it drifts;
 - every field in every record;
 - the untracked claims in sections 3–5: the vendor's tier descriptions and recommendation, the tokenizer note, Haiku 4.5's thinking and effort support, the batch output beta header, platform availability, the long-context pricing rule, and the Sonnet 5 pricing note.
 
 What should not rot: the ID/alias/snapshot model, the window-vs-output distinction, reading limits from the Models API, and comparing cost per completed task.
 
-Deliberately absent: cache, batch, fast-mode, data-residency, and tool-use prices; platform-specific IDs; knowledge cutoffs; and the retirement dates of the four current models. Retirement is carried only for the two legacy rows, where it is the fact that decides whether to migrate. All the rest are on the linked pages and would multiply this page's rot surface.
+Deliberately absent: cache, batch, fast-mode, data-residency, and tool-use prices; platform-specific IDs; knowledge cutoffs; and the retirement dates of the four current models. Retirement is carried only for the two legacy rows, where it is the fact that decides whether to migrate. **Also absent: the rest of the vendor's legacy group.** Only the two models this page once listed as current are tracked, because those are the two a reader of an earlier version of this page may have pinned; the others have never appeared here and are reachable from the overview's legacy navigation. All the rest are on the linked pages and would multiply this page's rot surface.
 
 ## 7. Proofs
 
