@@ -250,6 +250,62 @@ export function ledgerCorpus(root, { write = false } = {}) {
   return ledger;
 }
 
+// The artifact's own `unit`/`unit_keys` must be EXACTLY the unit --page
+// resolves to, checked in both directions. Widening lets one unit stamp another
+// unit's records; narrowing is the quieter half and the more dangerous one,
+// because an operator who cannot reach a source can delete that record from
+// `unit_keys` and from `records` and the rest of the unit then stamps clean —
+// precisely the move refresh-blocked and refresh-verdict-incoherent exist to
+// stop, one deletion away in the one file the pipeline is designed to have
+// hand-edited. Freshness is all-or-nothing: a page's `verified` asserts its
+// WHOLE section 6 was worked, so a unit refreshes as a whole or not at all.
+function assertUnitScope(page, unit, data) {
+  const artifactPages = Array.isArray(data.unit) ? data.unit : [];
+  const artifactKeys = Array.isArray(data.unit_keys) ? data.unit_keys : [];
+  for (const rel of artifactPages)
+    if (!unit.pages.some((p) => p.path === rel))
+      throw new RefreshError(
+        "refresh-unit-widened",
+        `${rel} is not a page of this unit`,
+      );
+  for (const k of artifactKeys)
+    if (!unit.keys.includes(k))
+      throw new RefreshError(
+        "refresh-unit-widened",
+        `${k} is not referenced by the unit rooted at ${page}`,
+      );
+  // The page list is the same in both scopes. `--key` narrows which RECORDS are
+  // re-read, never which pages belong to the unit, and renderArtifactSkeleton
+  // emits the full list either way, so page containment is bidirectional
+  // regardless of key_scoped.
+  for (const p of unit.pages)
+    if (!artifactPages.includes(p.path))
+      throw new RefreshError(
+        "refresh-unit-narrowed",
+        `${p.path} is a page of the unit rooted at ${page} but is absent from the artifact's unit list; a unit refreshes as a whole`,
+      );
+  // The record-coverage obligation is stated here in full for BOTH scopes
+  // rather than inferred from `key_scoped` — a boolean the artifact supplies
+  // and a one-character edit can flip. A key-scoped artifact is the one shape
+  // allowed to carry fewer records than its unit, and its licence to do so is
+  // exactly one record, so that claim is checked against the resolved unit;
+  // every other artifact must cover the unit's records exhaustively.
+  if (data.key_scoped === true) {
+    if (artifactKeys.length !== 1)
+      throw new RefreshError(
+        "refresh-key-scope-widened",
+        `a key_scoped artifact must carry exactly one of the unit's ${unit.keys.length} records, got ${artifactKeys.length}; --key narrows a unit to one record, so this artifact was widened by hand after --skeleton`,
+      );
+    return;
+  }
+  for (const k of unit.keys)
+    if (!artifactKeys.includes(k))
+      throw new RefreshError(
+        "refresh-unit-narrowed",
+        `${k} is referenced by the unit rooted at ${page} but is absent from the artifact's unit_keys; an unreachable record forces verdict: blocked, it is not dropped`,
+      );
+}
+
 // Returns its output rather than printing it, so the whole command is testable
 // without spawning a process. main() does the printing and the exiting.
 //
@@ -340,19 +396,8 @@ export function refreshCorpus(
         "refresh-artifact-path-mismatch",
         `--artifact=${artifactRel} but the artifact's own path field says ${JSON.stringify(data?.path)}`,
       );
+    assertUnitScope(page, unit, data);
     if (mode === "stamp") {
-      for (const k of data.unit_keys ?? [])
-        if (!unit.keys.includes(k))
-          throw new RefreshError(
-            "refresh-unit-widened",
-            `${k} is not referenced by the unit rooted at ${page}`,
-          );
-      for (const rel of data.unit ?? [])
-        if (!unit.pages.some((p) => p.path === rel))
-          throw new RefreshError(
-            "refresh-unit-widened",
-            `${rel} is not a page of this unit`,
-          );
       const { receipt, written } = stampUnit(root, data, { today });
       for (const w of written) out.push(`refresh: stamped ${w}`);
       out.push(`refresh: receipt at ${receipt.at}`);

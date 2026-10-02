@@ -18,6 +18,67 @@ function sandbox() {
   return dir;
 }
 
+// The CLI collapses a RefreshError into `${page} [${rule}] ${message}`, so an
+// exact rule comparison means parsing the bracketed token back out. A loose
+// assert.match(err, /refresh-unit-widened/) would also pass on a message that
+// merely mentions the rule, and on any longer rule name containing it — two of
+// the defects on this branch were tests that could not fail for exactly that
+// reason.
+function ruleOf(r) {
+  assert.equal(
+    r.err.length,
+    1,
+    `expected exactly one error line, got ${JSON.stringify(r.err)}`,
+  );
+  const m = /^(\S+) \[([^\]]+)\] /.exec(r.err[0]);
+  assert.notEqual(
+    m,
+    null,
+    `error line is not in "<path> [<rule>] <message>" form: ${r.err[0]}`,
+  );
+  return m[2];
+}
+
+// Snapshot everything a stamp or a revert could possibly write, so "nothing was
+// written" is an assertion over the whole fixture rather than over one file.
+const TOUCHABLE = [
+  "guides/alpha/one.md",
+  "guides/alpha/two.md",
+  "guides/beta/three.md",
+  "guides/beta/gone.md",
+  "guides/gamma/lonely.md",
+  "data/units.yaml",
+];
+const snapshot = (root) =>
+  Object.fromEntries(
+    TOUCHABLE.map((rel) => [
+      rel,
+      fs.readFileSync(path.join(root, rel), "utf8"),
+    ]),
+  );
+
+// Rewrites an artifact's front-matter the way the refresh prompt would: `patch`
+// receives the parsed front-matter and returns the filled replacement.
+function rewriteArtifact(root, rel, patch) {
+  const { data, body } = parseArtifact(
+    fs.readFileSync(path.join(root, rel), "utf8"),
+  );
+  const next = patch(data);
+  fs.writeFileSync(
+    path.join(root, rel),
+    `---\n${JSON.stringify(next, null, 2)}\n---\n${body}`,
+  );
+  return next;
+}
+
+const confirmEvery = (records) =>
+  records.map((r) => ({
+    ...r,
+    verdict: "confirmed",
+    url: "https://example.invalid/one",
+    stated: "unchanged",
+  }));
+
 test("the default mode prints the work order and exits 0 for a clean unit", () => {
   const root = sandbox();
   const r = refreshCorpus(root, ["--page=guides/alpha/one.md"], {
@@ -424,4 +485,141 @@ test("a unit cannot be widened by claiming another unit's page at stamp time", (
     fs.readFileSync(path.join(root, "guides/alpha/one.md"), "utf8"),
     before,
   );
+});
+
+// Review 2 / F1. The widening guard above was one-directional, so NARROWING
+// was unguarded: an operator who could not reach a source could delete that
+// record from unit_keys AND from records and the rest of the unit stamped
+// clean. validateArtifact's coverage rule is satisfied vacuously by the same
+// deletion, which is why this has to be asserted at the refreshCorpus entry
+// point — the artifact is self-consistent and only the resolved unit disagrees.
+test("a unit cannot be narrowed by deleting an unreachable record from the artifact", () => {
+  const root = sandbox();
+  const skeletonRun = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--skeleton"],
+    { today: "2026-09-28" },
+  );
+  assert.equal(skeletonRun.code, 0);
+  const rel = "research/alpha/2026-09-28-gone-plus-3-refresh.md";
+  const dropped = "fix.tail.three";
+  rewriteArtifact(root, rel, (data) => {
+    assert.equal(data.unit_keys.includes(dropped), true);
+    return {
+      ...data,
+      verdict: "changed",
+      unit_keys: data.unit_keys.filter((k) => k !== dropped),
+      records: confirmEvery(data.records.filter((r) => r.key !== dropped)),
+    };
+  });
+  const before = snapshot(root);
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--stamp", `--artifact=${rel}`],
+    { today: "2026-09-28" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-unit-narrowed");
+  assert.match(r.err[0], new RegExp(dropped.replace(/\./g, "\\.")));
+  assert.deepEqual(snapshot(root), before);
+});
+
+// Review 2 / F1b, the sharper exploit on the same root cause: no deletion at
+// all, just a one-character flip of key_scoped on a --key skeleton. The old
+// refresh-key-scope-widened check only fired when key_scoped === true, so
+// flipping it to false skipped that check, and 1 key is a subset of 3 so the
+// one-directional widening guard passed too.
+test("a key-scoped artifact cannot escape the coverage rule by flipping key_scoped to false", () => {
+  const root = sandbox();
+  const skeletonRun = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--skeleton", "--key=fix.tail.three"],
+    { today: "2026-09-28" },
+  );
+  assert.equal(skeletonRun.code, 0);
+  const rel = "research/alpha/2026-09-28-gone-plus-3-refresh.md";
+  rewriteArtifact(root, rel, (data) => {
+    assert.equal(data.key_scoped, true);
+    assert.deepEqual(data.unit_keys, ["fix.tail.three"]);
+    return {
+      ...data,
+      verdict: "confirmed",
+      key_scoped: false,
+      records: confirmEvery(data.records),
+    };
+  });
+  const before = snapshot(root);
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--stamp", `--artifact=${rel}`],
+    { today: "2026-09-28" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-unit-narrowed");
+  assert.deepEqual(snapshot(root), before);
+});
+
+// Review 2 / F1c, the page half. Dropping a page from `unit:` while keeping
+// every key leaves that page honestly stale while its shared records are dated
+// ahead of it, and the receipt never lists it, so --revert cannot see it either.
+test("a unit cannot be narrowed by deleting a page from the artifact's unit list", () => {
+  const root = sandbox();
+  const skeletonRun = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--skeleton"],
+    { today: "2026-09-28" },
+  );
+  assert.equal(skeletonRun.code, 0);
+  const rel = "research/alpha/2026-09-28-gone-plus-3-refresh.md";
+  rewriteArtifact(root, rel, (data) => {
+    assert.equal(data.unit.includes("guides/beta/three.md"), true);
+    return {
+      ...data,
+      verdict: "confirmed",
+      unit: data.unit.filter((p) => p !== "guides/beta/three.md"),
+      records: confirmEvery(data.records),
+    };
+  });
+  const before = snapshot(root);
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--stamp", `--artifact=${rel}`],
+    { today: "2026-09-28" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-unit-narrowed");
+  assert.match(r.err[0], /guides\/beta\/three\.md/);
+  assert.deepEqual(snapshot(root), before);
+});
+
+// The key-scope claim is checked against the RESOLVED unit, not taken on the
+// artifact's word: claiming key_scoped on a full-unit artifact would otherwise
+// buy an exemption from the narrowing rule for free.
+test("claiming key_scoped on a full-unit artifact is refused against the resolved unit", () => {
+  const root = sandbox();
+  const skeletonRun = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--skeleton"],
+    { today: "2026-09-28" },
+  );
+  assert.equal(skeletonRun.code, 0);
+  const rel = "research/alpha/2026-09-28-gone-plus-3-refresh.md";
+  rewriteArtifact(root, rel, (data) => {
+    assert.equal(data.unit_keys.length > 1, true);
+    return {
+      ...data,
+      verdict: "confirmed",
+      key_scoped: true,
+      records: confirmEvery(data.records),
+    };
+  });
+  const before = snapshot(root);
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--stamp", `--artifact=${rel}`],
+    { today: "2026-09-28" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-key-scope-widened");
+  assert.deepEqual(snapshot(root), before);
 });
