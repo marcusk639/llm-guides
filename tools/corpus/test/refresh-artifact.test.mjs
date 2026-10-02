@@ -194,6 +194,91 @@ test("a confirmed record must cite the url it was read from", () => {
   );
 });
 
+// Review 2 / F2 and F6b. `startsWith("data/")` is a string prefix test, so
+// `data/../../x.yaml` passed it and nodePath.join then resolved it above the
+// corpus root; stampUnit read that file, bumped it and wrote it back. F6b also
+// records that the whole shape check had NO test at all, which is why the
+// traversal shipped unnoticed, so every arm is pinned here.
+test("a records[].file that escapes data/ is refused by containment, not by prefix", () => {
+  const withFile = (file) => {
+    const data = confirmed();
+    data.records[0] = { ...data.records[0], file };
+    return validateArtifact(data).map((i) => i.rule);
+  };
+  // The probed traversal: out of data/ but still inside the corpus.
+  assert.equal(
+    withFile("data/../outside/evil.yaml").includes(
+      "refresh-record-file-escapes-data",
+    ),
+    true,
+  );
+  // The probed escape: two levels up, out of the corpus root entirely.
+  assert.equal(
+    withFile("data/../../ESCAPED.yaml").includes(
+      "refresh-record-file-escapes-data",
+    ),
+    true,
+  );
+  // An absolute path resolves nowhere near data/ either.
+  assert.equal(
+    withFile("/etc/evil.yaml").includes("refresh-record-file-escapes-data"),
+    true,
+  );
+  // A sibling of data/ whose name merely starts with the same characters:
+  // "dataset/" is what a bare prefix test on "data" would have let through.
+  assert.equal(
+    withFile("dataset/evil.yaml").includes("refresh-record-file-escapes-data"),
+    true,
+  );
+  // Not a .yaml file: the loader only ever reads .yaml, so nothing else is a
+  // record's home.
+  assert.equal(
+    withFile("data/units.yml").includes("refresh-record-file-escapes-data"),
+    true,
+  );
+  // A nested data file is legitimate and must still pass.
+  assert.deepEqual(withFile("data/nested/units.yaml"), []);
+  assert.deepEqual(withFile("data/units.yaml"), []);
+});
+
+test("a records[].file that is not a string is a missing-field issue, not an escape", () => {
+  const withFile = (file) => {
+    const data = confirmed();
+    data.records[0] = { ...data.records[0], file };
+    return validateArtifact(data).map((i) => i.rule);
+  };
+  for (const bad of [undefined, null, 42, ["data/units.yaml"], ""])
+    assert.equal(
+      withFile(bad).includes("refresh-artifact-field"),
+      true,
+      `expected refresh-artifact-field for file ${JSON.stringify(bad)}`,
+    );
+});
+
+// Review 2 / F6a. The per-record verdict check is load-bearing and had no test:
+// the all-or-nothing coherence rule keys off the exact string "unreachable", so
+// an accepted typo'd verdict leaves refresh-verdict-incoherent silent and the
+// unit stamps confirmed over a record that was never read.
+test("an unknown, miscased or absent record verdict is refused by name", () => {
+  const withVerdict = (verdict) => {
+    const data = confirmed();
+    data.records[0] = { ...data.records[0], verdict };
+    return validateArtifact(data).map((i) => i.rule);
+  };
+  for (const bad of ["unreachabl", "Unreachable", "not-reached", undefined])
+    assert.equal(
+      withVerdict(bad).includes("refresh-artifact-verdict"),
+      true,
+      `expected refresh-artifact-verdict for ${JSON.stringify(bad)}`,
+    );
+  // And the near-miss does NOT satisfy the coherence rule, which is the whole
+  // reason the vocabulary check has to hold.
+  assert.equal(
+    withVerdict("unreachabl").includes("refresh-verdict-incoherent"),
+    false,
+  );
+});
+
 const RECEIPT = {
   at: "2026-09-28",
   pages: [

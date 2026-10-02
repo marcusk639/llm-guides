@@ -8,9 +8,36 @@
 // and carries no comments, so dumpArtifact is safe on it; data/*.yaml and
 // guides/**.md get single-line surgical edits instead.
 import yaml from "js-yaml";
+import nodePath from "node:path";
 import { parseFrontmatter } from "./frontmatter.mjs";
 import { isValidIsoDate } from "./ledger.mjs";
 import { RefreshError } from "./refresh-units.mjs";
+
+// CONTAINMENT, not a string prefix. `data/../../x.yaml` begins with "data/" and
+// so passed the old `startsWith("data/")` test, while nodePath.join resolved it
+// above the corpus root — and stampUnit then read that file, ran
+// setRecordVerified on it and wrote it back. refresh-units.mjs documents this
+// exact hazard for the artifact path and hardened artifactPathFor against it;
+// records[].file is the OTHER operator-supplied path a refresh writes to.
+//
+// The test is purely a property of the relative path, so it needs no root: a
+// synthetic base makes "does this still land under <base>/data/" decidable
+// without touching the filesystem, and the same answer holds for every root.
+// Used by validateArtifact AND independently by revertUnit, which must not
+// depend on stamp-time validation having run.
+const CONTAINMENT_BASE = nodePath.resolve(nodePath.sep, "corpus");
+
+export function dataFileRel(rel) {
+  if (typeof rel !== "string" || rel === "") return null;
+  if (!rel.endsWith(".yaml")) return null;
+  const dataDir = nodePath.join(CONTAINMENT_BASE, "data");
+  const abs = nodePath.resolve(CONTAINMENT_BASE, rel);
+  if (!abs.startsWith(dataDir + nodePath.sep)) return null;
+  return nodePath
+    .relative(CONTAINMENT_BASE, abs)
+    .split(nodePath.sep)
+    .join("/");
+}
 
 // Two axes, not one: a record is corrected or could not be read; a unit shipped
 // or did not.
@@ -173,10 +200,15 @@ export function validateArtifact(data) {
         rule: "refresh-artifact-field",
         message: `record ${key}: url is required unless the verdict is unreachable`,
       });
-    if (typeof e?.file !== "string" || !e.file.startsWith("data/"))
+    if (typeof e?.file !== "string" || e.file === "")
       issues.push({
         rule: "refresh-artifact-field",
         message: `record ${key}: file must name the data/ file the record lives in`,
+      });
+    else if (dataFileRel(e.file) === null)
+      issues.push({
+        rule: "refresh-record-file-escapes-data",
+        message: `record ${key}: file ${JSON.stringify(e.file)} does not resolve to a .yaml file inside data/; a refresh writes only records in the corpus's own data directory`,
       });
   }
   if (

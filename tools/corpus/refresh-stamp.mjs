@@ -8,7 +8,26 @@ import { RefreshError } from "./refresh-units.mjs";
 import fs from "node:fs";
 import nodePath from "node:path";
 import { parseFrontmatter } from "./frontmatter.mjs";
-import { validateArtifact, withReceipt, withRevertMark } from "./refresh-artifact.mjs";
+import {
+  dataFileRel,
+  validateArtifact,
+  withReceipt,
+  withRevertMark,
+} from "./refresh-artifact.mjs";
+
+// Every path interpolated into a read-modify-write goes through here, on both
+// the stamp and the revert side. revertUnit must not inherit its safety from
+// stampUnit's validation pass: the receipt it works from is ordinary YAML in
+// the one file the pipeline is designed to have hand-edited.
+function assertDataFile(key, file) {
+  const rel = dataFileRel(file);
+  if (rel === null)
+    throw new RefreshError(
+      "refresh-record-file-escapes-data",
+      `record ${key}: file ${JSON.stringify(file)} does not resolve to a .yaml file inside data/; a refresh writes only records in the corpus's own data directory`,
+    );
+  return rel;
+}
 
 // Three capture groups so the body can be rebuilt byte-exactly: the opening
 // fence, the body without its trailing newline, and the closing fence. Mirrors
@@ -213,8 +232,9 @@ export function stampUnit(
     // The record's date is the date THIS entry was read, not today: two sources
     // in one unit can legitimately be read on different days, and using the
     // entry's own date also makes the idempotence proof time-independent.
+    const file = assertDataFile(entry.key, entry.file);
     const { text, previous } = setRecordVerified(
-      readPending(entry.file),
+      readPending(file),
       entry.key,
       entry.read,
     );
@@ -225,12 +245,12 @@ export function stampUnit(
     if (previous === entry.read)
       throw new RefreshError(
         "refresh-record-already-dated",
-        `${entry.key} in ${entry.file} already reads verified ${entry.read}; a previous stamp left no receipt — restore from git before retrying`,
+        `${entry.key} in ${file} already reads verified ${entry.read}; a previous stamp left no receipt — restore from git before retrying`,
       );
-    pending.set(entry.file, text);
+    pending.set(file, text);
     recordReceipts.push({
       key: entry.key,
-      file: entry.file,
+      file,
       previous_verified: previous,
       new_verified: entry.read,
     });
@@ -308,8 +328,9 @@ export function revertUnit(
       : fs.readFileSync(nodePath.join(root, rel), "utf8");
 
   for (const r of receipt.records ?? []) {
+    const file = assertDataFile(r.key, r.file);
     const probe = setRecordVerified(
-      readPending(r.file),
+      readPending(file),
       r.key,
       r.previous_verified,
     );
@@ -319,9 +340,9 @@ export function revertUnit(
     if (probe.previous !== r.new_verified)
       throw new RefreshError(
         "refresh-revert-drift",
-        `record ${r.key} in ${r.file} now reads verified ${probe.previous}, not the ${r.new_verified} this receipt wrote; another unit has already changed it`,
+        `record ${r.key} in ${file} now reads verified ${probe.previous}, not the ${r.new_verified} this receipt wrote; another unit has already changed it`,
       );
-    pending.set(r.file, probe.text);
+    pending.set(file, probe.text);
   }
 
   for (const p of receipt.pages ?? []) {

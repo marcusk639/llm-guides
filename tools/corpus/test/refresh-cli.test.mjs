@@ -592,6 +592,55 @@ test("a unit cannot be narrowed by deleting a page from the artifact's unit list
   assert.deepEqual(snapshot(root), before);
 });
 
+// Review 2 / F2, the probed T2 escape, end to end. The decoy sits two levels
+// above the corpus root and already holds the `- key:`/`verified:` pair the
+// surgical edit needs, so the only thing standing between the artifact and an
+// out-of-root write is the containment check.
+test("a records[].file pointing above the corpus root writes nothing and names the escape", () => {
+  const root = sandbox();
+  const outside = path.join(root, "..", "..", "ESCAPED.yaml");
+  const decoy = [
+    "records:",
+    "  - key: fix.shared.one",
+    '    value: "shared-one"',
+    "    volatility: high",
+    "    source: https://example.invalid/one",
+    '    verified: "1999-01-01"',
+    "",
+  ].join("\n");
+  fs.writeFileSync(outside, decoy);
+  try {
+    const skeletonRun = refreshCorpus(
+      root,
+      ["--page=guides/alpha/one.md", "--skeleton"],
+      { today: "2026-09-28" },
+    );
+    assert.equal(skeletonRun.code, 0);
+    const rel = "research/alpha/2026-09-28-gone-plus-3-refresh.md";
+    rewriteArtifact(root, rel, (data) => ({
+      ...data,
+      verdict: "confirmed",
+      records: confirmEvery(data.records).map((r) =>
+        r.key === "fix.shared.one"
+          ? { ...r, file: "data/../../ESCAPED.yaml" }
+          : r,
+      ),
+    }));
+    const before = snapshot(root);
+    const r = refreshCorpus(
+      root,
+      ["--page=guides/alpha/one.md", "--stamp", `--artifact=${rel}`],
+      { today: "2026-09-28" },
+    );
+    assert.equal(r.code, 1);
+    assert.equal(ruleOf(r), "refresh-record-file-escapes-data");
+    assert.equal(fs.readFileSync(outside, "utf8"), decoy);
+    assert.deepEqual(snapshot(root), before);
+  } finally {
+    fs.rmSync(outside, { force: true });
+  }
+});
+
 // The key-scope claim is checked against the RESOLVED unit, not taken on the
 // artifact's word: claiming key_scoped on a full-unit artifact would otherwise
 // buy an exemption from the narrowing rule for free.
