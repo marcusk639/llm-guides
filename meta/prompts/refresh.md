@@ -56,7 +56,19 @@ artifact carrying more than one key is refused at stamp time with
 
 2. For each record in the unit, fetch its `source` once (and `price_source`
    where the record has one) and compare the live figure to `value` and
-   `display`. Fill that record's entry:
+   `display`.
+
+   **Do not name the figure you expect in the fetch prompt, and do not accept a
+   summarised page as a reading.** Ask for the field, not for confirmation of a
+   value: "quote the input price row verbatim", never "confirm the input price is
+   $0.75". A summarising fetch primed with the expected number has been observed
+   returning it as a quoted, verbatim-looking row that does not exist in the
+   page's bytes — which is the most likely way a derived figure entered this
+   corpus in the first place. Where a figure decides a verdict, fetch the raw
+   payload and search it, and treat a tooltip or footnote as content: an
+   HTML-to-text pass drops both, which can make a live pricing note look deleted.
+
+   Fill that record's entry:
    - `verdict: confirmed` — the source states the same figure.
    - `verdict: corrected` — the source states a different figure. Correct the
      record in `data/` and adjust the prose around it, then re-render.
