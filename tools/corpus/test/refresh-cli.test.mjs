@@ -592,6 +592,302 @@ test("a unit cannot be narrowed by deleting a page from the artifact's unit list
   assert.deepEqual(snapshot(root), before);
 });
 
+// Review 2 / F3. --revert used to validate nothing: it never called
+// validateArtifact, applied no date check and carried no unit guard, on the
+// premise that it works only from a machine-written receipt. A `stamped:`
+// mapping is ordinary YAML in the one file the pipeline is designed to have
+// hand-edited, so that premise is the thing that fails. All four probes drive
+// the real refreshCorpus entry point.
+function skeletonFor(root, page, rel) {
+  const r = refreshCorpus(root, [`--page=${page}`, "--skeleton"], {
+    today: "2026-09-28",
+  });
+  assert.equal(r.code, 0);
+  assert.equal(fs.existsSync(path.join(root, rel)), true);
+  return rel;
+}
+
+// V1: a receipt on a never-stamped artifact, naming a page and a record of a
+// DIFFERENT unit. The drift check cannot see this — a fabricated receipt simply
+// sets new_verified to whatever is already on disk, which is what this does.
+test("--revert refuses a receipt naming a page outside the unit", () => {
+  const root = sandbox();
+  const rel = skeletonFor(
+    root,
+    "guides/alpha/one.md",
+    "research/alpha/2026-09-28-gone-plus-3-refresh.md",
+  );
+  rewriteArtifact(root, rel, (data) => ({
+    ...data,
+    verdict: "confirmed",
+    records: confirmEvery(data.records),
+    stamped: {
+      at: "2026-09-28",
+      pages: [
+        {
+          path: "guides/gamma/lonely.md",
+          previous_verified: "1999-01-01",
+          research_added: false,
+          previous_research: null,
+        },
+      ],
+      records: [],
+    },
+  }));
+  const before = snapshot(root);
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--revert", `--artifact=${rel}`],
+    { today: "2026-09-29" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-unit-widened");
+  assert.deepEqual(snapshot(root), before);
+});
+
+test("--revert refuses a receipt naming a record outside the unit", () => {
+  const root = sandbox();
+  const rel = skeletonFor(
+    root,
+    "guides/alpha/one.md",
+    "research/alpha/2026-09-28-gone-plus-3-refresh.md",
+  );
+  rewriteArtifact(root, rel, (data) => ({
+    ...data,
+    verdict: "confirmed",
+    records: confirmEvery(data.records),
+    stamped: {
+      at: "2026-09-28",
+      pages: [],
+      records: [
+        {
+          key: "fix.alone.four",
+          file: "data/units.yaml",
+          previous_verified: "1999-01-01",
+          new_verified: "2026-09-16",
+        },
+      ],
+    },
+  }));
+  const before = snapshot(root);
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--revert", `--artifact=${rel}`],
+    { today: "2026-09-29" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-unit-widened");
+  assert.deepEqual(snapshot(root), before);
+});
+
+// V2: an artifact whose whole front-matter is path, fetched and stamped. The
+// scope guard reaches it first — it has no `unit` at all — which is the right
+// refusal, so this pins which rule claims the case.
+test("--revert refuses a structurally empty artifact carrying a receipt", () => {
+  const root = sandbox();
+  const rel = skeletonFor(
+    root,
+    "guides/alpha/one.md",
+    "research/alpha/2026-09-28-gone-plus-3-refresh.md",
+  );
+  rewriteArtifact(root, rel, (data) => ({
+    path: data.path,
+    fetched: data.fetched,
+    stamped: {
+      at: "2026-09-28",
+      pages: [
+        {
+          path: "guides/alpha/one.md",
+          previous_verified: "2026-09-16",
+          research_added: false,
+          previous_research: null,
+        },
+      ],
+      records: [],
+    },
+  }));
+  const before = snapshot(root);
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--revert", `--artifact=${rel}`],
+    { today: "2026-09-29" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-unit-narrowed");
+  assert.deepEqual(snapshot(root), before);
+});
+
+// The same point, where only validateArtifact can make it: `unit` and
+// `unit_keys` are intact, so the scope guard passes and the refusal has to come
+// from revertUnit's own validation pass — which this path did not have.
+test("--revert runs validateArtifact: a scope-clean artifact with no kind is refused", () => {
+  const root = sandbox();
+  const rel = skeletonFor(
+    root,
+    "guides/alpha/one.md",
+    "research/alpha/2026-09-28-gone-plus-3-refresh.md",
+  );
+  rewriteArtifact(root, rel, (data) => {
+    const { kind, ...rest } = data;
+    assert.equal(kind, "refresh");
+    return {
+      ...rest,
+      verdict: "confirmed",
+      records: confirmEvery(data.records),
+      stamped: {
+        at: "2026-09-28",
+        pages: [
+          {
+            path: "guides/alpha/one.md",
+            previous_verified: "2026-09-16",
+            research_added: false,
+            previous_research: null,
+          },
+        ],
+        records: [],
+      },
+    };
+  });
+  const before = snapshot(root);
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--revert", `--artifact=${rel}`],
+    { today: "2026-09-29" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-artifact-kind");
+  assert.deepEqual(snapshot(root), before);
+});
+
+// V2, second half: the receipt's own dates were never checked either, so a
+// non-date was written straight into a page's front-matter.
+test("--revert refuses a receipt whose previous_verified is not a date", () => {
+  const root = sandbox();
+  const rel = skeletonFor(
+    root,
+    "guides/alpha/one.md",
+    "research/alpha/2026-09-28-gone-plus-3-refresh.md",
+  );
+  rewriteArtifact(root, rel, (data) => ({
+    ...data,
+    verdict: "confirmed",
+    records: confirmEvery(data.records),
+    stamped: {
+      at: "2026-09-28",
+      pages: [
+        {
+          path: "guides/alpha/one.md",
+          previous_verified: "NOT-A-DATE",
+          research_added: false,
+          previous_research: null,
+        },
+      ],
+      records: [],
+    },
+  }));
+  const before = snapshot(root);
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--revert", `--artifact=${rel}`],
+    { today: "2026-09-29" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-receipt-shape");
+  assert.deepEqual(snapshot(root), before);
+});
+
+// D1, the one that mattered most: 2099-12-31 is a real calendar date, so
+// frontmatter-date passes, expires = verified + cadence puts the page 73 years
+// past the `expired` rule, and lint reports CLEAN. Unlike every other defect
+// on this branch, nothing downstream reports it.
+test("--revert refuses a receipt date after today, page side and record side", () => {
+  for (const which of ["page", "record"]) {
+    const root = sandbox();
+    const rel = skeletonFor(
+      root,
+      "guides/alpha/one.md",
+      "research/alpha/2026-09-28-gone-plus-3-refresh.md",
+    );
+    rewriteArtifact(root, rel, (data) => ({
+      ...data,
+      verdict: "confirmed",
+      records: confirmEvery(data.records),
+      stamped: {
+        at: "2026-09-28",
+        pages:
+          which === "page"
+            ? [
+                {
+                  path: "guides/alpha/one.md",
+                  previous_verified: "2099-12-31",
+                  research_added: false,
+                  previous_research: null,
+                },
+              ]
+            : [],
+        records:
+          which === "record"
+            ? [
+                {
+                  key: "fix.shared.one",
+                  file: "data/units.yaml",
+                  previous_verified: "2099-12-31",
+                  new_verified: "2026-09-16",
+                },
+              ]
+            : [],
+      },
+    }));
+    const before = snapshot(root);
+    const r = refreshCorpus(
+      root,
+      ["--page=guides/alpha/one.md", "--revert", `--artifact=${rel}`],
+      { today: "2026-09-29" },
+    );
+    assert.equal(r.code, 1, `${which}: expected exit 1`);
+    assert.equal(ruleOf(r), "refresh-date-in-future");
+    assert.deepEqual(snapshot(root), before);
+  }
+});
+
+// The containment check is independent on the revert side, not inherited from
+// stamp-time validation: validateArtifact checks `records[].file`, but the
+// receipt's `records[].file` is a separate list it never looks at.
+test("--revert refuses a receipt record file that escapes data/", () => {
+  const root = sandbox();
+  const rel = skeletonFor(
+    root,
+    "guides/alpha/one.md",
+    "research/alpha/2026-09-28-gone-plus-3-refresh.md",
+  );
+  rewriteArtifact(root, rel, (data) => ({
+    ...data,
+    verdict: "confirmed",
+    records: confirmEvery(data.records),
+    stamped: {
+      at: "2026-09-28",
+      pages: [],
+      records: [
+        {
+          key: "fix.shared.one",
+          file: "data/../../ESCAPED.yaml",
+          previous_verified: "2026-09-16",
+          new_verified: "2026-09-28",
+        },
+      ],
+    },
+  }));
+  const before = snapshot(root);
+  const r = refreshCorpus(
+    root,
+    ["--page=guides/alpha/one.md", "--revert", `--artifact=${rel}`],
+    { today: "2026-09-29" },
+  );
+  assert.equal(r.code, 1);
+  assert.equal(ruleOf(r), "refresh-record-file-escapes-data");
+  assert.deepEqual(snapshot(root), before);
+});
+
 // Review 2 / F2, the probed T2 escape, end to end. The decoy sits two levels
 // above the corpus root and already holds the `- key:`/`verified:` pair the
 // surgical edit needs, so the only thing standing between the artifact and an

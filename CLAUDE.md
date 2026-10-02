@@ -414,16 +414,17 @@ Every rule name the tools emit, and what to do.
 | `refresh-artifact-path-mismatch`  | refresh | `--artifact` disagrees with the artifact's own `path` field.                                           | Pass the path the artifact names. |
 | `refresh-blocked`                 | refresh | `--stamp` on a `blocked` artifact. Nothing was written.                                               | Resolve the unreachable sources, or deprecate the page. |
 | `refresh-already-stamped`         | refresh | `--stamp` on an artifact that already carries a `stamped:` receipt.                                    | `--revert` first. |
-| `refresh-date-in-future`          | refresh | `artifact.fetched`, or a record entry's `read`, is a date after today.                                 | Fix the date; a future date would push `expires` out and let the page silently escape staleness detection. |
+| `refresh-date-in-future`          | refresh | `artifact.fetched`, a record entry's `read`, or — on `--revert` — any `previous_verified`/`new_verified` in the receipt, is a date after today. | Fix the date; a future date would push `expires` out and let the page silently escape staleness detection, and `lint` would report clean because a far-future date is still a real calendar date. |
 | `refresh-record-already-dated`   | refresh | A record's pending text already reads the stamp's target `verified` date before this run wrote it — a prior stamp attempt wrote the record but crashed before leaving a `stamped:` receipt. | Restore the record from git before retrying; stamping again would read the half-written date as "previous" and make it unrecoverable. |
 | `refresh-page-already-dated`      | refresh | Same hazard, page side: a page's pending text already reads the stamp's target `verified` date before this run wrote it. | Restore the page from git before retrying, for the same reason. |
 | `refresh-research-unresolved`     | refresh | The artifact's own `path` does not exist on disk. `checkResearchRequired` only checks the string is non-empty, so this is the only guard. | Write the artifact before stamping. |
 | `refresh-artifact-frontmatter`    | refresh | `--stamp` or `--revert` on an artifact with no `---` front-matter to carry or move the receipt.        | Regenerate the artifact with `--skeleton`. |
 | `refresh-record-out-of-unit`      | refresh | A record entry names a key outside `unit_keys`.                                                        | Do not widen a unit's footprint into another unit's records. |
 | `refresh-key-scope-widened`       | refresh | A `key_scoped: true` artifact carries more than one key in `unit_keys`.                                | `--key` narrows to exactly one record; the artifact was widened by hand after `--skeleton`. Regenerate it. |
-| `refresh-unit-widened`            | refresh | `--stamp` resolved the page's real unit and found the artifact's own `unit_keys` or `unit` names a record key or page the real unit does not contain — the artifact was widened by hand to claim another unit's record. | Do not add a key or page the entry page's real unit does not reference; regenerate the artifact with `--skeleton` instead. |
+| `refresh-unit-widened`            | refresh | `--stamp` or `--revert` resolved the page's real unit and found the artifact's own `unit_keys` or `unit` — or, on `--revert`, the receipt's own `pages`/`records` — naming a record key or page the real unit does not contain. | Do not add a key or page the entry page's real unit does not reference; regenerate the artifact with `--skeleton` instead. This is why `--page` is required on `--revert`. |
 | `refresh-unit-narrowed`           | refresh | `--stamp` or `--revert` resolved the page's real unit and found the artifact's `unit_keys` or `unit` MISSING a record key or page the real unit does contain — the narrowing half of `refresh-unit-widened`. Deleting an unreachable record from `unit_keys` and from `records` satisfies `refresh-artifact-coverage` vacuously, so this is the only check that sees it. A `key_scoped: true` artifact is exempt on `unit_keys` only, and must then carry exactly one key (`refresh-key-scope-widened`). | Do not drop a record or page from the artifact: freshness is all-or-nothing, so an unreachable record forces `verdict: blocked`. Regenerate the artifact with `--skeleton`. |
 | `refresh-no-receipt`              | refresh | `--revert` on an artifact with no `stamped:` receipt.                                                  | There is nothing to revert. |
+| `refresh-receipt-shape`           | refresh | A `stamped:` receipt `--revert` is working from is not a mapping, its `pages`/`records` are not lists, an entry has no `path`/`key`, or a `previous_verified`/`new_verified` is not a real date written `YYYY-MM-DD`. Nothing distinguishes a machine-written receipt from a hand-written one, so the receipt is validated rather than trusted. | Do not hand-write a receipt. `--revert` only undoes what `--stamp` wrote; restore the tree from version control instead. |
 | `refresh-revert-drift`            | refresh | A page or record no longer carries the date the receipt wrote.                                         | Another unit has landed on the same file; resolve by hand rather than clobbering it. |
 | `refresh-review-diff-failed`      | refresh | `git diff <baseRef> -- guides data` failed.                                                            | Check the base ref exists on the branch. |
 
@@ -674,7 +675,14 @@ a run escape a blocked outcome.
 **A block must be harmless to merge.** When the verify agent blocks,
 `refresh --revert` restores every page and record date to its prior value and
 removes any `research:` the refresh added, from the artifact's `stamped:` receipt
-alone — no git needed. The artifact stays on disk, marked `verdict: blocked` with
+alone — no git needed. **The receipt is validated, not trusted.** Nothing
+distinguishes a `stamped:` mapping stampUnit wrote from one typed by hand, and
+the artifact is the one file this pipeline is designed to have hand-edited, so
+`--revert` applies the same gates `--stamp` does: `validateArtifact` on the
+carrying artifact, `refresh-receipt-shape` on the receipt's own entries,
+`refresh-record-file-escapes-data` on every `file` it names,
+`refresh-date-in-future` on every date it would write, and the unit guard
+(`refresh-unit-widened`) against the unit `--page` resolves to. The artifact stays on disk, marked `verdict: blocked` with
 the receipt moved to `reverted:`, because what was checked and what was found is
 exactly what the next attempt needs. The pull request then opens as a **draft**,
 labelled, findings in the body: never silently skipped, never auto-merged.

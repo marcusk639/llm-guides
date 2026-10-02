@@ -402,6 +402,23 @@ export function refreshCorpus(
       for (const w of written) out.push(`refresh: stamped ${w}`);
       out.push(`refresh: receipt at ${receipt.at}`);
     } else {
+      // --page is required on --revert and used to be discarded on this path,
+      // so a receipt could name a page and a record of a DIFFERENT unit and
+      // revert would write to both. The receipt's own footprint is checked
+      // against the resolved unit for the same reason assertUnitScope checks
+      // the artifact's: one unit, one branch, one set of files.
+      for (const p of data.stamped?.pages ?? [])
+        if (!unit.pages.some((q) => q.path === p?.path))
+          throw new RefreshError(
+            "refresh-unit-widened",
+            `the receipt names ${JSON.stringify(p?.path)}, which is not a page of the unit rooted at ${page}`,
+          );
+      for (const r of data.stamped?.records ?? [])
+        if (!unit.keys.includes(r?.key))
+          throw new RefreshError(
+            "refresh-unit-widened",
+            `the receipt names record ${JSON.stringify(r?.key)}, which is not referenced by the unit rooted at ${page}`,
+          );
       const { restored } = revertUnit(root, data, { today });
       for (const r of restored) out.push(`refresh: reverted ${r}`);
     }

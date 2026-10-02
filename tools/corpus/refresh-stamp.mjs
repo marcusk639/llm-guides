@@ -8,6 +8,7 @@ import { RefreshError } from "./refresh-units.mjs";
 import fs from "node:fs";
 import nodePath from "node:path";
 import { parseFrontmatter } from "./frontmatter.mjs";
+import { isValidIsoDate } from "./ledger.mjs";
 import {
   dataFileRel,
   validateArtifact,
@@ -307,6 +308,51 @@ export function stampUnit(
   return { receipt, written: [...pending.keys()].sort() };
 }
 
+// A receipt is ordinary YAML inside the one file this pipeline is DESIGNED to
+// have hand-edited between --skeleton and --stamp, so "the receipt was written
+// by stampUnit" is a premise, not a fact. Nothing distinguishes a machine-
+// written `stamped:` mapping from a typed one. So every value revertUnit is
+// about to write through is checked here, with the same rules the stamp path
+// applies: shape, a real date, and never a date after today.
+function assertReceiptShape(receipt) {
+  if (receipt == null || typeof receipt !== "object" || Array.isArray(receipt))
+    throw new RefreshError(
+      "refresh-receipt-shape",
+      "stamped: is not a mapping, so it names nothing to restore",
+    );
+  for (const list of ["pages", "records"])
+    if (receipt[list] != null && !Array.isArray(receipt[list]))
+      throw new RefreshError(
+        "refresh-receipt-shape",
+        `stamped.${list} must be a list, got ${JSON.stringify(receipt[list])}`,
+      );
+  for (const p of receipt.pages ?? []) {
+    if (typeof p?.path !== "string" || p.path === "")
+      throw new RefreshError(
+        "refresh-receipt-shape",
+        `a stamped.pages entry has no path: ${JSON.stringify(p)}`,
+      );
+    if (!isValidIsoDate(p?.previous_verified))
+      throw new RefreshError(
+        "refresh-receipt-shape",
+        `${p.path}: previous_verified must be a real date written YYYY-MM-DD, got ${JSON.stringify(p?.previous_verified)}`,
+      );
+  }
+  for (const r of receipt.records ?? []) {
+    if (typeof r?.key !== "string" || r.key === "")
+      throw new RefreshError(
+        "refresh-receipt-shape",
+        `a stamped.records entry has no key: ${JSON.stringify(r)}`,
+      );
+    for (const f of ["previous_verified", "new_verified"])
+      if (!isValidIsoDate(r?.[f]))
+        throw new RefreshError(
+          "refresh-receipt-shape",
+          `record ${r.key}: ${f} must be a real date written YYYY-MM-DD, got ${JSON.stringify(r?.[f])}`,
+        );
+  }
+}
+
 // The undo a verify-agent block needs, with no git involved: the receipt alone
 // says what was written and what it replaced, so a blocked branch can be made
 // harmless to merge before the pull request is opened.
@@ -315,12 +361,41 @@ export function revertUnit(
   artifact,
   { today = new Date().toISOString().slice(0, 10) } = {},
 ) {
+  // A receipt is only trustworthy if the artifact carrying it is structurally
+  // sound, and the revert path used to run no validation at all: `kind`,
+  // `unit`, `unit_keys`, `records`, `verdict` and `key_scoped` could all be
+  // absent and revert still proceeded.
+  const issues = validateArtifact(artifact);
+  if (issues.length > 0)
+    throw new RefreshError(
+      issues[0].rule,
+      `artifact is not revertable: ${issues[0].message}`,
+    );
   const receipt = artifact.stamped;
   if (receipt == null)
     throw new RefreshError(
       "refresh-no-receipt",
       "artifact carries no stamped: receipt, so there is nothing to revert",
     );
+  assertReceiptShape(receipt);
+  // The same refusal the stamp path makes, for the same reason: a future date
+  // pushes `expires = verified + cadence` out by however far it reaches, so the
+  // page leaves staleness detection silently and permanently. A real calendar
+  // date passes frontmatter-date, so lint reports clean afterwards and nothing
+  // downstream ever flags it.
+  for (const p of receipt.pages ?? [])
+    if (p.previous_verified > today)
+      throw new RefreshError(
+        "refresh-date-in-future",
+        `${p.path}'s previous_verified is ${p.previous_verified}, after today (${today})`,
+      );
+  for (const r of receipt.records ?? [])
+    for (const f of ["previous_verified", "new_verified"])
+      if (r[f] > today)
+        throw new RefreshError(
+          "refresh-date-in-future",
+          `record ${r.key}'s ${f} is ${r[f]}, after today (${today})`,
+        );
   const pending = new Map();
   const readPending = (rel) =>
     pending.has(rel)
