@@ -754,7 +754,12 @@ and nothing is written until all of them succeed — but the final write loop is
 multi-file atomic. If an `fs` write fails part-way (a permission error, a vanished
 file), earlier files are already stamped. The artifact's receipt is written **last**,
 so the failure mode is "pages stamped, no receipt", and its only evidence is the
-receipt's absence: nothing positively flags a half-stamped unit. Re-running the
-identical `--stamp` self-heals, because every per-file write is a deterministic
-function of the artifact. A half-stamped unit cannot be undone by `--revert`,
-which needs the receipt — recover by retrying the stamp, not by reverting.
+receipt's absence: nothing positively flags a half-stamped unit.
+
+**Do not retry the stamp, and do not expect `--revert` to help — restore from git.**
+A retry looks like it works and silently destroys recoverability: `--stamp` reads
+each prior `verified` from what is *on disk now*, so after a partial write the
+already-stamped files report the new date as their previous one. The receipt then
+records `previous_verified` equal to `new_verified`, `--revert` exits 0 claiming
+success, and the original dates are gone. `--revert` cannot help by itself either,
+because a half-stamped unit has no receipt. The prior dates exist only in git.
