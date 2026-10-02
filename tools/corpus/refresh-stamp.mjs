@@ -248,6 +248,18 @@ export function stampUnit(
         "refresh-record-already-dated",
         `${entry.key} in ${file} already reads verified ${entry.read}; a previous stamp left no receipt — restore from git before retrying`,
       );
+    // Exact equality above only catches a SAME-DAY retry. The realistic retry
+    // is the next morning, when fetched and every read advance by a day and
+    // that test goes quiet while the receipt records the half-stamp's own
+    // bumped date as the prior state. Comparing against the date --skeleton
+    // actually read catches it on any day, and also catches a concurrent edit
+    // by another unit sharing this data file — which had no stamp-side check
+    // at all, only a revert-side one.
+    if (previous !== entry.was)
+      throw new RefreshError(
+        "refresh-record-drifted",
+        `${entry.key} in ${file} now reads verified ${previous}, but --skeleton read ${entry.was}; something has written this record since, so the receipt would record a date that was never the record's true prior value — restore from version control, or regenerate the artifact`,
+      );
     pending.set(file, text);
     recordReceipts.push({
       key: entry.key,
@@ -286,6 +298,12 @@ export function stampUnit(
         throw new RefreshError(
           "refresh-page-already-dated",
           `${rel} already reads verified ${artifact.fetched}; a previous stamp left no receipt — restore from git before retrying`,
+        );
+      // Page side of the same snapshot comparison; see the record case above.
+      if (bumped.previous !== artifact.unit_was[rel])
+        throw new RefreshError(
+          "refresh-page-drifted",
+          `${rel} now reads verified ${bumped.previous}, but --skeleton read ${artifact.unit_was[rel]}; something has written this page since, so the receipt would record a date that was never its true prior value — restore from version control, or regenerate the artifact`,
         );
       const set = setPageResearch(bumped.text, artifact.path);
       pending.set(rel, set.text);

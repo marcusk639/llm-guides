@@ -419,6 +419,8 @@ Every rule name the tools emit, and what to do.
 | `refresh-date-in-future`          | refresh | `artifact.fetched`, a record entry's `read`, or — on `--revert` — any `previous_verified`/`new_verified` in the receipt, is a date after today. | Fix the date; a future date would push `expires` out and let the page silently escape staleness detection, and `lint` would report clean because a far-future date is still a real calendar date. |
 | `refresh-record-already-dated`   | refresh | A record's pending text already reads the stamp's target `verified` date before this run wrote it — a prior stamp attempt wrote the record but crashed before leaving a `stamped:` receipt. | Restore the record from git before retrying; stamping again would read the half-written date as "previous" and make it unrecoverable. |
 | `refresh-page-already-dated`      | refresh | Same hazard, page side: a page's pending text already reads the stamp's target `verified` date before this run wrote it. | Restore the page from git before retrying, for the same reason. |
+| `refresh-record-drifted`          | refresh | A record's on-disk `verified` is no longer the date `--skeleton` recorded in that entry's `was`. Catches the half-stamp retry on **any** day — `refresh-record-already-dated` is exact equality against the stamp's own target date, so it only ever saw a same-day retry — and also catches a concurrent edit by another unit sharing the data file, which had no stamp-side check at all. | Restore the record from version control, or regenerate the artifact with `--skeleton` so its snapshot matches what is actually on disk. |
+| `refresh-page-drifted`            | refresh | Same comparison, page side: a page's on-disk `verified` is no longer the date `--skeleton` recorded in `unit_was`. | Restore the page from version control, or regenerate the artifact. |
 | `refresh-research-unresolved`     | refresh | The artifact's own `path` does not exist on disk. `checkResearchRequired` only checks the string is non-empty, so this is the only guard. | Write the artifact before stamping. |
 | `refresh-artifact-frontmatter`    | refresh | `--stamp` or `--revert` on an artifact with no `---` front-matter to carry or move the receipt.        | Regenerate the artifact with `--skeleton`. |
 | `refresh-record-out-of-unit`      | refresh | A record entry names a key outside `unit_keys`.                                                        | Do not widen a unit's footprint into another unit's records. |
@@ -650,8 +652,13 @@ no override because discarding a live receipt is what makes a stamp unrevertible
 Two distinct units can also collide on one path, since the slug collapses above
 three pages. Its front-matter is
 machine-readable: `kind: refresh`, `unit`, `entry`, `topic`, `topics`, `slug`,
-`path`, `fetched`, `verdict`, `key_scoped`, `unit_keys`, and one `records` entry per
-record carrying `key`, `file`, `verdict`, `url`, `stated` and `read`. The same unit
+`path`, `fetched`, `verdict`, `key_scoped`, `unit_keys`, `unit_was`, and one `records`
+entry per record carrying `key`, `file`, `verdict`, `url`, `stated`, `read` and `was`.
+`unit_was` and each entry's `was` are the **snapshot** `--skeleton` took: the date that
+page or record carried when the work order was built. Do not hand-edit them — `--stamp`
+requires the file to still agree (`refresh-page-drifted`, `refresh-record-drifted`), and
+`validateArtifact` requires a real date for every unit page and every record, so a
+deleted snapshot fails rather than silently disabling the check. The same unit
 entered from its other end files its artifact under that page's topic instead; both
 artifacts name the same `unit` and the same `entry`, so neither is lost and either can
 be found from either page. **Narrative belongs
@@ -779,9 +786,19 @@ so the failure mode is "pages stamped, no receipt", and its only evidence is the
 receipt's absence: nothing positively flags a half-stamped unit.
 
 **Do not retry the stamp, and do not expect `--revert` to help — restore from git.**
-A retry looks like it works and silently destroys recoverability: `--stamp` reads
-each prior `verified` from what is *on disk now*, so after a partial write the
-already-stamped files report the new date as their previous one. The receipt then
-records `previous_verified` equal to `new_verified`, `--revert` exits 0 claiming
-success, and the original dates are gone. `--revert` cannot help by itself either,
-because a half-stamped unit has no receipt. The prior dates exist only in git.
+`--stamp` reads each prior `verified` from what is *on disk now*, so after a partial
+write the already-stamped files would report the new date as their previous one, the
+receipt would record `previous_verified` equal to `new_verified`, and `--revert` would
+exit 0 claiming success with the original dates gone. Four guards now refuse that
+instead. A same-day retry stops at `refresh-record-already-dated` or
+`refresh-page-already-dated`. A retry on a **later** day — the realistic one, where the
+operator investigates overnight and re-runs, so every date advances and the equality
+test goes quiet — stops at `refresh-record-drifted` or `refresh-page-drifted`, because
+the on-disk date no longer matches the snapshot `--skeleton` took. Do not diagnose a
+half-stamp by checking whether `previous_verified` equals `new_verified`: on a
+next-day retry they differ by a day while recoverability is already gone. `--revert`
+still cannot help by itself, because a half-stamped unit has no receipt; the prior
+dates exist only in git. `--skeleton` will not paper over it either — it refuses to
+overwrite an existing artifact at all (`refresh-skeleton-exists`), and refuses
+unconditionally if that artifact carries a receipt
+(`refresh-skeleton-would-destroy-receipt`).

@@ -512,6 +512,7 @@ test("a record outside unit_keys is refused before anything is written", () => {
       url: "https://example.invalid/four",
       stated: "unchanged",
       read: "2026-09-28",
+      was: "2026-09-16",
     },
   ];
   const before = read(root, "data/units.yaml");
@@ -585,6 +586,7 @@ test("a key-scoped artifact widened by hand is refused before anything is writte
       url: "https://example.invalid/one",
       stated: "unchanged",
       read: "2026-09-28",
+      was: "2026-09-16",
     },
   ];
   assert.deepEqual(validateArtifact(artifact), []);
@@ -646,6 +648,78 @@ test("retrying a stamp whose page was already bumped is refused, not silently re
 // I1: a future artifact.fetched or record read must be refused before
 // anything is written -- it would push expires out and escape staleness
 // detection entirely. Covers both halves plus the legitimate earlier-read case.
+
+// Review 2 / F4. The already-dated guards above are exact equality against the
+// stamp's own target date, so they only ever caught a SAME-DAY retry. The
+// realistic retry is the next morning: the operator hits the half-stamp window,
+// investigates, re-dates the artifact and re-runs, and every date advances by a
+// day. previous ("2026-09-28") is then not equal to the new read
+// ("2026-10-03"), both equality guards stay silent, and the receipt records the
+// half-stamp's OWN bumped date as the prior state -- so --revert exits 0,
+// reports every file restored, and leaves the bumped dates in place. Comparing
+// against what --skeleton actually read catches it on any day.
+function halfStamped(root, artifact) {
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  const onDisk = parseArtifact(read(root, artifact.path)).data;
+  // The receipt write is the last one, so the documented half-stamp window is
+  // "every date on disk, no receipt".
+  assert.notEqual(onDisk.stamped, undefined);
+  const { stamped, ...noReceipt } = onDisk;
+  return noReceipt;
+}
+
+function rewriteOnDisk(root, data) {
+  const { body } = parseArtifact(read(root, data.path));
+  fs.writeFileSync(nodePath.join(root, data.path), dumpArtifact(data, body));
+  return data;
+}
+
+test("a next-day half-stamp retry is refused: the record drifted from what --skeleton read", () => {
+  const root = sandbox();
+  const retry = rewriteOnDisk(root, {
+    ...halfStamped(root, prepared(root, { read: "2026-09-28" })),
+    fetched: "2026-10-03",
+  });
+  retry.records = retry.records.map((r) => ({ ...r, read: "2026-10-03" }));
+  rewriteOnDisk(root, retry);
+  // The old guard really is silent here: previous is 2026-09-28, read is
+  // 2026-10-03, so they are not equal.
+  assert.equal(
+    read(root, "data/units.yaml").includes('verified: "2026-09-28"'),
+    true,
+  );
+  const before = read(root, "data/units.yaml");
+  assert.throws(
+    () => stampUnit(root, retry, { today: "2026-10-03" }),
+    (err) =>
+      err instanceof RefreshError && err.rule === "refresh-record-drifted",
+  );
+  assert.equal(read(root, "data/units.yaml"), before);
+});
+
+test("a next-day half-stamp retry is refused on the page side too", () => {
+  const root = sandbox();
+  // Records reverted to what --skeleton read, so the record loop passes and the
+  // page comparison is the only thing left -- which is also the shape of a
+  // concurrent edit by another unit, a hazard the stamp path had no check for.
+  const artifact = prepared(root, { read: "2026-09-28" });
+  const retry = rewriteOnDisk(root, {
+    ...halfStamped(root, artifact),
+    fetched: "2026-10-03",
+  });
+  for (const r of retry.records)
+    fs.writeFileSync(
+      nodePath.join(root, r.file),
+      setRecordVerified(read(root, r.file), r.key, r.was).text,
+    );
+  const before = read(root, "guides/alpha/one.md");
+  assert.equal(before.includes("verified: 2026-09-28"), true);
+  assert.throws(
+    () => stampUnit(root, retry, { today: "2026-10-03" }),
+    (err) => err instanceof RefreshError && err.rule === "refresh-page-drifted",
+  );
+  assert.equal(read(root, "guides/alpha/one.md"), before);
+});
 
 test("a future artifact.fetched is refused, and nothing is written", () => {
   const root = sandbox();

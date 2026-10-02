@@ -194,6 +194,66 @@ test("a confirmed record must cite the url it was read from", () => {
   );
 });
 
+// Review 2 / F4. The drift guard is only as strong as the snapshot it compares
+// against, so a hand-deleted or hand-edited snapshot must not be accepted --
+// otherwise the half-stamp hole re-opens with one deletion.
+test("the skeleton records the dates it read, per page and per record", () => {
+  const { text } = skeleton();
+  const { data } = parseArtifact(text);
+  assert.deepEqual(Object.keys(data.unit_was).sort(), [...data.unit].sort());
+  for (const rel of data.unit) assert.equal(data.unit_was[rel], "2026-09-16");
+  for (const r of data.records) assert.equal(r.was, "2026-09-16");
+});
+
+test("a missing or non-date unit_was snapshot is refused", () => {
+  const { unit_was, ...noSnapshot } = confirmed();
+  assert.equal(
+    validateArtifact(noSnapshot).some(
+      (i) => i.rule === "refresh-artifact-field",
+    ),
+    true,
+  );
+  for (const bad of [null, "2026-09-16", []])
+    assert.equal(
+      validateArtifact({ ...confirmed(), unit_was: bad }).some(
+        (i) => i.rule === "refresh-artifact-field",
+      ),
+      true,
+      `expected refresh-artifact-field for unit_was ${JSON.stringify(bad)}`,
+    );
+  // Present, a mapping, but one page's entry deleted or spoiled.
+  const dropped = confirmed();
+  const victim = dropped.unit[0];
+  const { [victim]: gone, ...rest } = dropped.unit_was;
+  assert.equal(
+    validateArtifact({ ...dropped, unit_was: rest }).some(
+      (i) => i.rule === "refresh-artifact-date",
+    ),
+    true,
+  );
+  assert.equal(
+    validateArtifact({
+      ...dropped,
+      unit_was: { ...dropped.unit_was, [victim]: "2026-02-30" },
+    }).some((i) => i.rule === "refresh-artifact-date"),
+    true,
+  );
+});
+
+test("a missing or non-date record was snapshot is refused", () => {
+  const withWas = (was) => {
+    const data = confirmed();
+    data.records[0] = { ...data.records[0], was };
+    return validateArtifact(data).map((i) => i.rule);
+  };
+  for (const bad of [undefined, null, "", "28-09-2026", "2026-02-30", 20260916])
+    assert.equal(
+      withWas(bad).includes("refresh-artifact-date"),
+      true,
+      `expected refresh-artifact-date for was ${JSON.stringify(bad)}`,
+    );
+});
+
 // Review 2 / F2 and F6b. `startsWith("data/")` is a string prefix test, so
 // `data/../../x.yaml` passed it and nodePath.join then resolved it above the
 // corpus root; stampUnit read that file, bumped it and wrote it back. F6b also

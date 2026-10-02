@@ -64,6 +64,14 @@ export const ARTIFACT_FIELDS = Object.freeze([
   "verdict",
   "key_scoped",
   "unit_keys",
+  // The state --skeleton SAW, per unit page. Exact equality against the
+  // stamp's own target date only ever caught a SAME-DAY half-stamp retry; the
+  // realistic retry is the next morning, when every date advances by a day and
+  // the equality test goes quiet while the receipt records the half-stamp's own
+  // bumped date as the prior state. Comparing against the snapshot catches it
+  // on any day. Not optional: a hand-deleted snapshot re-opens the hole, so
+  // validateArtifact requires an entry per `unit` page.
+  "unit_was",
   "records",
 ]);
 
@@ -92,6 +100,9 @@ export function renderArtifactSkeleton(order, { fetched, artifactPath }) {
     // touched: a key-scoped refresh stamps records only.
     key_scoped: order.key !== null,
     unit_keys: order.records.map((r) => r.key),
+    unit_was: Object.fromEntries(
+      order.unit.pages.map((p) => [p.path, p.verified ?? null]),
+    ),
     records: order.records.map((r) => ({
       key: r.key,
       file: r.file,
@@ -99,6 +110,10 @@ export function renderArtifactSkeleton(order, { fetched, artifactPath }) {
       url: r.source ?? "",
       stated: "",
       read: fetched,
+      // The record's date as --skeleton read it, for the same reason as
+      // unit_was. Do not hand-edit it: stampUnit requires the file to still
+      // agree, and a changed value means something wrote that record since.
+      was: r.verified ?? null,
     })),
   };
   const body = [
@@ -175,6 +190,21 @@ export function validateArtifact(data) {
       rule: "refresh-artifact-field",
       message: "records must be a list",
     });
+  // One snapshot per unit page, each a real date. Required, not optional: a
+  // hand-deleted entry would put the half-stamp hole back.
+  const wasMap = data.unit_was;
+  if (wasMap == null || typeof wasMap !== "object" || Array.isArray(wasMap))
+    issues.push({
+      rule: "refresh-artifact-field",
+      message: `unit_was must be a mapping of unit page to the verified date --skeleton read, got ${JSON.stringify(wasMap)}`,
+    });
+  else
+    for (const rel of Array.isArray(data.unit) ? data.unit : [])
+      if (!isValidIsoDate(wasMap[rel]))
+        issues.push({
+          rule: "refresh-artifact-date",
+          message: `unit_was[${JSON.stringify(rel)}] must be the real date --skeleton read from that page, written YYYY-MM-DD, got ${JSON.stringify(wasMap[rel])}`,
+        });
   const entries = Array.isArray(data.records) ? data.records : [];
   const seen = new Set();
   for (const e of entries) {
@@ -189,6 +219,11 @@ export function validateArtifact(data) {
       issues.push({
         rule: "refresh-artifact-date",
         message: `record ${key}: read must be a real date written YYYY-MM-DD, got ${JSON.stringify(e?.read)}`,
+      });
+    if (!isValidIsoDate(e?.was))
+      issues.push({
+        rule: "refresh-artifact-date",
+        message: `record ${key}: was must be the real date --skeleton read from the record, written YYYY-MM-DD, got ${JSON.stringify(e?.was)}`,
       });
     // A record that could not be reached has no url to cite; every other
     // verdict asserts a figure was read somewhere, so it must say where.

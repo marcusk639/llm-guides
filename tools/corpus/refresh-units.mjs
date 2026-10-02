@@ -43,6 +43,12 @@ export function pageFacts(root, records) {
       path: path.relative(root, abs).split(path.sep).join("/"),
       topic: typeof data?.topic === "string" ? data.topic : null,
       status: typeof data?.status === "string" ? data.status : null,
+      // The date the page carries RIGHT NOW. renderArtifactSkeleton copies it
+      // into the artifact as `unit_was`, and stampUnit requires the on-disk
+      // value still to equal it — which is how a half-stamp retry on a LATER
+      // day is caught, and how a concurrent edit by another unit is caught at
+      // stamp time rather than only at revert time.
+      verified: data?.verified == null ? null : String(data.verified),
       keys: [...referencedRecordKeys(text, records)].sort(),
     };
   });
