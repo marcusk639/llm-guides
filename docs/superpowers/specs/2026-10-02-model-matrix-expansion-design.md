@@ -247,7 +247,7 @@ named model fails it.
 | --- | --- | --- | --- |
 | Anthropic | Its lifecycle state is not `Retired` | `https://platform.claude.com/docs/en/about-claude/model-deprecations` | yes, read 2026-10-02 |
 | OpenAI | It is listed on the current models index | `https://developers.openai.com/api/docs/models` | yes, read 2026-10-02 |
-| Google | It carries a `status-subtext` badge and that badge is not `Preview` | `https://ai.google.dev/gemini-api/docs/models` | yes, read 2026-10-02 |
+| Google | Its model id is a text-model id carrying no modality suffix (exact pattern below), it carries a `status-subtext` badge, and that badge is not `Preview` | `https://ai.google.dev/gemini-api/docs/models` | yes, read 2026-10-02 |
 | Meta, Qwen | It is a member of at least one collection the owning organisation currently publishes on Hugging Face | Qwen: `https://huggingface.co/Qwen/collections`; Meta: `https://huggingface.co/meta-llama/collections` | Qwen: yes, read 2026-10-02 · Meta: **no** — every published repository is already covered, so the test currently excludes nothing (see evidence) |
 
 Verbatim evidence for the Google row, read from `https://ai.google.dev/gemini-api/docs/models`
@@ -281,10 +281,37 @@ per model. First, the badge governs, not the card's prose description: Gemini 3.
 `Stable` while its description reads "Our legacy Flash model, providing baseline speed and
 foundational performance for routine, high-throughput workloads" — the model is in scope because
 the badge, not the word "legacy" in the prose, decides. Second, a bare `New` badge (neither
-`Stable` nor `Preview`) is in scope: `Preview` is the sole exclusion marker, and the absence of
-`Stable` does not itself exclude. Three cards carry a bare `New` badge — Gemini 3.5 Live
-Translate, Gemini 3.1 Flash Live, and Gemini Omni Flash — and all three are in scope under the
-amended rule.
+`Stable` nor `Preview`) is not itself disqualifying: `Preview` is the sole badge-based exclusion
+marker, and the absence of `Stable` does not exclude. The id clause applies independently of the
+badge, and in fact excludes all three cards that currently carry a bare `New` badge — Gemini 3.5
+Live Translate (`gemini-3.5-live-translate-preview`), Gemini 3.1 Flash Live
+(`gemini-3.1-flash-live-preview`) and Gemini Omni Flash — because none of their ids match the
+text-model pattern. An earlier revision of this section stated all three were in scope. That was
+wrong: Gemini Omni Flash is a video model. It is corrected here, and the error is instructive —
+the claim survived two revisions of the rule because each revision edited the rule without
+re-checking the examples written around it.
+
+**The id clause, and why it exists.** A model is in scope only if its id matches the regular
+expression `^gemini-\d+(\.\d+)?-(pro|flash|flash-lite)$` — a text-model id with no modality
+suffix. The badge test alone says nothing about modality, so it admitted image models
+(`gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`, `gemini-3-pro-image`), text-to-speech
+(`gemini-3.8-flash-tts`, `gemini-3.8-flash-lite-tts`), speech-to-text (`gemini-3.5-transcribe`)
+and Live/voice models (`gemini-3.8-live`, `gemini-3.8-live-extended-thinking`). The page exposes
+no structured modality field — only each card's prose description — and the sub-ruling above
+establishes that prose does not decide scope, so modality is tested through the id instead.
+
+Applying all three clauses to the twenty badged cards read on 2026-10-02 admits exactly six:
+`gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`,
+`gemini-3.5-flash-lite` and `gemini-3.1-flash-lite`. Two further ids match the pattern but are
+excluded by their badge: `gemini-3.1-pro` and `gemini-3-flash` are both `Preview`.
+
+This is the fourth revision of this rule, and the first in the inclusion form. The three that
+failed were each phrased as an exclusion over an open set — exclude "legacy" (no such marking
+existed), then exclude unbadged entries (an entire unbadged media section slipped through), then
+exclude by badge alone (modality was never tested). The set of things to exclude is unbounded, so
+each repair closed only the hole it was shown. An allowlist over a closed, enumerable set is the
+only form that ends the series, and the same test should be applied to every other provider rule
+in this table before phase 3.
 
 Revision 1's open-weights rule was "the owning organisation still publishes the
 weights repository". The review was right that this over-generates to the point of
