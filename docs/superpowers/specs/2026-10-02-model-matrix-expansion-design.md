@@ -248,7 +248,7 @@ named model fails it.
 | Anthropic | Its lifecycle state is not `Retired` | `https://platform.claude.com/docs/en/about-claude/model-deprecations` | yes, read 2026-10-02 |
 | OpenAI | It is listed on the current models index | `https://developers.openai.com/api/docs/models` | yes, read 2026-10-02 |
 | Google | It is listed on the Gemini API models page outside the `id="previous_models"` section — which the page wraps in `<aside class="deprecated">` and whose entries are suffixed "(Shut down)" — and its `status-subtext` badge is not `Preview` | `https://ai.google.dev/gemini-api/docs/models` | yes, read 2026-10-02 |
-| Meta, Qwen | It is a member of the owning organisation's current model collection | the org's published collection | **no** — pin both URLs and confirm the collection has stable membership |
+| Meta, Qwen | It is a member of at least one collection the owning organisation currently publishes on Hugging Face | Qwen: `https://huggingface.co/Qwen/collections`; Meta: `https://huggingface.co/meta-llama/collections` | Qwen: yes, read 2026-10-02 · Meta: **no** — every published repository is already covered, so the test currently excludes nothing (see evidence) |
 
 Verbatim evidence for the Google row, read from `https://ai.google.dev/gemini-api/docs/models`
 on 2026-10-02 (HTTP 200, no redirect): 20 model cards carry a `status-subtext` badge, and that
@@ -286,6 +286,35 @@ Two consequences the design accepts openly. The rules are not equivalent — an
 Anthropic `Legacy` model is in scope while a quietly unlisted OpenAI model is not —
 and each rule is itself a volatile fact, so each is a named re-check item in its
 page's section 6.
+
+Verbatim evidence for the Meta/Qwen (open-weights) row, gathered 2026-10-02. Both
+organisation profile pages returned HTTP 200, no redirect: `https://huggingface.co/meta-llama`
+and `https://huggingface.co/Qwen`. Each embeds a `"collections":[...]` blob (HTML-entity-escaped)
+enumerating every collection the organisation has published, with each collection's `title`
+and `slug`; meta-llama's blob lists 15 collections, Qwen's lists 37. That embedded blob caps
+each collection's preview at 4 items, so membership was instead read from the Hugging Face
+collections API, `https://huggingface.co/api/collections/<slug>` — one call per collection,
+all 15 and all 37 returning HTTP 200 — and compared against each organisation's full model
+roster from `https://huggingface.co/api/models?author=<org>&limit=1000` (also HTTP 200):
+70 repositories under `meta-llama`, 468 under `Qwen`.
+
+Qwen: the union of the 37 collections' `items` covers 454 of the 468 repositories. 14 exist
+but belong to none of them, among them `Qwen/Qwen-VL-Chat` and `Qwen/Qwen-Audio` — Qwen's
+first-generation vision- and audio-language models, superseded by the later Qwen2-VL and
+Qwen2-Audio lines, both of which are collected — and `Qwen/Qwen-tokenizer` (not a model).
+`Qwen/Qwen3-235B-A22B-Instruct-2507` is a member of the "Qwen3" collection
+(`https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f`) and is admitted.
+The rule is therefore falsifiable for Qwen, and a named model fails it.
+
+Meta: the union of the 15 collections' `items` covers all 70 of `meta-llama`'s repositories,
+with no exception — even `meta-llama/Llama-2-7b-hf`, the oldest surviving Llama 2 checkpoint,
+is a member of the "Llama 2 Family" collection
+(`https://huggingface.co/collections/meta-llama/llama-2-family-661da1f90a9d678b6f55773b`).
+No repository under `meta-llama` could be named that fails the rule as of this read. This is
+not Revision 1's failure recurring — the test can in principle exclude a repository Meta adds
+without collecting it, unlike "the org still publishes the repo", which no repository can ever
+fail — but today it excludes nothing for this organisation, so the Meta half of the row is
+recorded as unpinned rather than guessed at.
 
 ## 9. Evidence discipline
 
