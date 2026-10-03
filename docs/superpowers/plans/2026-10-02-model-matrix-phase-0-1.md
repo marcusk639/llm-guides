@@ -286,10 +286,10 @@ The entry must contain no API id, price, context window, output limit or effort 
 
 ```bash
 cd /Users/marcusklein/dev/llm-guides
-sed -n '/^### 4.7/,/^## 5\./p' guides/models/claude-models.md | grep -nE 'claude-[a-z0-9-]+|\$[0-9]|[0-9]+K tokens|1M tokens|medium|high' || echo "clean: no value or default in the new prose"
+sed -n '/^### 4.7/,/^## 5\./p' guides/models/claude-models.md | grep -nE 'claude-[a-z0-9-]+|\$[0-9]|[0-9]+K tokens|1M tokens|\b(medium|high)\b' || echo "clean: no value or default in the new prose"
 ```
 
-Expected: `clean: ...`. A hit on `medium` or `high` means a parameter default was written as a value — rephrase to a relation ("lower than Fable 5.1's") instead.
+Expected: `clean: ...`. A hit on a whole word `medium` or `high` means a parameter default was written as a value — rephrase to a relation ("lower than Fable 5.1's") instead. The word boundaries matter: without them this check matches "higher", which appears legitimately in the relational phrasing the constraint asks for.
 
 - [ ] **Step 5: Run the four gates**
 
