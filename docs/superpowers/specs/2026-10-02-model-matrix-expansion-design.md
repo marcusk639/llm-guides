@@ -247,8 +247,15 @@ named model fails it.
 | --- | --- | --- | --- |
 | Anthropic | Its lifecycle state is not `Retired` | `https://platform.claude.com/docs/en/about-claude/model-deprecations` | yes, read 2026-10-02 |
 | OpenAI | It is listed on the current models index | `https://developers.openai.com/api/docs/models` | yes, read 2026-10-02 |
-| Google | It is listed as a current model on the Gemini API models page, excluding entries that page marks preview or legacy | the Gemini API models list | **no** — pin the URL and confirm the page distinguishes current from preview/legacy |
+| Google | It is listed as a current model on the Gemini API models page, excluding entries that page marks preview or legacy | `https://ai.google.dev/gemini-api/docs/models` | yes, read 2026-10-02 |
 | Meta, Qwen | It is a member of the owning organisation's current model collection | the org's published collection | **no** — pin both URLs and confirm the collection has stable membership |
+
+Verbatim evidence for the Google row, read from `https://ai.google.dev/gemini-api/docs/models`
+on 2026-10-02 (HTTP 200, no redirect): the page's raw HTML marks each model card with a
+`status-subtext` line. Gemini 3.8 Flash carries `<p class="status-subtext"><span class="gemini-api-new">New</span> Stable</p>` —
+a model the rule admits. Gemini 3.1 Pro carries `<p class="status-subtext">Preview</p>` —
+a model the rule excludes. The page therefore both enumerates models and marks at least one
+of them in a way that excludes it, so the rule as written is falsifiable.
 
 Revision 1's open-weights rule was "the owning organisation still publishes the
 weights repository". The review was right that this over-generates to the point of
