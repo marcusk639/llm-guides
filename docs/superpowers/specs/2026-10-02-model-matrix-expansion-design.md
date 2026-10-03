@@ -247,19 +247,22 @@ named model fails it.
 | --- | --- | --- | --- |
 | Anthropic | Its lifecycle state is not `Retired` | `https://platform.claude.com/docs/en/about-claude/model-deprecations` | yes, read 2026-10-02 |
 | OpenAI | It is listed on the current models index | `https://developers.openai.com/api/docs/models` | yes, read 2026-10-02 |
-| Google | Its model id is a text-model id carrying no modality suffix (exact pattern below), it carries a `status-subtext` badge, and that badge is not `Preview` | `https://ai.google.dev/gemini-api/docs/models` | yes, read 2026-10-02 |
+| Google | Its model id is a text-model id carrying no modality suffix (exact pattern below), and its card is not under the `previous_models` or `generative_media_models` sections | `https://ai.google.dev/gemini-api/docs/models` | yes, read 2026-10-02 |
 | Meta, Qwen | It is a member of at least one collection the owning organisation currently publishes on Hugging Face | Qwen: `https://huggingface.co/Qwen/collections`; Meta: `https://huggingface.co/meta-llama/collections` | Qwen: yes, read 2026-10-02 · Meta: **no** — every published repository is already covered, so the test currently excludes nothing (see evidence) |
 
 Verbatim evidence for the Google row, read from `https://ai.google.dev/gemini-api/docs/models`
 on 2026-10-02 (HTTP 200, no redirect): 20 model cards carry a `status-subtext` badge, and that
 vocabulary is closed at four values — bare `Stable` (8 cards), `<span class="gemini-api-new">New</span> Stable`
 (6 cards), bare `<span class="gemini-api-new">New</span>` (3 cards), and `Preview` (3 cards). No card's
-badge reads `Legacy` or `Deprecated`. The amended rule is an **inclusion** test over this closed set of
-badged entries, not an exclusion test over the rest of the page: a model is in scope only when it
-carries one of these four badge values and that value is not `Preview`, so the rule admits 17 of the
-20 badged cards. Gemini 3.8 Flash carries `New Stable` — a model the rule admits. Gemini 3.1 Pro
-carries `Preview` — a model the rule excludes. The page therefore both enumerates models and marks
-at least one of them in a way that excludes it, so the rule as written is falsifiable.
+badge reads `Legacy` or `Deprecated`. Those badges are page-structure background only, and no longer
+gate inclusion: all 20 sit inside the single `gemini-3` section, and zero badges appear anywhere else
+on the page — which is precisely why revision 4's badge-presence clause could not see the still-served
+Gemini 2.5 models at all. The rule is an **inclusion** test over the page's linked model ids: a model
+is in scope only when its id matches the pattern below and its card is not under `previous_models` or
+`generative_media_models`, so the rule admits 9 of the 44 linked model ids. `gemini-3.8-flash`, under
+`gemini-3`, is a model the rule admits. `Imagen 4 (Shut down)`, under `generative_media_models`, is a
+model the rule excludes. The page therefore both enumerates models and places some of them in sections
+that exclude them, so the rule as written is falsifiable.
 
 The page separately carries six entries suffixed "(Shut down)": five inside an `id="previous_models"`
 heading ("Previous models"), immediately followed by `<aside class="deprecated">` — for example,
@@ -270,48 +273,69 @@ wrapper at all. Neither section carries a single `status-subtext` badge: zero ba
 Revision 1's clause — "outside `previous_models` … and its badge is not `Preview`" — was an exclusion
 test, and exclusion by absence of a `Preview` badge is vacuously true of a card that carries no badge
 at all, so it admitted the whole of `generative_media_models`, shut-down entries included: a model
-named `Imagen 4 (Shut down)`, not even an LLM, passed. The amended rule closes this by requiring a
-badge's presence as the entry condition rather than `Preview`'s absence as the exit condition: both
-`previous_models` and `generative_media_models` are excluded by construction, because neither carries
-a badge, and `Imagen 4 (Shut down)` is the worked example the old rule wrongly admitted and the new
-rule excludes.
+named `Imagen 4 (Shut down)`, not even an LLM, passed. Revision 4 closed that by requiring a badge's
+presence as the entry condition, which excluded both sections by construction — but it also excluded
+the three Gemini 2.5 models, which the page still serves and never badges. This revision names the two
+sections directly instead: `previous_models` and `generative_media_models` are excluded because the
+rule says so, not because of a badge they happen to lack. `Imagen 4 (Shut down)` remains the worked
+example the revision-1 rule wrongly admitted and this rule excludes.
 
-Two ambiguities the amended rule resolves explicitly, so a later phase does not re-litigate them
-per model. First, the badge governs, not the card's prose description: Gemini 3.5 Flash is badged
-`Stable` while its description reads "Our legacy Flash model, providing baseline speed and
-foundational performance for routine, high-throughput workloads" — the model is in scope because
-the badge, not the word "legacy" in the prose, decides. Second, a bare `New` badge (neither
-`Stable` nor `Preview`) is not itself disqualifying: `Preview` is the sole badge-based exclusion
-marker, and the absence of `Stable` does not exclude. The id clause applies independently of the
-badge, and in fact excludes all three cards that currently carry a bare `New` badge — Gemini 3.5
-Live Translate (`gemini-3.5-live-translate-preview`), Gemini 3.1 Flash Live
-(`gemini-3.1-flash-live-preview`) and Gemini Omni Flash — because none of their ids match the
-text-model pattern. An earlier revision of this section stated all three were in scope. That was
+Two ambiguities this rule resolves explicitly, so a later phase does not re-litigate them
+per model. First, the id and the section govern, not the card's prose description: Gemini 3.5 Flash is
+badged `Stable` while its description reads "Our legacy Flash model, providing baseline speed and
+foundational performance for routine, high-throughput workloads" — the model is in scope because its
+id and its section admit it, and the word "legacy" in the prose does not decide. Second, no badge
+value is disqualifying, because badges no longer gate inclusion at all: the three cards carrying a
+bare `New` badge — Gemini 3.5 Live Translate (`gemini-3.5-live-translate-preview`), Gemini 3.1 Flash
+Live (`gemini-3.1-flash-live-preview`) and Gemini Omni Flash (`gemini-omni-flash`) — are excluded by
+the id clause, because none of their ids match the text-model pattern. An earlier revision of this section stated all three were in scope. That was
 wrong: Gemini Omni Flash is a video model. It is corrected here, and the error is instructive —
 the claim survived two revisions of the rule because each revision edited the rule without
 re-checking the examples written around it.
 
 **The id clause, and why it exists.** A model is in scope only if its id matches the regular
 expression `^gemini-\d+(\.\d+)?-(pro|flash|flash-lite)$` — a text-model id with no modality
-suffix. The badge test alone says nothing about modality, so it admitted image models
-(`gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`, `gemini-3-pro-image`), text-to-speech
-(`gemini-3.8-flash-tts`, `gemini-3.8-flash-lite-tts`), speech-to-text (`gemini-3.5-transcribe`)
-and Live/voice models (`gemini-3.8-live`, `gemini-3.8-live-extended-thinking`). The page exposes
+suffix. Neither a badge test nor a section test says anything about modality, and the section test
+does not subsume the id clause: the audio models sit outside both excluded sections —
+`gemini-3.8-flash-tts` is listed under `audio_models` and `gemini-3`, both in scope — so without the
+id clause the rule would admit text-to-speech (`gemini-3.8-flash-tts`, `gemini-3.8-flash-lite-tts`),
+speech-to-text (`gemini-3.5-transcribe`) and Live/voice models (`gemini-3.8-live`,
+`gemini-3.8-live-extended-thinking`). The image models (`gemini-3.1-flash-image`,
+`gemini-3.1-flash-lite-image`, `gemini-3-pro-image`) are cross-listed under `generative_media_models`
+and so are excluded twice over. The page exposes
 no structured modality field — only each card's prose description — and the sub-ruling above
 establishes that prose does not decide scope, so modality is tested through the id instead.
 
-Applying all three clauses to the twenty badged cards read on 2026-10-02 admits exactly six:
+Applying both clauses to the 44 linked model ids read on 2026-10-02 admits exactly nine:
 `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`,
-`gemini-3.5-flash-lite` and `gemini-3.1-flash-lite`. Two further ids match the pattern but are
-excluded by their badge: `gemini-3.1-pro` and `gemini-3-flash` are both `Preview`.
+`gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-2.5-pro`, `gemini-2.5-flash` and
+`gemini-2.5-flash-lite`. Exactly two further ids match the id pattern and are excluded by the section
+clause alone: `gemini-2.0-flash` and `gemini-2.0-flash-lite`, both under `previous_models`. That pair
+is what demonstrates the section clause does independent work — every other exclusion on this page is
+already made by the id pattern, including all three `Preview`-badged cards, whose real ids are
+`gemini-3.1-pro-preview`, `gemini-3-flash-preview` and `gemini-3.1-flash-tts-preview` and which fail
+the pattern on their `-preview` suffix. The three Gemini 2.5 ids carry no `status-subtext` badge at
+all and sit in their own `gemini_25_pro`, `gemini_25_flash` and `gemini_25_flash-lite` sections, where
+the page states verbatim: "These models are not deprecated and will continue to be served until
+further notice through the API."
 
-This is the fourth revision of this rule, and the first in the inclusion form. The three that
-failed were each phrased as an exclusion over an open set — exclude "legacy" (no such marking
-existed), then exclude unbadged entries (an entire unbadged media section slipped through), then
-exclude by badge alone (modality was never tested). The set of things to exclude is unbounded, so
-each repair closed only the hole it was shown. An allowlist over a closed, enumerable set is the
-only form that ends the series, and the same test should be applied to every other provider rule
-in this table before phase 3.
+This is the fifth revision of this rule. The first three were each phrased as an exclusion over an
+open set — exclude "legacy" (no such marking existed), then exclude unbadged entries (an entire
+unbadged media section slipped through), then exclude by badge alone (modality was never tested). The
+set of things to exclude is unbounded, so each of those repairs closed only the hole it was shown. The
+fourth was an inclusion test, but taken over the wrong set: requiring a badge's presence silently
+under-generated, dropping three models the vendor still serves and says so on the same page. An
+inclusion test is therefore not sufficient on its own — it must be taken over a set that actually
+contains everything in scope, which is why this revision tests sections rather than badges. The same
+test should be applied to every other provider rule in this table before phase 3.
+
+**Re-check items for this rule.** The section anchors `previous_models` and `generative_media_models`
+are this rule's only structural dependency, and an HTML heading id is a weaker anchor than the badge
+string it replaces: Google can rename or re-partition a section with no visible change to the page.
+Re-check on each refresh that both anchors still exist, that no in-scope model has been moved under
+either, and that no new section has appeared holding text models the two-section test would silently
+admit. `audio_models`, `music-models`, `tool_and_agent_models` and `specialized_task_models` are all
+in scope today and are kept out by the id pattern alone.
 
 Revision 1's open-weights rule was "the owning organisation still publishes the
 weights repository". The review was right that this over-generates to the point of
