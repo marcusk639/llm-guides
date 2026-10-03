@@ -247,15 +247,32 @@ named model fails it.
 | --- | --- | --- | --- |
 | Anthropic | Its lifecycle state is not `Retired` | `https://platform.claude.com/docs/en/about-claude/model-deprecations` | yes, read 2026-10-02 |
 | OpenAI | It is listed on the current models index | `https://developers.openai.com/api/docs/models` | yes, read 2026-10-02 |
-| Google | It is listed as a current model on the Gemini API models page, excluding entries that page marks preview or legacy | `https://ai.google.dev/gemini-api/docs/models` | yes, read 2026-10-02 |
+| Google | It is listed on the Gemini API models page outside the `id="previous_models"` section — which the page wraps in `<aside class="deprecated">` and whose entries are suffixed "(Shut down)" — and its `status-subtext` badge is not `Preview` | `https://ai.google.dev/gemini-api/docs/models` | yes, read 2026-10-02 |
 | Meta, Qwen | It is a member of the owning organisation's current model collection | the org's published collection | **no** — pin both URLs and confirm the collection has stable membership |
 
 Verbatim evidence for the Google row, read from `https://ai.google.dev/gemini-api/docs/models`
-on 2026-10-02 (HTTP 200, no redirect): the page's raw HTML marks each model card with a
-`status-subtext` line. Gemini 3.8 Flash carries `<p class="status-subtext"><span class="gemini-api-new">New</span> Stable</p>` —
-a model the rule admits. Gemini 3.1 Pro carries `<p class="status-subtext">Preview</p>` —
-a model the rule excludes. The page therefore both enumerates models and marks at least one
-of them in a way that excludes it, so the rule as written is falsifiable.
+on 2026-10-02 (HTTP 200, no redirect): 20 model cards carry a `status-subtext` badge, and that
+vocabulary is closed at four values — bare `Stable` (8 cards), `<span class="gemini-api-new">New</span> Stable`
+(6 cards), bare `<span class="gemini-api-new">New</span>` (3 cards), and `Preview` (3 cards). No card's
+badge reads `Legacy` or `Deprecated`. Gemini 3.8 Flash carries `New Stable` — a model the rule
+admits. Gemini 3.1 Pro carries `Preview` — a model the rule excludes. The page therefore both
+enumerates models and marks at least one of them in a way that excludes it, so the rule as
+written is falsifiable.
+
+The page separately maintains an `id="previous_models"` heading ("Previous models"), immediately
+followed by `<aside class="deprecated">`, whose table rows name a model suffixed "(Shut down)" —
+for example, `Gemini 2.0 Flash (Shut down)`. That section, not the badge vocabulary, is what the
+amended rule's first clause excludes.
+
+Two ambiguities the amended rule resolves explicitly, so a later phase does not re-litigate them
+per model. First, the badge governs, not the card's prose description: Gemini 3.5 Flash is badged
+`Stable` while its description reads "Our legacy Flash model, providing baseline speed and
+foundational performance for routine, high-throughput workloads" — the model is in scope because
+the badge, not the word "legacy" in the prose, decides. Second, a bare `New` badge (neither
+`Stable` nor `Preview`) is in scope: `Preview` is the sole exclusion marker, and the absence of
+`Stable` does not itself exclude. Three cards carry a bare `New` badge — Gemini 3.5 Live
+Translate, Gemini 3.1 Flash Live, and Gemini Omni Flash — and all three are in scope under the
+amended rule.
 
 Revision 1's open-weights rule was "the owning organisation still publishes the
 weights repository". The review was right that this over-generates to the point of
