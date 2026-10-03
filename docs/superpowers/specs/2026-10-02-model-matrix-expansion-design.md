@@ -247,22 +247,34 @@ named model fails it.
 | --- | --- | --- | --- |
 | Anthropic | Its lifecycle state is not `Retired` | `https://platform.claude.com/docs/en/about-claude/model-deprecations` | yes, read 2026-10-02 |
 | OpenAI | It is listed on the current models index | `https://developers.openai.com/api/docs/models` | yes, read 2026-10-02 |
-| Google | It is listed on the Gemini API models page outside the `id="previous_models"` section — which the page wraps in `<aside class="deprecated">` and whose entries are suffixed "(Shut down)" — and its `status-subtext` badge is not `Preview` | `https://ai.google.dev/gemini-api/docs/models` | yes, read 2026-10-02 |
+| Google | It carries a `status-subtext` badge and that badge is not `Preview` | `https://ai.google.dev/gemini-api/docs/models` | yes, read 2026-10-02 |
 | Meta, Qwen | It is a member of at least one collection the owning organisation currently publishes on Hugging Face | Qwen: `https://huggingface.co/Qwen/collections`; Meta: `https://huggingface.co/meta-llama/collections` | Qwen: yes, read 2026-10-02 · Meta: **no** — every published repository is already covered, so the test currently excludes nothing (see evidence) |
 
 Verbatim evidence for the Google row, read from `https://ai.google.dev/gemini-api/docs/models`
 on 2026-10-02 (HTTP 200, no redirect): 20 model cards carry a `status-subtext` badge, and that
 vocabulary is closed at four values — bare `Stable` (8 cards), `<span class="gemini-api-new">New</span> Stable`
 (6 cards), bare `<span class="gemini-api-new">New</span>` (3 cards), and `Preview` (3 cards). No card's
-badge reads `Legacy` or `Deprecated`. Gemini 3.8 Flash carries `New Stable` — a model the rule
-admits. Gemini 3.1 Pro carries `Preview` — a model the rule excludes. The page therefore both
-enumerates models and marks at least one of them in a way that excludes it, so the rule as
-written is falsifiable.
+badge reads `Legacy` or `Deprecated`. The amended rule is an **inclusion** test over this closed set of
+badged entries, not an exclusion test over the rest of the page: a model is in scope only when it
+carries one of these four badge values and that value is not `Preview`, so the rule admits 17 of the
+20 badged cards. Gemini 3.8 Flash carries `New Stable` — a model the rule admits. Gemini 3.1 Pro
+carries `Preview` — a model the rule excludes. The page therefore both enumerates models and marks
+at least one of them in a way that excludes it, so the rule as written is falsifiable.
 
-The page separately maintains an `id="previous_models"` heading ("Previous models"), immediately
-followed by `<aside class="deprecated">`, whose table rows name a model suffixed "(Shut down)" —
-for example, `Gemini 2.0 Flash (Shut down)`. That section, not the badge vocabulary, is what the
-amended rule's first clause excludes.
+The page separately carries six entries suffixed "(Shut down)": five inside an `id="previous_models"`
+heading ("Previous models"), immediately followed by `<aside class="deprecated">` — for example,
+`Gemini 2.0 Flash (Shut down)` — and one, `Imagen 4 (Shut down)`, inside the unrelated
+`id="generative_media_models"` section (image and video models), which carries no such `<aside>`
+wrapper at all. Neither section carries a single `status-subtext` badge: zero badges appear in
+`previous_models`, and zero appear in `generative_media_models`, across all of that section's cards.
+Revision 1's clause — "outside `previous_models` … and its badge is not `Preview`" — was an exclusion
+test, and exclusion by absence of a `Preview` badge is vacuously true of a card that carries no badge
+at all, so it admitted the whole of `generative_media_models`, shut-down entries included: a model
+named `Imagen 4 (Shut down)`, not even an LLM, passed. The amended rule closes this by requiring a
+badge's presence as the entry condition rather than `Preview`'s absence as the exit condition: both
+`previous_models` and `generative_media_models` are excluded by construction, because neither carries
+a badge, and `Imagen 4 (Shut down)` is the worked example the old rule wrongly admitted and the new
+rule excludes.
 
 Two ambiguities the amended rule resolves explicitly, so a later phase does not re-litigate them
 per model. First, the badge governs, not the card's prose description: Gemini 3.5 Flash is badged
