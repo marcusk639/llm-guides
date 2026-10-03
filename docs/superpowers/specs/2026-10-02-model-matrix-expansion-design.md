@@ -251,24 +251,24 @@ named model fails it.
 | Meta, Qwen | It is a member of at least one collection the owning organisation currently publishes on Hugging Face | Qwen: `https://huggingface.co/Qwen/collections`; Meta: `https://huggingface.co/meta-llama/collections` | Qwen: yes, read 2026-10-02 · Meta: **no** — every published repository is already covered, so the test currently excludes nothing (see evidence) |
 
 Verbatim evidence for the Google row, read from `https://ai.google.dev/gemini-api/docs/models`
-on 2026-10-02 (HTTP 200, no redirect): 20 model cards carry a `status-subtext` badge, and that
-vocabulary is closed at four values — bare `Stable` (8 cards), `<span class="gemini-api-new">New</span> Stable`
-(6 cards), bare `<span class="gemini-api-new">New</span>` (3 cards), and `Preview` (3 cards). No card's
-badge reads `Legacy` or `Deprecated`. Those badges are page-structure background only, and no longer
-gate inclusion: all 20 sit inside the single `gemini-3` section, and zero badges appear anywhere else
+on 2026-10-02 (HTTP 200, no redirect): the `status-subtext` badge vocabulary is closed at four
+values — bare `Stable`, `<span class="gemini-api-new">New</span> Stable`, bare
+`<span class="gemini-api-new">New</span>`, and `Preview`. No card's badge reads `Legacy` or
+`Deprecated`. Those badges are page-structure background only, and no longer gate inclusion: every
+badge sits inside the single `gemini-3` section, and no badge appears anywhere else
 on the page — which is precisely why revision 4's badge-presence clause could not see the still-served
 Gemini 2.5 models at all. The rule is an **inclusion** test over the page's linked model ids: a model
 is in scope only when its id matches the pattern below and its card is not under `previous_models` or
-`generative_media_models`, so the rule admits 9 of the 44 linked model ids. `gemini-3.8-flash`, under
+`generative_media_models`. The ids it admits are enumerated below. `gemini-3.8-flash`, under
 `gemini-3`, is a model the rule admits. `Imagen 4 (Shut down)`, under `generative_media_models`, is a
 model the rule excludes. The page therefore both enumerates models and places some of them in sections
 that exclude them, so the rule as written is falsifiable.
 
-The page separately carries six entries suffixed "(Shut down)": five inside an `id="previous_models"`
-heading ("Previous models"), immediately followed by `<aside class="deprecated">` — for example,
-`Gemini 2.0 Flash (Shut down)` — and one, `Imagen 4 (Shut down)`, inside the unrelated
-`id="generative_media_models"` section (image and video models), which carries no such `<aside>`
-wrapper at all. Neither section carries a single `status-subtext` badge: zero badges appear in
+The page separately carries entries suffixed "(Shut down)" in two different places: inside an
+`id="previous_models"` heading ("Previous models"), immediately followed by
+`<aside class="deprecated">` — for example, `Gemini 2.0 Flash (Shut down)` — and also inside the
+unrelated `id="generative_media_models"` section (image and video models), where `Imagen 4 (Shut down)`
+carries no such `<aside>` wrapper at all. Neither section carries a single `status-subtext` badge: zero badges appear in
 `previous_models`, and zero appear in `generative_media_models`, across all of that section's cards.
 Revision 1's clause — "outside `previous_models` … and its badge is not `Preview`" — was an exclusion
 test, and exclusion by absence of a `Preview` badge is vacuously true of a card that carries no badge
@@ -306,7 +306,15 @@ and so are excluded twice over. The page exposes
 no structured modality field — only each card's prose description — and the sub-ruling above
 establishes that prose does not decide scope, so modality is tested through the id instead.
 
-Applying both clauses to the 44 linked model ids read on 2026-10-02 admits exactly nine:
+**Aliases are out of scope.** The page documents moving aliases beside specific versions — for
+example `gemini-flash-latest`, of which it states: "For breaking changes, a 2-week notice will be
+provided through email before the version behind latest is changed." An alias names whichever model
+currently sits behind it, so it has no stable identity, and a row describing one would hold a fixed
+`verified` date while the thing it describes changed underneath. The id pattern already rejects
+`-latest` ids, but only incidentally; the exclusion is stated here so a later phase reads the
+omission as a decision rather than an oversight.
+
+Applying both clauses to the page's linked model ids, read on 2026-10-02, admits exactly nine:
 `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`,
 `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-2.5-pro`, `gemini-2.5-flash` and
 `gemini-2.5-flash-lite`. Exactly two further ids match the id pattern and are excluded by the section
@@ -332,9 +340,14 @@ test should be applied to every other provider rule in this table before phase 3
 **Re-check items for this rule.** The section anchors `previous_models` and `generative_media_models`
 are this rule's only structural dependency, and an HTML heading id is a weaker anchor than the badge
 string it replaces: Google can rename or re-partition a section with no visible change to the page.
-Re-check on each refresh that both anchors still exist, that no in-scope model has been moved under
-either, and that no new section has appeared holding text models the two-section test would silently
-admit. `audio_models`, `music-models`, `tool_and_agent_models` and `specialized_task_models` are all
+Re-check on each refresh that both anchors still exist and that no in-scope model has been moved
+under either. Then enumerate every `<h2 id="…">` on the page and diff it against the sections recorded
+here: because the rule names its exclusions **by denial**, any section Google adds later is admitted by
+default. That is the same open-set hazard that made revision 2 defective, reappearing on the section
+axis rather than the badge axis, and the enumeration is the only check that sees it. The sections
+present on 2026-10-02 were `gemini-3`, `gemini_25_pro`, `gemini_25_flash`, `gemini_25_flash-lite`,
+`audio_models`, `generative_media_models`, `music-models`, `tool_and_agent_models`,
+`specialized_task_models`, `previous_models`, `model-versions` and `model_deprecations`. `audio_models`, `music-models`, `tool_and_agent_models` and `specialized_task_models` are all
 in scope today and are kept out by the id pattern alone.
 
 Revision 1's open-weights rule was "the owning organisation still publishes the
