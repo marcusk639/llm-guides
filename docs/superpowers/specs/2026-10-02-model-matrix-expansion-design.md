@@ -367,22 +367,30 @@ Verbatim evidence for the Meta/Qwen (open-weights) row, gathered 2026-10-02. Bot
 organisation profile pages returned HTTP 200, no redirect: `https://huggingface.co/meta-llama`
 and `https://huggingface.co/Qwen`. Each embeds a `"collections":[...]` blob (HTML-entity-escaped)
 enumerating every collection the organisation has published, with each collection's `title`
-and `slug`; meta-llama's blob lists 15 collections, Qwen's lists 37. That embedded blob caps
-each collection's preview at 4 items, so membership was instead read from the Hugging Face
-collections API, `https://huggingface.co/api/collections/<slug>` — one call per collection,
-all 15 and all 37 returning HTTP 200 — and compared against each organisation's full model
-roster from `https://huggingface.co/api/models?author=<org>&limit=1000` (also HTTP 200):
-70 repositories under `meta-llama`, 468 under `Qwen`.
+and `slug`. That embedded blob caps each collection's preview at 4 items, so membership was
+instead read from the Hugging Face collections API,
+`https://huggingface.co/api/collections/<slug>` — one call per collection, every call
+returning HTTP 200 — and compared against each organisation's full model roster from
+`https://huggingface.co/api/models?author=<org>&limit=1000` (also HTTP 200).
 
-Qwen: the union of the 37 collections' `items` covers 454 of the 468 repositories. 14 exist
-but belong to none of them, among them `Qwen/Qwen-VL-Chat` and `Qwen/Qwen-Audio` — Qwen's
-first-generation vision- and audio-language models, superseded by the later Qwen2-VL and
-Qwen2-Audio lines, both of which are collected — and `Qwen/Qwen-tokenizer` (not a model).
+Qwen: the union of the collections' `items` covers every repository in the organisation's
+roster but fourteen, which belong to no published collection and are therefore excluded. They
+are enumerated here in full so the set can be re-derived rather than trusted (re-read
+2026-10-03, unchanged): `Qwen/CodeQwen1.5-7B-AWQ`, `Qwen/Qwen-Audio`, `Qwen/Qwen-Audio-Chat`,
+`Qwen/Qwen-Drive-1.0-4B`, `Qwen/Qwen-Image-2.1`, `Qwen/Qwen-Image-2.1-PE-I2I`,
+`Qwen/Qwen-Image-2.1-PE-T2I`, `Qwen/Qwen-VL`, `Qwen/Qwen-VL-Chat`, `Qwen/Qwen-VL-Chat-Int4`,
+`Qwen/Qwen-tokenizer`, `Qwen/Qwen2.5-Math-7B-PRM800K`,
+`Qwen/Qwen3-Next-80B-A3B-Instruct-GGUF` and `Qwen/Qwen3-Next-80B-A3B-Thinking-GGUF`.
+`Qwen/Qwen-VL-Chat` and `Qwen/Qwen-Audio` are Qwen's first-generation vision- and
+audio-language models, superseded by the later Qwen2-VL and Qwen2-Audio lines, both of which
+are collected; `Qwen/Qwen-tokenizer` is not a model. The two `Qwen3-Next-80B-A3B-*-GGUF`
+quantisations are the sharpest falsification available: they are current text models, and the
+rule still excludes them, because the test reads collection membership and nothing else.
 `Qwen/Qwen3-235B-A22B-Instruct-2507` is a member of the "Qwen3" collection
 (`https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f`) and is admitted.
-The rule is therefore falsifiable for Qwen, and a named model fails it.
+The rule is therefore falsifiable for Qwen, and named models fail it.
 
-Meta: the union of the 15 collections' `items` covers all 70 of `meta-llama`'s repositories,
+Meta: the union of the collections' `items` covers every one of `meta-llama`'s repositories,
 with no exception — even `meta-llama/Llama-2-7b-hf`, the oldest surviving Llama 2 checkpoint,
 is a member of the "Llama 2 Family" collection
 (`https://huggingface.co/collections/meta-llama/llama-2-family-661da1f90a9d678b6f55773b`).
