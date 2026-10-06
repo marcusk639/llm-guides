@@ -38,7 +38,8 @@ records:
     max_output: 128,000 tokens
     input_price: $10 / MTok
     output_price: $50 / MTok
-    notes: Prompts above 272K input tokens are billed at higher rates for the whole request.
+    notes: Prompts with more than 272K input tokens are priced at 2x input and cache
+      rates and 1.5x output for the full request.
     lint_literals:
       - gpt-6-astra
       - 1,050,000 tokens
@@ -46,10 +47,12 @@ records:
       - $10 / MTok
       - $50 / MTok
       - 272K input tokens
+      - 2x input and cache
+      - 1.5x output for the full request
     volatility: high
     source: https://developers.openai.com/api/docs/models/gpt-6-astra
     price_source: https://developers.openai.com/api/docs/pricing
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [comparison-hosted]
   - key: openai.models.gpt-5-6-terra
     value: gpt-5.6-terra
@@ -60,7 +63,8 @@ records:
     max_output: 128,000 tokens
     input_price: $2 / MTok
     output_price: $12 / MTok
-    notes: Prompts above 272K input tokens are billed at higher rates for the whole request.
+    notes: Prompts with >272K input tokens are priced at 2x input and 1.5x output for
+      the full request.
     lint_literals:
       - gpt-5.6-terra
       - 1,050,000 tokens
@@ -68,10 +72,11 @@ records:
       - $2 / MTok
       - $12 / MTok
       - 272K input tokens
+      - 2x input and 1.5x output
     volatility: high
     source: https://developers.openai.com/api/docs/models/gpt-5.6-terra
     price_source: https://developers.openai.com/api/docs/pricing
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [comparison-hosted]
   - key: openai.models.gpt-5-6-luna
     value: gpt-5.6-luna
@@ -82,7 +87,8 @@ records:
     max_output: 128,000 tokens
     input_price: $0.20 / MTok
     output_price: $1.20 / MTok
-    notes: Prompts above 272K input tokens are billed at higher rates for the whole request.
+    notes: Prompts with >272K input tokens are priced at 2x input and 1.5x output for
+      the full request.
     lint_literals:
       - gpt-5.6-luna
       - 1,050,000 tokens
@@ -90,10 +96,11 @@ records:
       - $0.20 / MTok
       - $1.20 / MTok
       - 272K input tokens
+      - 2x input and 1.5x output
     volatility: high
     source: https://developers.openai.com/api/docs/models/gpt-5.6-luna
     price_source: https://developers.openai.com/api/docs/pricing
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [comparison-hosted]
   # ---- Google ------------------------------------------------------------
   - key: google.models.gemini-3-8-flash
@@ -119,7 +126,7 @@ records:
     volatility: high
     source: https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash
     price_source: https://ai.google.dev/gemini-api/docs/pricing
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [comparison-hosted]
   - key: google.models.gemini-3-1-pro-preview
     value: gemini-3.1-pro-preview
@@ -143,7 +150,7 @@ records:
     volatility: high
     source: https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview
     price_source: https://ai.google.dev/gemini-api/docs/pricing
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [comparison-hosted]
   - key: google.models.gemini-3-5-flash-lite
     value: gemini-3.5-flash-lite
@@ -159,7 +166,7 @@ records:
     volatility: high
     source: https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite
     price_source: https://ai.google.dev/gemini-api/docs/pricing
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [comparison-hosted]
   # ---- Meta Llama (open weight) -------------------------------------------
   - key: meta.models.llama-4-maverick
@@ -173,7 +180,7 @@ records:
     lint_fields: [model_id, parameters, context_length, licence]
     volatility: high
     source: https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [comparison-open-weight]
   - key: meta.models.llama-4-scout
     value: meta-llama/Llama-4-Scout-17B-16E-Instruct
@@ -186,7 +193,7 @@ records:
     lint_fields: [model_id, parameters, context_length, licence]
     volatility: high
     source: https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [comparison-open-weight]
   # ---- Alibaba Qwen (open weight) ------------------------------------------
   - key: qwen.models.qwen3-8-2-4t-a95b
@@ -201,7 +208,7 @@ records:
     volatility: high
     source: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B
     licence_source: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B/blob/main/LICENSE
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [comparison-open-weight]
   - key: qwen.models.qwen3-8-27b
     value: Qwen/Qwen3.8-27B
@@ -211,6 +218,10 @@ records:
     parameters: 27B
     context_length: 262,144 natively and extensible up to 1,000,000 tokens
     licence: Apache License 2.0
+    notes: Hugging Face lists this repository's pipeline_tag as image-text-to-text
+      rather than text-generation, and the model card carries a VL Performance
+      section beside its Text Performance section. Whether the vendor states a
+      text-only output modality is not established by the pages read on 2026-10-06.
     lint_literals:
       - Qwen/Qwen3.8-27B
       - 262,144 natively and extensible up to 1,000,000 tokens
@@ -218,5 +229,5 @@ records:
     volatility: high
     source: https://huggingface.co/Qwen/Qwen3.8-27B
     licence_source: https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/LICENSE
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [comparison-open-weight]
