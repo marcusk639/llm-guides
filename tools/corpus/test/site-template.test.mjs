@@ -1,7 +1,7 @@
 // tools/corpus/test/site-template.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { renderPage } from "../site-template.mjs";
+import { renderFrontPage, renderPage } from "../site-template.mjs";
 
 const model = {
   path: "guides/models/claude-models.md",
@@ -77,4 +77,36 @@ test("a deprecated page renders no freshness banner at all", () => {
   const html = renderPage({ ...model, status: "deprecated" });
   assert.equal(html.includes("data-freshness"), false);
   assert.equal(html.includes("re-check every"), false);
+});
+
+test("the front page leads with method before topics", () => {
+  const html = renderFrontPage([model], ["models"]);
+  const method = html.indexOf("How claims here earn their confidence");
+  const topics = html.indexOf("<h2>Guides</h2>");
+  assert.equal(method > -1, true);
+  assert.equal(method < topics, true);
+});
+
+test("the front page links pages as .html, not .md", () => {
+  const html = renderFrontPage([model], ["models"]);
+  assert.match(html, /href="guides\/models\/claude-models\.html"/);
+});
+
+test("the front page omits a topic with no pages", () => {
+  const html = renderFrontPage([model], ["models", "cowork"]);
+  assert.equal(html.includes("Cowork"), false);
+});
+
+// The brief's Files block promises "a nav block in renderPage" that no step
+// adds. A site-wide topic menu would need models and topics, which Task 4 froze
+// out of renderPage's signature, so the nav block is a root-relative home link.
+test("a page links back to the front page at the right depth", () => {
+  const html = renderPage(model);
+  assert.match(html, /href="\.\.\/\.\.\/index\.html"/);
+});
+
+test("a page one directory deep links one level up, not two", () => {
+  const html = renderPage({ ...model, path: "guides/orphan.md" });
+  assert.match(html, /href="\.\.\/index\.html"/);
+  assert.equal(html.includes('href="../../index.html"'), false);
 });

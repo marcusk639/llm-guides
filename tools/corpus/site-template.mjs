@@ -1,5 +1,6 @@
 // tools/corpus/site-template.mjs
 import { renderMarkdown } from "./site-markdown.mjs";
+import { navTopics, loadTopics } from "./site-nav.mjs";
 import { annotateBody, injectProvenance } from "./site-provenance.mjs";
 import { clientScript, freshnessFacts, renderBanner } from "./site-freshness.mjs";
 
@@ -43,6 +44,14 @@ export function stripMarkerComments(body) {
   return body.replace(/<!--\s*\/?corpus:(data|table)[^>]*-->\n?/g, "");
 }
 
+// A page at guides/<topic>/<name>.html reaches the front page two levels up.
+// renderPage is never given the topic list, so site-wide navigation is a home
+// link rather than a menu.
+export function homeHref(mdPath) {
+  const depth = String(mdPath).split("/").length - 1;
+  return depth > 0 ? "../".repeat(depth) + "index.html" : "index.html";
+}
+
 export function renderPage(model, byKey = new Map(), records = []) {
   const headings = numberedHeadings(model.body);
   const facts = freshnessFacts(model);
@@ -76,6 +85,7 @@ export function renderPage(model, byKey = new Map(), records = []) {
 </head>
 <body>
 <main>
+  <nav class="site" aria-label="Site"><a href="${esc(homeHref(model.path))}">All guides</a></nav>
   <h1>${esc(model.title)}</h1>
   <p class="summary">${esc(model.summary)}</p>
   ${renderBanner(facts)}
@@ -110,4 +120,58 @@ ${facts ? clientScript() : ""}
 </body>
 </html>
 `;
+}
+
+
+export function renderFrontPage(models, topics) {
+  const nav = navTopics(models, topics);
+  const sections = nav
+    .map(
+      (t) => `    <section class="topic">
+      <h3>${esc(t.label)}</h3>
+      <ul>
+${t.pages.map((p) => `        <li><a href="${esc(htmlPathFor(p.path))}">${esc(p.title)}</a></li>`).join("\n")}
+      </ul>
+    </section>`,
+    )
+    .join("\n");
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM guides</title>
+<meta name="description" content="A reference corpus on effective LLM use, where every page and every figure carries a verification date.">
+</head>
+<body>
+<main>
+  <h1>LLM guides</h1>
+  <section class="method">
+    <h2>How claims here earn their confidence</h2>
+    <p>Every volatile value — a model id, a price, a context limit — lives in a
+    record carrying the URL it was read from and the date it was read. Figures
+    on a page show that date and link that source, independently of when the
+    page itself was last checked.</p>
+    <p>Claims are labelled. <strong>Verified</strong> means a runnable proof
+    ships in the repository. <strong>Documented</strong> means a vendor or
+    peer-reviewed source states it, linked, with the date it was read.
+    <strong>Plausible</strong> means practitioner inference, and is never
+    written as confident prose.</p>
+    <p>Every page states when it was last checked and when it goes stale. A
+    page past its expiry says so, in its banner, before its content.</p>
+  </section>
+  <section class="topics">
+    <h2>Guides</h2>
+${sections}
+  </section>
+</main>
+</body>
+</html>
+`;
+}
+
+// guides/models/comparison.md -> guides/models/comparison.html
+export function htmlPathFor(mdPath) {
+  return mdPath.replace(/\.md$/, ".html");
 }
