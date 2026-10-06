@@ -110,3 +110,10 @@ test("a page one directory deep links one level up, not two", () => {
   assert.match(html, /href="\.\.\/index\.html"/);
   assert.equal(html.includes('href="../../index.html"'), false);
 });
+
+test("the front page carries the search field and its script", () => {
+  const html = renderFrontPage([model], ["models"]);
+  assert.match(html, /<input[^>]*data-search/);
+  assert.match(html, /data-search-results/);
+  assert.match(html, /search-index\.json/);
+});

@@ -1,6 +1,7 @@
 // tools/corpus/site-template.mjs
 import { renderMarkdown } from "./site-markdown.mjs";
 import { navTopics, loadTopics } from "./site-nav.mjs";
+import { searchScript } from "./site-search.mjs";
 import { annotateBody, injectProvenance } from "./site-provenance.mjs";
 import { clientScript, freshnessFacts, renderBanner } from "./site-freshness.mjs";
 
@@ -147,6 +148,8 @@ ${t.pages.map((p) => `        <li><a href="${esc(htmlPathFor(p.path))}">${esc(p.
 <body>
 <main>
   <h1>LLM guides</h1>
+  <form class="search" role="search" onsubmit="return false"><label for="q">Search the corpus</label> <input id="q" type="search" data-search autocomplete="off"></form>
+  <ul data-search-results></ul>
   <section class="method">
     <h2>How claims here earn their confidence</h2>
     <p>Every volatile value — a model id, a price, a context limit — lives in a
@@ -166,6 +169,7 @@ ${t.pages.map((p) => `        <li><a href="${esc(htmlPathFor(p.path))}">${esc(p.
 ${sections}
   </section>
 </main>
+${searchScript()}
 </body>
 </html>
 `;
