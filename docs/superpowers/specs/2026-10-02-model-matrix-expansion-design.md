@@ -1,7 +1,7 @@
 # Model matrix expansion — design
 
-Date: 2026-10-02 (revision 3, after a second plan review)
-Status: design, awaiting owner review
+Date: 2026-10-06 (revision 6, plus the stated-criterion amendment)
+Status: design, phase 0 delivered; phases 1-5 awaiting owner review
 Extends `docs/superpowers/specs/2026-09-16-llm-corpus-foundation-design.md` (revision 2) as amended by `CLAUDE.md`, which wins on any conflict.
 
 Revision 2 responds to a plan review of revision 1. It adds the tag design that
@@ -10,11 +10,27 @@ shape degrade when a vendor publishes no positioning (section 7), defines done p
 page (section 11), and resolves the three decisions revision 1 left open
 (section 16).
 
+Revisions 4 to 6 and the criterion amendment all landed in section 8, during phase 0.
+Revision 4 scoped the Google rule to text-model ids, after revision 3's badge-only
+rule was found to admit TTS, ASR, image and video models. Revision 5 replaced the
+badge-presence clause with a section test, after revision 4 was found to exclude three
+Gemini models the vendor still serves but does not badge. Revision 6 deleted every
+derived vendor-inventory count and pinned alias handling, one of those counts having
+proved not merely wrong but undefined. A final amendment states the criterion all four
+rules approximate and makes it govern. The lesson those revisions paid for: a rule
+tests a proxy, and a proxy that is never checked against its criterion drifts silently.
+
 ## 1. Intent
 
-Cover every actively supported model from each AI provider, each carrying its
+Cover every model each AI provider currently serves, each carrying its
 strengths, weaknesses, pros, cons and use cases — without weakening the corpus's
 one real promise, that no reader ever copies a wrong-but-plausible number.
+
+That wording is deliberately identical to the criterion section 8 states for its
+inclusion rules. "Supported" is a vendor-specific lifecycle word — Anthropic defines
+Active as fully supported and Deprecated as still functional but no longer recommended
+— so the corpus does not reuse it (D5). A Deprecated model the vendor still serves is
+in scope.
 
 Two reader jobs, served in layers on one page per provider:
 
@@ -28,12 +44,14 @@ out is one a named vendor published on a stated date.
 
 ## 2. Why this needs a design rather than page work
 
-Anthropic's pricing page alone still rates nineteen models. Across Anthropic,
+Anthropic's pricing page alone rates its whole served lineup. Across Anthropic,
 OpenAI, Google, Meta and Qwen the set is plausibly 60–100 records. Every model
 record is `high` volatility, and one `high` record sets its whole page to the
 30-day cadence in `CADENCE_DAYS`.
 
-The corpus tracks fourteen such records today. The first hand-driven refresh of
+The number of such records the corpus tracks is whatever `loadRecords("data")`
+returns — sixteen at the 2026-10-06 read, and it moves whenever a model is added or
+demoted. The first hand-driven refresh of
 them, on 2026-10-02, returned `verdict: blocked`: four records could not be
 confirmed, and a blocked unit writes nothing at all. Scaling that unit to six pages
 and 60–100 records without changing its shape gives a corpus whose freshness
@@ -150,9 +168,6 @@ than failing loudly.
 
 ### The test that makes this real
 
-A unit test in `tools/corpus/test/` asserting, for each provider page, that
-`resolveUnit` returns keys from exactly one vendor namespace:
-
 Revision 2 proposed a unit test calling `resolveUnit` on named provider pages. That
 was wrong in three ways, and the correction matters more than the original idea:
 
@@ -209,8 +224,9 @@ Revision 1 assumed every in-scope model has a vendor positioning sentence. It do
 not. The four current Anthropic models carry one ("For long-running agentic coding
 and knowledge work"); the legacy model pages read on 2026-10-02 carry a lifecycle
 status, limits and a "How it compares to the current lineup" table, but **no
-positioning sentence**. On the inclusion rule in section 8 that affects roughly
-fifteen of nineteen Anthropic entries.
+positioning sentence**. Most in-scope entries will therefore carry no vendor
+positioning sentence; phase 2 enumerates which do, by opening each admitted model's
+page and recording the date read.
 
 So the field degrades, explicitly:
 
@@ -230,7 +246,9 @@ describing.
 Model **names** are identifiers, free in prose. Model **ids**, prices, limits and
 parameter counts are **values**: they may appear in a guide body only inside a
 marker block backed by a record. An entry never writes `claude-opus-5-5`; it writes
-"Claude Opus 5.5" and relies on the page's table.
+"Claude Opus 5.5" and relies on the page's table. (This spec is not under `guides/`,
+the only tree `guidePaths` walks, so the lint never scans it and the id above is safe
+as an example.)
 
 For tracked models the lint enforces this — a tracked id written bare is
 `bare-value`. For a model with no record the lint is blind, because it is
@@ -472,7 +490,9 @@ revision 1 lacked.
 2. Every model the rule admits has an entry; every entry has a `Strengths` and a
    `Limits` list with Evidence labels, or a stated reason it is short per section 7.
 3. The page renders its own vendor's records and no others, proved by the
-   `resolveUnit` test in section 6 of this design.
+   `page-vendor-mixed` verify rule (section 6), which lands in phase 4. Until then
+   this criterion cannot be met mechanically — consistent with section 6's own
+   Timing paragraph — and is carried by review instead.
 4. Four gates clean: `render --check` exit 0 with no `would render:`, `lint: clean`,
    `verify: clean`, `npm test` green.
 5. A `research:` artifact exists and resolves.
@@ -494,9 +514,9 @@ review and pull request.
 
 | Phase | Scope | Proves |
 | --- | --- | --- |
-| 0 | Pin the two unpinned inclusion rules (section 8). Research only; no file in `guides/` or `data/` changes | That both remaining rules are falsifiable against a page that exists |
+| 0 | Pin the Google and Qwen inclusion rules; state the criterion the rules approximate; remove derived vendor counts. Meta remains deliberately unpinned (section 8). Research only; no file in `guides/` or `data/` changes | That the pinned rules are falsifiable against a page that exists, and that Meta's is not yet |
 | 1 | `claude-models.md` gains entries for the six Anthropic models already tracked (four current, two legacy). No tag or unit change: the page already renders `claude-current` and `claude-legacy` | The entry shape and the evidence discipline, including a legacy entry with no vendor positioning |
-| 2 | `claude-models.md` extends to the full in-scope Anthropic set | That the shape survives roughly nineteen entries on one page, and whether risk 14.3 is real |
+| 2 | `claude-models.md` extends to the full in-scope Anthropic set | That the shape survives the full in-scope set on one page, and whether risk 14.3 is real |
 | 3 | Create `openai.md`, then `google.md`, then `open-weights.md` — one page, one branch, one review each — each with its own new per-vendor tags. `comparison.md` keeps its tables throughout | Replication of the shape. Records are rendered twice during this phase, by their provider page and still by `comparison.md`; the unit stays temporarily large, and nothing breaks |
 | 4 | `comparison.md` goes prose-only; retire the two cross-vendor tags; add the `page-vendor-mixed` verify rule with its fixture tests; all three `CLAUDE.md` edits. One merge commit, no value changes | The unit separation. This is where the four units actually come apart, and the verify rule is its standing guard |
 | 5 | The "adding a provider" recipe in each page's section 6 | That a sixth provider is a documented operation, not a re-derivation |
@@ -508,7 +528,7 @@ rather than failing loudly. Phase 3 therefore precedes phase 4, and no record is
 ever orphaned: every record is rendered by at least one page at every point.
 
 The `resolveUnit` test lands in phase 4 rather than phase 0 because the invariant
-it asserts is false until then. Today `resolveUnit("guides/models/claude-models.md")`
+it asserts is false until then. Today `resolveUnit(root, "guides/models/claude-models.md", records)`
 returns records from all five vendors, since `comparison.md` renders them and shares
 the unit. The test is written in the same change that makes it true, and it then
 guards every later provider page.
@@ -580,12 +600,13 @@ the number of cycles goes up fourfold.
 ## 14. Risks, and what this design weakens
 
 1. **The page date still asserts a lot.** A provider page's `verified` claims the
-   whole of its section 6 was worked. On a nineteen-model page that is a large
+   whole of its section 6 was worked. On a page carrying a provider's full served
+   lineup that is a large
    claim. Mitigation: the entry shape is fixed, so the page's section 6 can enumerate what
    must be re-read, and criterion 7 forbids moving the date on a partial pass.
 2. **Untracked ids are invisible to the lint.** Section 6 of each page names them.
    Author discipline and the adversarial review are the only guards.
-3. **Page size.** Nineteen entries plus two tables is long. Phase 2 is where this
+3. **Page size.** The full in-scope set plus two tables is long. Phase 2 is where this
    gets tested, against a stated threshold rather than a feeling: if the Anthropic
    page exceeds roughly 1,200 lines, or its section 6 re-check list exceeds 40 items,
    it is too large. The fallback — current models on the provider page, legacy on a
