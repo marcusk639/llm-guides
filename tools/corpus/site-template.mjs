@@ -1,5 +1,6 @@
 // tools/corpus/site-template.mjs
 import { renderMarkdown } from "./site-markdown.mjs";
+import { annotateBody, injectProvenance } from "./site-provenance.mjs";
 
 const esc = (s) =>
   String(s)
@@ -43,6 +44,13 @@ export function stripMarkerComments(body) {
 
 export function renderPage(model, byKey = new Map(), records = []) {
   const headings = numberedHeadings(model.body);
+  const { body: annotated } = annotateBody(model.body, byKey, records);
+  const article = injectProvenance(
+    renderMarkdown(stripMarkerComments(annotated)),
+    model,
+    byKey,
+    records,
+  );
   const nav = headings
     .map((h) => `<li><a href="#${esc(h.slug)}">${esc(h.text)}</a></li>`)
     .join("\n      ");
@@ -81,7 +89,7 @@ export function renderPage(model, byKey = new Map(), records = []) {
     </ul>
   </nav>
   <article>
-${renderMarkdown(stripMarkerComments(model.body))}
+${article}
   </article>
   <section class="sources">
     <h2>Sources</h2>

@@ -3,6 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { recordsByKey } from "../data.mjs";
 import { provenanceFor, renderSubRow } from "../site-provenance.mjs";
+import { renderPage } from "../site-template.mjs";
 
 const records = [
   {
@@ -114,4 +115,85 @@ test("an unterminated marker block yields no provenance sub-row", () => {
   const { entries, issues } = provenanceFor(block, byKey, records);
   assert.deepEqual(entries, []);
   assert.deepEqual(issues, []);
+});
+
+const model = {
+  path: "guides/models/claude-models.md",
+  title: "Claude models",
+  summary: "Current Claude model ids, limits and prices.",
+  topic: "models",
+  verified: "2026-10-06",
+  status: null,
+  seed: true,
+  appliesTo: ["Claude API, read 2026-10-06"],
+  sources: ["https://example.invalid/models"],
+  related: ["guides/models/comparison.md"],
+  body: "",
+  keys: ["a.models.one", "a.models.two"],
+  volatility: "high",
+};
+
+// The brief declares injectProvenance in its Files and Produces blocks and
+// Task 9 relies on renderPage(page, byKey, records) running the provenance
+// pass, but no brief step implements either. These tests close that gap.
+const tableBody = `## 1. What this covers
+
+<!-- corpus:table fields=key,value tag=t -->
+
+| key | value |
+| --- | ----- |
+| a.models.one | one |
+| a.models.two | two |
+
+<!-- /corpus:table -->
+
+## 6. Where this rots
+
+| Claim | Record |
+| ----- | ------ |
+| hand written | none |
+`;
+
+test("each generated table row gets a provenance sub-row immediately beneath it", () => {
+  const html = renderPage({ ...model, body: tableBody }, byKey, records);
+  assert.match(html, /<tr class="provenance" data-record-key="a\.models\.one">/);
+  assert.match(html, /<tr class="provenance" data-record-key="a\.models\.two">/);
+  const firstRow = html.indexOf(">one<");
+  const firstSub = html.indexOf('data-record-key="a.models.one"');
+  const secondRow = html.indexOf(">two<");
+  assert.ok(firstRow !== -1 && secondRow !== -1);
+  assert.ok(firstRow < firstSub && firstSub < secondRow);
+});
+
+test("a sub-row spans the generated table's full width rather than adding columns", () => {
+  const html = renderPage({ ...model, body: tableBody }, byKey, records);
+  assert.match(html, /data-record-key="a\.models\.one"><td colspan="2">/);
+});
+
+test("a hand-written table outside any marker block gets no provenance sub-row", () => {
+  const html = renderPage({ ...model, body: tableBody }, byKey, records);
+  const rot = html.slice(html.indexOf("hand written"));
+  assert.equal(/class="provenance"/.test(rot), false);
+});
+
+test("row sentinels never leak into the rendered output", () => {
+  const html = renderPage({ ...model, body: tableBody }, byKey, records);
+  assert.equal(html.includes("@@PROV"), false);
+});
+
+test("an inline corpus:data figure carries its own date and source", () => {
+  const body =
+    "## 1. What this covers\n\nThe value is <!-- corpus:data key=a.models.one -->one<!-- /corpus:data --> today.\n";
+  const html = renderPage({ ...model, body }, byKey, records);
+  assert.match(
+    html,
+    /<span class="provenance" data-record-key="a\.models\.one">/,
+  );
+  assert.match(html, /2026-09-16/);
+  assert.match(html, /href="https:\/\/example\.invalid\/one"/);
+});
+
+test("provenance is absent when renderPage is called without records", () => {
+  const html = renderPage({ ...model, body: tableBody });
+  assert.equal(/class="provenance"/.test(html), false);
 });
