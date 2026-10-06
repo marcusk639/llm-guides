@@ -526,7 +526,7 @@ git commit -m "feat: render markdown with marked, preserving generated table mar
 
 **Interfaces:**
 - Consumes: a page model from Task 2's `collectPages`; `renderMarkdown(md)` from Task 3.
-- Produces: `renderPage(model)` → a complete HTML document string. Task 5 injects provenance into its table markup, Task 6 inserts the banner, Task 7 inserts navigation, Task 8 inserts the search field. Those tasks extend this function rather than replacing it.
+- Produces: `renderPage(model, byKey = new Map(), records = [])` → a complete HTML document string. The second and third parameters are declared NOW, with defaults, even though only Task 5's provenance pass and Task 9's build loop supply them. They are in the signature from the start so that no later task edits a function this task delivered: a signature that grows in Task 9 means Task 4's reviewer approved a different function from the one that ships, and the defaults would hide the change. Task 5 injects provenance into its table markup, Task 6 inserts the banner, Task 7 inserts navigation, Task 8 inserts the search field. Those tasks extend this function rather than replacing it.
 
 **Page anatomy, in the spec's order (lines 281-300):** title and summary from front-matter with `summary` doubling as the meta description, because strangers arrive via search; the freshness banner (Task 6); `applies_to` stated plainly, because it is the page's own declaration of which product version it describes and burying it hides the corpus's answer to its hardest staleness problem; the eight numbered sections with in-page tier navigation; section 6 "Where this rots" surfaced prominently, because a guide that states what it cannot promise is the trust signal, not an appendix; then sources and related links.
 
@@ -636,7 +636,7 @@ export function numberedHeadings(body) {
   return out;
 }
 
-export function renderPage(model) {
+export function renderPage(model, byKey = new Map(), records = []) {
   const headings = numberedHeadings(model.body);
   const nav = headings
     .map((h) => `<li><a href="#${esc(h.slug)}">${esc(h.text)}</a></li>`)
@@ -2007,7 +2007,7 @@ export function siteCorpus(root, { write = false } = {}) {
 }
 ```
 
-`renderPage` gains two parameters so Task 5's provenance pass can run: change its signature in `site-template.mjs` to `renderPage(model, byKey = new Map(), records = [])` and call `injectProvenance` on the rendered article HTML. Existing Task 4 and 6 tests call it with one argument, and the defaults keep them passing.
+`renderPage` already takes `byKey` and `records` — Task 4 declared them with defaults for exactly this call site, so nothing about its signature changes here. Pass the real `byKey` and `records` through and the provenance pass runs; pass nothing and Task 4's and Task 6's tests still hold.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
