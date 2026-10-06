@@ -60,3 +60,21 @@ test("marker comments do not appear in the rendered output", () => {
   const html = renderPage(withMarkers);
   assert.equal(html.includes("corpus:data"), false);
 });
+
+test("the banner states the facts without a badge in the markup", () => {
+  const html = renderPage(model);
+  assert.match(html, /Verified 2026-10-06 · re-check every 30 days/);
+  assert.match(html, /data-freshness=/);
+  assert.equal(html.includes("badge-fresh"), false);
+});
+
+test("a seed page discloses that its date predates the pipeline", () => {
+  const html = renderPage(model);
+  assert.match(html, /authored before the refresh pipeline existed/);
+});
+
+test("a deprecated page renders no freshness banner at all", () => {
+  const html = renderPage({ ...model, status: "deprecated" });
+  assert.equal(html.includes("data-freshness"), false);
+  assert.equal(html.includes("re-check every"), false);
+});

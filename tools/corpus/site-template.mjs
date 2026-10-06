@@ -1,6 +1,7 @@
 // tools/corpus/site-template.mjs
 import { renderMarkdown } from "./site-markdown.mjs";
 import { annotateBody, injectProvenance } from "./site-provenance.mjs";
+import { clientScript, freshnessFacts, renderBanner } from "./site-freshness.mjs";
 
 const esc = (s) =>
   String(s)
@@ -44,6 +45,7 @@ export function stripMarkerComments(body) {
 
 export function renderPage(model, byKey = new Map(), records = []) {
   const headings = numberedHeadings(model.body);
+  const facts = freshnessFacts(model);
   const { body: annotated } = annotateBody(model.body, byKey, records);
   const article = injectProvenance(
     renderMarkdown(stripMarkerComments(annotated)),
@@ -76,7 +78,7 @@ export function renderPage(model, byKey = new Map(), records = []) {
 <main>
   <h1>${esc(model.title)}</h1>
   <p class="summary">${esc(model.summary)}</p>
-  <!-- banner -->
+  ${renderBanner(facts)}
   <section class="applies-to">
     <h2>Applies to</h2>
     <ul>
@@ -104,6 +106,7 @@ ${article}
     </ul>
   </section>
 </main>
+${facts ? clientScript() : ""}
 </body>
 </html>
 `;
