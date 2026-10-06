@@ -105,7 +105,7 @@ Measured across all five guides, because it determines the one dependency this d
 
 | Feature                            | Count                        | Consequence                        |
 | ---------------------------------- | ---------------------------- | ---------------------------------- |
-| GFM table rows                     | 97                           | Tables are mandatory, not optional |
+| GFM table rows                     | 96                           | Tables are mandatory, not optional |
 | Fenced blocks                      | 16 (32 delimiters)           | All language-tagged                |
 | Fence languages                    | `bash` 8, `json` 5, `text` 3 | Three languages, no more           |
 | ATX headings                       | 90                           | The `## N.` eight-part structure   |
@@ -115,8 +115,10 @@ Measured across all five guides, because it determines the one dependency this d
 **The requirement is exactly CommonMark plus GFM tables.** Nothing more.
 
 These counts are a function of current content, so they must be re-measured rather than
-copied forward: the table-row figure already moved once, when a refresh re-rendered the two
-`models` pages three days after this document was first written.
+copied forward. A refresh re-rendered both `models` pages and added a column to two tables
+three days after this document was first written; the row count happened to come back
+unchanged at 96, but a pass that assumed it had moved wrote 97 into this table and had to be
+corrected. Re-measure and compare — do not assume a change, and do not assume stability.
 
 Every count above excludes fenced content, because a fence poisons a naive scan in both
 directions. Method: match the feature outside fenced blocks only — toggling on each line
