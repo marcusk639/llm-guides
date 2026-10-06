@@ -11,14 +11,17 @@ page (section 11), and resolves the three decisions revision 1 left open
 (section 16).
 
 Revisions 4 to 6 and the criterion amendment all landed in section 8, during phase 0.
-Revision 4 scoped the Google rule to text-model ids, after revision 3's badge-only
-rule was found to admit TTS, ASR, image and video models. Revision 5 replaced the
+Revision 4 scoped the Google rule to text-model ids, after revision 3's badge-only rule
+was found to admit TTS, ASR, image and video models. Revision 5 replaced the
 badge-presence clause with a section test, after revision 4 was found to exclude three
-Gemini models the vendor still serves but does not badge. Revision 6 deleted every
-derived vendor-inventory count and pinned alias handling, one of those counts having
-proved not merely wrong but undefined. A final amendment states the criterion all four
-rules approximate and makes it govern. The lesson those revisions paid for: a rule
-tests a proxy, and a proxy that is never checked against its criterion drifts silently.
+Gemini models the vendor still serves but does not badge. Revision 6 dropped the Google
+rule's derived vendor-inventory counts and pinned alias handling, one of those counts
+having proved not merely wrong but undefined; a following commit did the same for the
+Meta/Qwen rule. A final amendment states the criterion all four rules approximate and
+makes it govern. This paragraph is a convenience and `git log` is authoritative: if the
+two disagree, it is this paragraph that is stale. The lesson those revisions paid for: a
+rule tests a proxy, and a proxy that is never checked against its criterion drifts
+silently.
 
 ## 1. Intent
 
@@ -44,18 +47,19 @@ out is one a named vendor published on a stated date.
 
 ## 2. Why this needs a design rather than page work
 
-Anthropic's pricing page alone rates its whole served lineup. Across Anthropic,
-OpenAI, Google, Meta and Qwen the set is plausibly 60–100 records. Every model
-record is `high` volatility, and one `high` record sets its whole page to the
-30-day cadence in `CADENCE_DAYS`.
+Across Anthropic, OpenAI, Google, Meta and Qwen the set is plausibly 60–100 records.
+Every model record is `high` volatility, and one `high` record sets its whole page to
+the 30-day cadence in `CADENCE_DAYS`.
 
-The number of such records the corpus tracks is whatever `loadRecords("data")`
-returns — sixteen at the 2026-10-06 read, and it moves whenever a model is added or
-demoted. The first hand-driven refresh of
-them, on 2026-10-02, returned `verdict: blocked`: four records could not be
-confirmed, and a blocked unit writes nothing at all. Scaling that unit to six pages
-and 60–100 records without changing its shape gives a corpus whose freshness
-machinery can never close.
+The number of such records the corpus tracks is how many of `loadRecords("data")` carry
+a key of the form `<vendor>.models.<id>` — sixteen at the 2026-10-06 read, and it moves
+whenever a model is added or demoted. The key shape is the test rather than the file
+list, because a sixth vendor would arrive in a new `data/` file and would still key its
+models the same way; `loadRecords("data")` on its own returns every record in `data/`,
+model or not, so it answers a different question. The first hand-driven refresh of them,
+on 2026-10-02, returned `verdict: blocked`: four records could not be confirmed, and a
+blocked unit writes nothing at all. Scaling that unit to six pages and 60–100 records
+without changing its shape gives a corpus whose freshness machinery can never close.
 
 The design question is therefore not how to write the pages. It is how to keep the
 refresh unit small while the corpus gets large.
@@ -527,11 +531,11 @@ old tags are removed, because removing a tag a page still renders yields
 rather than failing loudly. Phase 3 therefore precedes phase 4, and no record is
 ever orphaned: every record is rendered by at least one page at every point.
 
-The `resolveUnit` test lands in phase 4 rather than phase 0 because the invariant
-it asserts is false until then. Today `resolveUnit(root, "guides/models/claude-models.md", records)`
-returns records from all five vendors, since `comparison.md` renders them and shares
-the unit. The test is written in the same change that makes it true, and it then
-guards every later provider page.
+The `page-vendor-mixed` rule lands in phase 4 rather than phase 0 because the invariant
+it asserts is false until then. Today
+`resolveUnit(root, "guides/models/claude-models.md", records)` returns records from all
+five vendors, since `comparison.md` renders them and shares the unit. The rule is added in the same change
+that makes it true, and it then guards every later provider page.
 
 Phase 4 is the least reversible step — it changes a declared archetype — so it
 deliberately comes last of the structural work.
