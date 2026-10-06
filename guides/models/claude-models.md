@@ -8,7 +8,7 @@ summary: >-
 topic: models
 verified: 2026-10-06
 applies_to:
-  - "Claude API (first-party) as documented on platform.claude.com on 2026-09-16; the Anthropic model lineup, legacy status and prices re-read 2026-10-02"
+  - "Claude API (first-party) as documented on platform.claude.com on 2026-10-06"
   - "Current models: Claude Fable 5.1, Claude Opus 5.5, Claude Sonnet 5.5, Claude Haiku 4.5"
   - "Legacy models still served: Claude Opus 5, Claude Sonnet 5"
 sources:

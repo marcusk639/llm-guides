@@ -48,6 +48,7 @@ records:
       - $50 / MTok
       - 272K input tokens
       - 2x input and cache
+      - 1.5x output for the full request
     volatility: high
     source: https://developers.openai.com/api/docs/models/gpt-6-astra
     price_source: https://developers.openai.com/api/docs/pricing

@@ -10,8 +10,8 @@ summary: >-
 topic: models
 verified: 2026-10-06
 applies_to:
-  - "Anthropic Claude API, OpenAI API and Google Gemini API documentation as published on 2026-09-16; the Anthropic rows re-read 2026-10-02, when Claude Opus 5.5 replaced Claude Opus 5 in the hosted table"
-  - "Hugging Face model cards in the meta-llama and Qwen organisations as published on 2026-09-16"
+  - "Anthropic Claude API, OpenAI API and Google Gemini API documentation as published on 2026-10-06"
+  - "Hugging Face model cards in the meta-llama and Qwen organisations as published on 2026-10-06"
   - "Rows: Claude Fable 5.1, Claude Opus 5.5, Claude Haiku 4.5; GPT-6 Astra, GPT-5.6 Terra, GPT-5.6 Luna; Gemini 3.8 Flash, Gemini 3.1 Pro Preview, Gemini 3.5 Flash-Lite; Llama 4 Maverick, Llama 4 Scout; Qwen3.8-2.4T-A95B, Qwen3.8-27B"
 sources:
   - https://platform.claude.com/docs/en/models/overview
@@ -91,13 +91,13 @@ Hosted models, as published on the verification date. Prices are base paid-tier 
 
 Open-weight models, as stated in each official model card on the verification date. There is no price column: what you pay depends on where and how you run the weights.
 
-<!-- corpus:table fields=vendor,name,model_id,parameters,context_length,licence headers="Vendor,Model,Model ID,Parameters,Context length,Licence" sort=vendor tag=comparison-open-weight -->
-| Vendor | Model | Model ID | Parameters | Context length | Licence |
-| --- | --- | --- | --- | --- | --- |
-| Alibaba Qwen | Qwen3.8-2.4T-A95B | Qwen/Qwen3.8-2.4T-A95B | 2.4T in total and 95B activated | 262,144 natively and extensible up to 1,010,000 tokens | Qwen3.8-Max License |
-| Alibaba Qwen | Qwen3.8-27B | Qwen/Qwen3.8-27B | 27B | 262,144 natively and extensible up to 1,000,000 tokens | Apache License 2.0 |
-| Meta | Llama 4 Maverick | meta-llama/Llama-4-Maverick-17B-128E-Instruct | 17B (Activated), 400B (Total) | 1M | Llama 4 Community License Agreement |
-| Meta | Llama 4 Scout | meta-llama/Llama-4-Scout-17B-16E-Instruct | 17B (Activated), 109B (Total) | 10M | Llama 4 Community License Agreement |
+<!-- corpus:table fields=vendor,name,model_id,parameters,context_length,licence,notes headers="Vendor,Model,Model ID,Parameters,Context length,Licence,Notes" sort=vendor tag=comparison-open-weight -->
+| Vendor | Model | Model ID | Parameters | Context length | Licence | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Alibaba Qwen | Qwen3.8-2.4T-A95B | Qwen/Qwen3.8-2.4T-A95B | 2.4T in total and 95B activated | 262,144 natively and extensible up to 1,010,000 tokens | Qwen3.8-Max License |  |
+| Alibaba Qwen | Qwen3.8-27B | Qwen/Qwen3.8-27B | 27B | 262,144 natively and extensible up to 1,000,000 tokens | Apache License 2.0 | Hugging Face lists this repository's pipeline_tag as image-text-to-text rather than text-generation, and the model card carries a VL Performance section beside its Text Performance section. Whether the vendor states a text-only output modality is not established by the pages read on 2026-10-06. |
+| Meta | Llama 4 Maverick | meta-llama/Llama-4-Maverick-17B-128E-Instruct | 17B (Activated), 400B (Total) | 1M | Llama 4 Community License Agreement |  |
+| Meta | Llama 4 Scout | meta-llama/Llama-4-Scout-17B-16E-Instruct | 17B (Activated), 109B (Total) | 10M | Llama 4 Community License Agreement |  |
 <!-- /corpus:table -->
 
 If a table and the vendor page it came from disagree, the vendor page wins. Section 8 lists every page.
