@@ -70,8 +70,9 @@ from that.
 
 ## Repository state at the time of writing
 
-Verified by reading the files rather than trusting prior summaries, as of 2026-10-06
-summaries:
+Verified by reading the files rather than trusting prior summaries. Every figure below is
+the value on `master` as of 2026-10-06. Where a figure is volatile it is stated with its
+derivation as well, so a later reader can tell a stale number from a wrong one:
 
 - Gates clean: `render --check` exits 0 with no output, `lint: clean`, `verify: clean`,
   `npm test` 372/372.
@@ -91,7 +92,12 @@ summaries:
 - `meta/ledger.yaml`: `generated` plus 5 entries of `path`, `verified`, `volatility`,
   `expires`. No title, summary or topic.
 - `research/` holds exactly one artifact, `verdict: blocked`.
-- Both `models` pages expire **2026-10-16**; the other three expire 2026-12-15.
+- Expiry is derived, never stored by hand: `expires = verified + CADENCE_DAYS[volatility]`,
+  and `CADENCE_DAYS = { high: 30, medium: 90, low: 270 }` in `ledger.mjs`. The two `models`
+  pages are the corpus's only `high`-volatility pages, so they take the 30-day cadence; the
+  other three are `medium` at 90 days. As of 2026-10-06 that puts the `models` pages at
+  2026-11-05 and the other three at 2026-12-15 — values that move on every refresh, which is
+  why this design depends on the rule and not on the dates.
 
 ### Markdown surface actually used
 
@@ -99,7 +105,7 @@ Measured across all five guides, because it determines the one dependency this d
 
 | Feature                            | Count                        | Consequence                        |
 | ---------------------------------- | ---------------------------- | ---------------------------------- |
-| GFM table rows                     | 96                           | Tables are mandatory, not optional |
+| GFM table rows                     | 97                           | Tables are mandatory, not optional |
 | Fenced blocks                      | 16 (32 delimiters)           | All language-tagged                |
 | Fence languages                    | `bash` 8, `json` 5, `text` 3 | Three languages, no more           |
 | ATX headings                       | 90                           | The `## N.` eight-part structure   |
@@ -107,6 +113,10 @@ Measured across all five guides, because it determines the one dependency this d
 | Images, raw HTML blocks            | 0                            | No extension needed                |
 
 **The requirement is exactly CommonMark plus GFM tables.** Nothing more.
+
+These counts are a function of current content, so they must be re-measured rather than
+copied forward: the table-row figure already moved once, when a refresh re-rendered the two
+`models` pages three days after this document was first written.
 
 Every count above excludes fenced content, because a fence poisons a naive scan in both
 directions. Method: match the feature outside fenced blocks only — toggling on each line
@@ -397,9 +407,10 @@ different times. This is the single most important mechanic in the component:
 
 **Why this split is not optional.** State is a function of *today*. Revision 1 computed it at
 build time and embedded the result, which meant the banner froze at whatever the state was when
-the site was last deployed. On this corpus's own numbers that is not theoretical: both `models`
-pages expire 2026-10-16, so a site built today and left alone would still assert `fresh` in
-November over pages that were by then more than a cadence overdue. Worse, the two failures
+the site was last deployed. On this corpus's own numbers that is not theoretical: a
+`high`-volatility page expires 30 days after the date it was verified, so a site that computes
+the label at build time begins asserting `fresh` over an expired page within about a month of
+any refresh, and goes on asserting it until something redeploys. Worse, the two failures
 compound — once a page is that overdue `lint` fails, and because the workflow runs the gates as
 blocking steps *before* the build, the deploy is refused at exactly the moment the banner is
 most wrong. The site would be unable to correct itself.
@@ -410,8 +421,9 @@ anything was deployed — which is strictly what the neglect test asks for. A sc
 would also fix the banner, but only while the schedule keeps working, and a cron that silently
 stops is indistinguishable from one that never existed.
 
-**With JavaScript unavailable the page states the facts and shows no badge** — "Verified
-2026-09-16 · re-check every 30 days". That is complete and honest: the reader has both numbers
+**With JavaScript unavailable the page states the facts and shows no badge** — for example
+"Verified YYYY-MM-DD · re-check every 30 days", with that page's own verified date and its
+own cadence substituted. That is complete and honest: the reader has both numbers
 and can draw the conclusion. A missing badge is a far better failure than a confident wrong one.
 
 The thresholds themselves are unchanged, and are `lint`'s thresholds, so a banner can never
@@ -626,8 +638,9 @@ before it can land**, and `research/` currently holds exactly one, whose verdict
 This is not site scope, but it bounds how fast the site gains pages, and any plan that assumes
 otherwise will slip.
 
-**Both `models` pages expire 2026-10-16.** If the site launches on or after that date, two of
-its five pages show `due` from the first view. That is the machinery working correctly and the
+**The two `models` pages are `high`-volatility, so they expire 30 days after each refresh.**
+If the site launches more than 30 days after their most recent refresh, two of its five pages
+show `due` from the first view. That is the machinery working correctly and the
 banner will say so, but it should be a conscious launch-timing choice rather than a surprise.
 (No countdown is written here on purpose: a "N days from now" figure in a document is stale the
 day after it is written, which is the same rot this corpus removes from its own prose.)
@@ -689,3 +702,4 @@ stacked card per row — remains open, but provenance no longer depends on the a
 | -------- | ---------- | ---------------------------------------------------------------- |
 | 1        | 2026-10-03 | Initial design, from the brainstorming session of the same date. |
 | 2        | 2026-10-06 | After plan review. C1: freshness facts render server-side, the state label is computed client-side at view time, so the banner cannot freeze. C2: the ledger cross-check is removed — it would have failed on every correct merge. C3: provenance is a full-width sub-row, never extra columns. C4: ATX heading count corrected 103 → 90, with the extraction method stated. Plus the workflow trigger, a rollback path, `seed: true` disclosure, lazy index loading, Actions rot, transitive-dependency criterion, and a noted discrepancy in the foundation spec's ledger-consumer list. |
+| 3        | 2026-10-06 | Factual de-rot, no design change. A refresh merged three days after revision 1 moved both `models` pages' `verified` and `expires`, falsifying the expiry dates quoted here, the C1 worked example that turned on one of them, the launch-timing warning, and the GFM table-row count. Each is now stated as a derivation — the cadence rule rather than the date — with concrete values marked as of a read date. The document had argued in its own risks section that a "N days from now" figure is stale the day after it is written, while quoting a hard date two lines earlier; it rotted in three days and is evidence for its own rule. |
