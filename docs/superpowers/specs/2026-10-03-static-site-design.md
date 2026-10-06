@@ -1,7 +1,7 @@
 ---
 title: Static Site — Design
 date: 2026-10-03
-revision: 1
+revision: 2
 status: draft
 scope: sub-project 5 of 5 (static site — publishing surface only)
 ---
@@ -36,7 +36,7 @@ produced this document:
 | Product shape       | A reading site with freshness. Guided learning paths, progress tracking and accounts were considered and **deferred**, not rejected.                      |
 | Sequencing          | Content first, thin site now. The site ships over the four populated topics; breadth accrues as sub-project 3 lands.                                      |
 | Build approach      | A `site` subcommand inside the existing corpus CLI. No framework, no SSG, no docs platform.                                                               |
-| Freshness source    | The site **derives** freshness itself and uses `meta/ledger.yaml` as a cross-check that fails the build on disagreement. This amends the foundation spec. |
+| Freshness source    | The site **derives** freshness from `verified` and the cadence, renders those facts server-side, and computes the state label client-side at view time. It does **not** read `meta/ledger.yaml`. This amends the foundation spec.                     |
 | Topic display names | Derived from the slug with a small exceptions map. `meta/taxonomy.yaml` is not changed.                                                                   |
 | Empty topics        | Not listed in navigation. The full taxonomy may appear as a roadmap, never as a menu.                                                                     |
 | Expired pages       | Labelled above the fold, never hidden.                                                                                                                    |
@@ -70,7 +70,7 @@ from that.
 
 ## Repository state at the time of writing
 
-Verified against the tree at `9e7c2f6`, by reading the files rather than trusting prior
+Verified by reading the files rather than trusting prior summaries, as of 2026-10-06
 summaries:
 
 - Gates clean: `render --check` exits 0 with no output, `lint: clean`, `verify: clean`,
@@ -102,12 +102,19 @@ Measured across all five guides, because it determines the one dependency this d
 | GFM table rows                     | 96                           | Tables are mandatory, not optional |
 | Fenced blocks                      | 16 (32 delimiters)           | All language-tagged                |
 | Fence languages                    | `bash` 8, `json` 5, `text` 3 | Three languages, no more           |
-| ATX headings                       | 103                          | The `## N.` eight-part structure   |
+| ATX headings                       | 90                           | The `## N.` eight-part structure   |
 | Footnotes, admonitions, containers | 0                            | No extension needed                |
 | Images, raw HTML blocks            | 0                            | No extension needed                |
 
-**The requirement is exactly CommonMark plus GFM tables.** Nothing more. (A naive scan
-reports one footnote; it is a bash character class inside a fence, not markdown.)
+**The requirement is exactly CommonMark plus GFM tables.** Nothing more.
+
+Every count above excludes fenced content, because a fence poisons a naive scan in both
+directions. Method: match the feature outside fenced blocks only — toggling on each line
+matching `^\s*```{3}`. Two concrete cases: a naive scan reports one footnote, which is a bash
+character class inside a fence; and a naive `^#{1,6} ` scan reports 103 headings rather than
+90, because 13 are bash comments inside fences. The second error shipped in revision 1 of
+this document while the first was already corrected here — so recompute, never copy, these
+figures.
 
 ## Scope
 
@@ -116,7 +123,7 @@ Four deliverables, matching the foundation spec's four nouns:
 1. **`site` subcommand** — `tools/corpus/site.mjs`, exporting `siteCorpus(root, { write })`.
 2. **Page rendering** — front-matter, the eight sections, in-page tier navigation, and
    per-figure provenance.
-3. **Freshness** — derived banner states, cross-checked against the ledger.
+3. **Freshness** — facts rendered server-side, state label computed at view time.
 4. **Search** — a build-time index and a client-side script.
 
 Plus the two things that make it shippable: an output directory, and a CI workflow that runs
@@ -165,10 +172,20 @@ force to the site: the ledger is regenerated **only on `master` after a merge**,
 routinely stale on a branch, and a site that read it would be the one component whose banner
 could contradict the gates.
 
-**The site therefore derives, and uses the ledger as a test.** It compares its derived values
-against `meta/ledger.yaml` and fails the build on any disagreement. This converts the ledger
-from a dependency that can silently poison output into a check that catches a stale ledger
-instead of rendering it.
+**The site therefore does not read `meta/ledger.yaml` at all.**
+
+Revision 1 of this document had the site cross-check its derived values against the ledger and
+fail the build on disagreement. That was wrong, for two reasons that only became clear once the
+one-writer rule was followed through. First, the ledger is stale *by design* at the moment any
+content merge lands, so the check would fail on every correct merge and force the owner to
+remember to regenerate and push again — which the "Deliberately absent" section of this very
+document forbids. Second, and more simply: once nothing reads the ledger, a stale ledger harms
+nothing, so the check guarded a risk the derivation had already eliminated. A check that fires
+on correct input is not a safety net; it is a tax with a safety net's reputation.
+
+Ledger currency still matters to the ledger's *other* consumers, and enforcing it belongs in a
+post-merge job on `master` where regeneration already happens. It is not coupled to publishing,
+and the site neither reads nor validates it.
 
 ## Component 1: the `site` subcommand
 
@@ -210,8 +227,12 @@ and a third makes it worse. The site imports `guidePages`. Collapsing the existi
 out of scope here but should be noted as debt.
 
 **`parseFrontmatter`'s `yaml.JSON_SCHEMA` is load-bearing** (`frontmatter.mjs:8`). Without
-it, an unquoted `verified: 2026-09-16` parses as a JavaScript `Date` rather than a string,
-and every date comparison downstream changes behaviour silently. The site must use this
+it, an unquoted `verified: 2026-09-16` parses as a JavaScript `Date` rather than a string —
+and the consequence is worse than a type change. The value UTC-parses and then renders in
+local time, so west of UTC it prints as **the previous calendar day**. Verified by running
+both variants: with the schema, `"2026-09-16"` (string); without, `Tue Sep 15 2026` (Date).
+A banner built that way would show every page verified a day earlier than it was, in a
+component whose entire purpose is to state that date accurately. The site must use this
 function, not its own YAML load.
 
 `pageFacts(root, records)` already returns `{path, topic, status, verified, keys}` — a site
@@ -228,9 +249,10 @@ argument list; the positional directory is the first non-`--` argument.
   command but `render`. Supporting `site --check` requires editing that guard.
 
 This design specifies **`site --write` only**, and does not add `site --check`. Rationale: the
-gate that matters for the site is the ledger cross-check, which fails the build from inside
-`siteCorpus` regardless of flag, and leaving `cli.mjs:477` untouched keeps the change
-additive. If a dry-run mode is wanted later, that guard is the one line to change.
+site's own correctness checks fail the build from inside `siteCorpus` regardless of flag, so a
+dry-run mode adds nothing a failing build does not already give, and leaving `cli.mjs:477`
+untouched keeps the change additive. If a dry-run mode is wanted later, that guard is the one
+line to change.
 
 Exit conventions follow the existing commands exactly:
 
@@ -248,7 +270,14 @@ In order, top to bottom:
 
 1. **Title and summary** from front-matter. `summary` is prose (often a folded scalar) and
    doubles as the meta description — which matters, because strangers arrive via search.
-2. **Freshness banner** — state, `verified` date, `expires` date, derived volatility.
+2. **Freshness banner** — the `verified` date, the cadence, the `expires` date, derived
+   volatility, and the state label (see Component 3 for which of these are computed when).
+   On a `seed: true` page the banner also says so, in words: the page was authored before the
+   refresh pipeline existed, so its `verified` date records when it was last checked by hand
+   and not a pipeline run. All five launch pages carry `seed: true`, so this disclosure covers
+   100% of content at launch — which is precisely why it cannot be omitted. `CLAUDE.md` calls
+   `seed: true` "permanent provenance"; a banner that showed only the date would let a reader
+   infer a rigour the page has not yet been through.
 3. **`applies_to`, stated plainly.** This is what makes identifier drift legible: it is the
    page's own declaration of which product version it describes. Burying it would hide the
    corpus's answer to the hardest staleness problem it has.
@@ -280,6 +309,22 @@ figure itself:
 
 For a `corpus:table`, that is per row, because each row is its own record. For a
 `corpus:data` block, it is the single record named by `key`.
+
+**Provenance does not occupy the column axis.** It renders as a **sub-row** immediately beneath
+its data row, spanning the table's full width, and never as additional columns. This is a
+requirement, not a preference, and the reason is arithmetic: `comparison.md`'s main table is
+already 9 columns across 11 rows, and `claude-models.md`'s is 7. Adding a date column and a
+source column would make the widest table 11 columns, which is unusable at phone width — so the
+differentiator would be the thing that broke the page. A sub-row keeps the column count
+unchanged at every viewport and stacks naturally when the table is scrolled or collapsed.
+
+| Aspect | Specification |
+| ------ | ------------- |
+| Content | The record's `verified` date, and its `source` as a link whose text names the vendor page rather than showing a bare URL. |
+| Association | Rendered as the next row after its data row, carrying the data row's record key as a `data-` attribute, so the pairing survives re-sorting and is checkable in a test. |
+| Several records in one row | One sub-row listing each contributing record once, keyed by the column it backs — e.g. a price from one record and a context window from another produce two entries in a single sub-row, not two sub-rows. |
+| Identical dates | When every record behind a row shares one `verified` date and one `source`, the sub-row states it once rather than repeating it per column. |
+| Default visibility | Visible by default. A disclosure that hides provenance until clicked reduces it to the tooltip this design rejects. |
 
 A figure whose record's `verified` is older than the page's own date is the normal, honest
 state — `--key`-scoped refreshes move a record without moving its pages, by design — and the
@@ -340,9 +385,36 @@ topics. With four populated topics, method is the honest headline anyway.
 
 ## Component 3: freshness
 
-### Three states, borrowed from `lint`
+### What is rendered, and what is computed when
 
-The site invents no vocabulary. Its thresholds are `lint`'s thresholds, so a banner can never
+The banner separates **facts** from the **label derived from them**, and the two are produced at
+different times. This is the single most important mechanic in the component:
+
+| Part | Produced | Why |
+| ---- | -------- | --- |
+| `verified` date, cadence in days, `expires` date, derived volatility | **server-side at build** | Facts about the tree. They cannot change without a commit. |
+| The state label `fresh` / `due` / `expired` | **client-side at view time** | A function of the viewer's current date, which the build cannot know. |
+
+**Why this split is not optional.** State is a function of *today*. Revision 1 computed it at
+build time and embedded the result, which meant the banner froze at whatever the state was when
+the site was last deployed. On this corpus's own numbers that is not theoretical: both `models`
+pages expire 2026-10-16, so a site built today and left alone would still assert `fresh` in
+November over pages that were by then more than a cadence overdue. Worse, the two failures
+compound — once a page is that overdue `lint` fails, and because the workflow runs the gates as
+blocking steps *before* the build, the deploy is refused at exactly the moment the banner is
+most wrong. The site would be unable to correct itself.
+
+Computing the label in the browser removes the whole failure class. Nothing has to run, no cron
+can rot, no workflow has to be maintained, and correctness no longer depends on how recently
+anything was deployed — which is strictly what the neglect test asks for. A scheduled rebuild
+would also fix the banner, but only while the schedule keeps working, and a cron that silently
+stops is indistinguishable from one that never existed.
+
+**With JavaScript unavailable the page states the facts and shows no badge** — "Verified
+2026-09-16 · re-check every 30 days". That is complete and honest: the reader has both numbers
+and can draw the conclusion. A missing badge is a far better failure than a confident wrong one.
+
+The thresholds themselves are unchanged, and are `lint`'s thresholds, so a banner can never
 assert something the gates would contradict:
 
 | State     | Condition                                            | Matches                       |
@@ -366,27 +438,17 @@ renders it with its deprecation reason and replacement link, and **no freshness 
 there is no freshness claim to make. It stays reachable, because the contract requires
 deprecated pages never be silently deleted.
 
-### The ledger cross-check
+### The ledger is not read
 
-After deriving every page's volatility and expiry, `siteCorpus` reads `meta/ledger.yaml` and
-compares. **Any disagreement fails the build**, reported in the standard issue form.
+`siteCorpus` never opens `meta/ledger.yaml`. The reasoning is in "Deriving freshness is safer
+than reading the ledger" above and recorded as Amendment 1 below.
 
-Disagreement means the ledger was not regenerated after a merge, which is a real and expected
-condition on any branch. Failing loudly is correct: it catches the stale ledger at build time
-rather than shipping two different answers to the same question.
-
-A page present in `guides/` but absent from the ledger is a disagreement. So is the reverse.
-The exception is any page the ledger legitimately omits, and the site must exclude those from
-the comparison on exactly the same terms or the check will fail permanently on correct input.
-Those terms live in **two different places**, which is easy to get wrong:
-
-| Omitted                              | Enforced by     | Where             |
-| ------------------------------------ | --------------- | ----------------- |
-| `status: deprecated`                 | `buildLedger`   | `ledger.mjs:55`   |
-| Missing or invalid `verified` date   | `ledgerCorpus`  | `cli.mjs:238-239` |
-
-An implementer reading `buildLedger` alone would find only the first and would then see a
-spurious disagreement for any page with a malformed date.
+One consequence worth stating because it is easy to re-introduce by accident: there is no
+ledger comparison step, so no page needs to be excluded from one. The ledger omits pages on two
+different grounds enforced in two different places — `status: deprecated` by `buildLedger`
+(`ledger.mjs:55`) and a missing or invalid `verified` date by `ledgerCorpus` (`cli.mjs:238-239`)
+— and any future comparison would have to reproduce both exactly or fail on correct input. That
+trap is the reason not to build one.
 
 ## Component 4: search
 
@@ -394,6 +456,12 @@ A **build-time JSON index** plus a short client-side script. No search library.
 
 The index carries, per page: path, title, summary, topic, the heading text of each numbered
 section, and that section's text. Matching is client-side over that index.
+
+**The index is fetched lazily, on first interaction with the search field — never on page
+load.** Per-section text across the whole corpus is the largest asset the site ships, and
+eager-loading it on every page view would spend more bytes than the avoided search library
+saves, which would defeat the reason for hand-rolling it. The index is a separate file, not
+inlined, so it caches independently of the pages.
 
 **Why no dependency.** At five pages — and realistically at fifty — a search library is not
 yet earned, and every dependency is weighed against the neglect test. The index format is
@@ -420,12 +488,28 @@ There is no `.github` directory in this repo. `CLAUDE.md` nonetheless describes 
 gates as "the CI gates" and justifies `verify` being strictly read-only on the grounds that
 this "lets it run unconditionally as a CI gate". Today they are run by hand.
 
-This sub-project adds a GitHub Actions workflow that:
+This sub-project adds a GitHub Actions workflow, **triggered on push to `master` only**, that:
 
 1. runs `render --check .`, `lint .`, `verify .`, and `npm test` — **first, and as blocking
    steps**;
 2. builds the site with `site --write .` only if all four pass;
 3. deploys `dist/` to GitHub Pages.
+
+Pull requests run steps 1 and 2 but never step 3, so a branch gets the gates and a build
+without publishing. Nothing is scheduled: with the state label computed at view time there is
+nothing a periodic rebuild would correct.
+
+**Rollback.** A Pages deploy replaces the site wholesale, so a renderer bug reaches every page
+at once. The revert is to push a revert commit on `master`, which re-runs the workflow and
+redeploys the previous output; recovery time is one workflow run. There is no partial rollback
+and no per-page revert, which is acceptable because the input is version-controlled text and
+the build is deterministic — but it does mean the first deploy of any rendering change should
+be watched rather than fired and forgotten.
+
+**The site build is not one of the four gates.** `render --check`, `lint`, `verify` and
+`npm test` all pass on a tree whose site build is broken, because none of them reads
+`tools/corpus/site.mjs`'s output. A green local gate run is therefore not evidence the site
+builds; only the workflow, or `site --write .` run by hand, is.
 
 Ordering is the point. A site built from a tree that fails `verify` would publish exactly the
 class of error the gates exist to catch. Gates before build, always.
@@ -453,12 +537,15 @@ and is not:
 | Record provenance on the correct figure    | Provenance rendered against the wrong record — plausible and invisible    |
 | Marker comments absent from output         | Comments leaking into published HTML                                      |
 | Generated `<br>` survives the table path   | A renderer escaping raw HTML and mangling every generated multi-line cell |
-| Ledger cross-check fails on a stale ledger | The check being present but vacuous — the failure that makes it theatre   |
+| State label at a simulated future date     | A banner frozen at build time — the revision-1 defect, which no build-time test can see |
 | Deprecated page renders with no banner     | Asserting freshness about a page that makes no freshness claim            |
 | Empty topic absent from navigation         | The honesty rule regressing into a dead menu entry                        |
 
-The ledger cross-check test is the one most worth writing carefully. A cross-check that
-cannot fail is worse than none, because it produces the appearance of verification.
+The state-label test is the one most worth writing carefully, and it has a specific shape: it
+must drive the label function with an **injected** current date rather than the real clock, and
+assert all three states from one fixture. A test that uses the real date passes today and stops
+exercising `due` and `expired` the moment the fixture ages — which would be a test present but
+vacuous, the failure that makes a check theatre.
 
 ## Contract amendments
 
@@ -468,8 +555,7 @@ The foundation spec states: "The static site (sub-project 5) renders per-page fr
 banners from it [the ledger]" (`2026-09-16-llm-corpus-foundation-design.md:238`).
 
 This design does not do that. The site derives volatility and expiry with
-`derivePageVolatility` and `expiryFor`, and uses the ledger only as a cross-check that fails
-the build on disagreement.
+`derivePageVolatility` and `expiryFor`, and does not read the ledger at all.
 
 Reasoning, recorded in the manner `CLAUDE.md` records its own amendments from the seeds:
 
@@ -480,11 +566,20 @@ Reasoning, recorded in the manner `CLAUDE.md` records its own amendments from th
    the only component able to contradict the gates.
 3. The ledger is regenerated **only on `master` after a merge**, never on a branch. Its
    normal state during development is stale.
-4. Cross-checking is strictly stronger than reading: it produces the same banner on correct
-   input and catches the stale-ledger case that reading would silently render.
+4. Having derived the values, the site has no remaining use for the file. Revision 1 kept it as
+   a build-failing cross-check; revision 2 drops that, because a check that fires on every
+   correct merge is a cost without a benefit once nothing reads the thing it guards.
 
-The ledger's three stated consumers are unchanged in number; consumer 2 becomes a verifier
-rather than a source.
+Consumer 2 of the ledger is therefore removed rather than converted: the site is no longer a
+consumer in any form.
+
+**A discrepancy in the foundation spec, noted so a later reader does not trust it.** That spec
+lists three ledger consumers at `:237-239`, the third being that the lint fails the build when a
+page is more than one cadence past expiry. `CLAUDE.md` states the opposite — "Lint does not read
+`meta/ledger.yaml`: it derives each page's volatility and expiry itself with the same functions"
+— and `CLAUDE.md` wins by its own precedence rule ("Where this file and the spec disagree, this
+file wins"). So the foundation's consumer list is itself stale in its third entry, independently
+of anything this design changes. Resolving it is not in scope here.
 
 **No other contract change.** `meta/taxonomy.yaml` is untouched, no front-matter field is
 added, no record field is added, and no lint, render, verify or refresh rule changes.
@@ -531,10 +626,19 @@ before it can land**, and `research/` currently holds exactly one, whose verdict
 This is not site scope, but it bounds how fast the site gains pages, and any plan that assumes
 otherwise will slip.
 
-**Both `models` pages expire 2026-10-16.** On current dates that is thirteen days after this
-spec. If the site launches near that date, two of its five pages show `due` immediately. This
-is the machinery working correctly, and the banner will say so, but it should be a conscious
-launch-timing choice rather than a surprise.
+**Both `models` pages expire 2026-10-16.** If the site launches on or after that date, two of
+its five pages show `due` from the first view. That is the machinery working correctly and the
+banner will say so, but it should be a conscious launch-timing choice rather than a surprise.
+(No countdown is written here on purpose: a "N days from now" figure in a document is stale the
+day after it is written, which is the same rot this corpus removes from its own prose.)
+
+**The CI workflow is itself a rot surface.** GitHub Actions deprecates runner images and action
+versions on its own schedule, and a pinned `actions/*@vN` eventually warns and then fails. On a
+neglected one-person repo the realistic failure is a workflow that stops running and a site that
+silently stops updating — the same class of harm as a stale banner, arriving by a different
+route. Two mitigations are cheap and worth stating: the deploy is the only step that depends on
+Actions-specific features, and `site --write .` must stay runnable by hand so a broken workflow
+degrades to a manual publish rather than to no publish.
 
 **Hand-rolled HTML is work the design treats as small.** The measured markdown surface
 supports that, but templating, layout and responsive behaviour are still real effort. If it
@@ -560,12 +664,28 @@ CommonMark plus GFM tables, raw HTML passing through far enough for generated `<
 survive — and the choice should be made against that requirement, with its maintenance
 posture weighed on the neglect test, at implementation-plan time.
 
-**3. Visual design and layout.** This document specifies what the site renders and what it
-must never misrepresent. It does not specify typography, colour, or responsive layout, and
-does not need to in order for an implementation plan to be written.
+**Zero or minimal transitive dependencies is an explicit selection criterion, not a
+tiebreaker.** The entire neglect argument for hand-rolling rests on this design adding *one*
+dependency; a library that brings five transitive packages is a materially different
+proposition from one that brings none, and would undercut the reasoning that rejected an SSG.
+The repo today has exactly one runtime dependency and zero devDependencies, so the candidate's
+full resolved tree — not its direct dependency list — is what must be compared.
+
+**3. Visual design.** This document specifies what the site renders and what it must never
+misrepresent. Typography and colour are not specified and do not need to be for an
+implementation plan to be written.
+
+**Responsive layout is no longer deferred where it bears on provenance.** Revision 1 deferred
+layout wholesale while simultaneously requiring per-row provenance to be first-class, which
+left the differentiator's feasibility resting on an open question — the tables are 9 and 7
+columns wide, so whether provenance fits was the deferral. That is now settled in "Per-figure
+provenance": a full-width sub-row, never extra columns, column count unchanged at every
+viewport. How the wide tables themselves behave on a narrow screen — horizontal scroll, or a
+stacked card per row — remains open, but provenance no longer depends on the answer.
 
 ## Revision history
 
 | Revision | Date       | Change                                                           |
 | -------- | ---------- | ---------------------------------------------------------------- |
 | 1        | 2026-10-03 | Initial design, from the brainstorming session of the same date. |
+| 2        | 2026-10-06 | After plan review. C1: freshness facts render server-side, the state label is computed client-side at view time, so the banner cannot freeze. C2: the ledger cross-check is removed — it would have failed on every correct merge. C3: provenance is a full-width sub-row, never extra columns. C4: ATX heading count corrected 103 → 90, with the extraction method stated. Plus the workflow trigger, a rollback path, `seed: true` disclosure, lazy index loading, Actions rot, transitive-dependency criterion, and a noted discrepancy in the foundation spec's ledger-consumer list. |
