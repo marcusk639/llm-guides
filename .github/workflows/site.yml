@@ -1,0 +1,48 @@
+name: site
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      # Gates first, as blocking steps. A site built from a tree that fails
+      # verify would publish exactly the class of error the gates exist to
+      # catch.
+      - run: node tools/corpus/cli.mjs render --check .
+      - run: node tools/corpus/cli.mjs lint .
+      - run: node tools/corpus/cli.mjs verify .
+      - run: npm test
+      - run: node tools/corpus/cli.mjs site --write .
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    # Pull requests gate and build but never publish.
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
