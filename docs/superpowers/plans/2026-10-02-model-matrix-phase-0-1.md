@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Pin the two unverified inclusion rules, then give `guides/models/claude-models.md` a per-model qualitative entry for each of the six Anthropic models it already tracks — proving the entry shape before any of it is copied to another provider.
+**Goal:** Pin the Google and Qwen inclusion rules — Meta remains deliberately unpinned — then give `guides/models/claude-models.md` a per-model qualitative entry for each of the six Anthropic models it already tracks — proving the entry shape before any of it is copied to another provider.
 
 **Architecture:** Phase 0 is research only; it edits the spec and nothing under `guides/` or `data/`. Phase 1 adds prose to one existing page under a new numbered subsection `### 4.7`, with one `####` entry per model. No record is created, changed or re-tagged, so the refresh unit is untouched and no page date moves.
 
@@ -10,15 +10,17 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-02-model-matrix-expansion-design.md`. Read sections 7, 8, 9, 11 and 12 before starting.
 
-Read the spec as it stands on your branch; do not trust a revision number written here. Section 8 has now been revised six times and this reference has already gone stale once. The state this plan assumes is described by content, not by number: section 8 opens with a **stated criterion** — the model is a text LLM the vendor currently serves — that every per-provider rule approximates and that governs when a rule disagrees with it; the Google rule is an id-pattern test plus a section-membership test, with no badge clause; and section 8 carries no vendor-inventory counts. If what you read differs from that, the spec is the newer document and this plan is the stale one — stop and reconcile before editing.
+Read the spec as it stands on your branch; do not trust a revision number written here — this reference has already gone stale once, and a count of revisions would go stale the same way. The state this plan assumes is described by content, not by number: section 8 opens with a **stated criterion** — the model is a text LLM the vendor currently serves — that every per-provider rule approximates and that governs when a rule disagrees with it; the Google rule is an id-pattern test plus a section-membership test, with no badge clause; and section 8 carries no vendor-inventory counts. If what you read differs from that, the spec is the newer document and this plan is the stale one — stop and reconcile before editing.
 
 **Scope note:** This plan deliberately stops at the end of phase 1. The spec names phase 1 as the kill point — if the entry shape cannot carry six models honestly, the design is wrong and phases 2–5 do not start. Planning them now would plan work that may never happen.
 
 ## Prerequisites and branching
 
-The spec this plan implements is on branch `spec-model-matrix` and is **not yet
-merged**. Nothing in this plan starts until it is, because the plan argues from the
-spec and an executor reads both.
+The spec this plan implements ships **in the same pull request as this plan**, on
+branch `model-matrix-phase-0` (PR #7). An executor reads both, so read the spec from
+your own branch rather than from `master`, where it does not yet exist. Phase 0's
+Tasks 1 and 2 are already complete and committed on that branch; see each task's
+checked steps below before re-running anything.
 
 Per the spec's section 12, each phase is its own branch, review and pull request:
 
@@ -27,8 +29,8 @@ Per the spec's section 12, each phase is its own branch, review and pull request
 | 0 | `model-matrix-phase-0` | `master` | 1, 2 |
 | 1 | `model-matrix-phase-1` | `master` | 3, 4, 5, 6 |
 
-Phase 1 does not depend on phase 0's output: the two pinned rules govern Google and
-the open-weight providers, and phase 1 touches only Anthropic. They may run in
+Phase 1 does not depend on phase 0's output: the rules pinned there govern Google and
+Qwen, and phase 1 touches only Anthropic. They may run in
 either order or in parallel.
 
 **`guides/models/claude-models.md` carries `seed: true`**, so `corpus verify` does
@@ -66,13 +68,20 @@ neither. Because they scan the same range, the weakest pattern to run last silen
 Export it once per shell session and let every task reference `"$VALUE_SCAN"`:
 
 ```bash
-export VALUE_SCAN='claude-[a-z0-9-]+|\$[0-9]|[0-9]+K tokens|1M tokens|\b[0-9]+K\b|\b1M\b|\b(medium|high)\b'
+export VALUE_SCAN='claude-[a-z0-9-]+|\$[0-9]|[0-9]+K tokens|1M tokens|\b[0-9]+K\b|\b1M\b|(^|[^-[:alnum:]])(medium|high)($|[^-[:alnum:]])'
 ```
 
 It covers model ids, prices, window and output ceilings in both the `200K tokens` and bare
 `200K` spellings, and the `medium`/`high` effort settings — those are **parameter defaults**,
 which the contract classes as values, not identifiers. Change the pattern here and nowhere
 else; a task that restates it reintroduces the drift.
+
+The effort terms are delimited by `(^|[^-[:alnum:]])…($|[^-[:alnum:]])` rather than by `\b`
+on purpose. `\b` treats a hyphen as a word boundary, so `\b(medium|high)\b` fires on
+`high-volume` and `medium-term` — ordinary prose this plan actually contains. The character
+classes exclude a hyphen-joined word while still catching a bare `high` or `medium`, and
+still reject `higher` and `mediums`. This is the same substring hazard `CLAUDE.md` records
+for `27B` inside `Qwen3.8-27B`. Use ERE (`grep -nE`); the pattern needs no PCRE.
 
 ## Review Focus
 
@@ -88,7 +97,10 @@ Five failure modes the spec implies that no task's happy path exercises. Each ha
 
 ## Task 1: Pin the Google inclusion rule
 
-Phase 0. Research only.
+Phase 0. Research only. **COMPLETE** — shipped across commits `053b923`, `9fc4fd6`,
+`1b409f7`, `86ef866`, `c99dbb2`, `20d86f4` and `a23827c`. Do not re-run the steps below:
+the Step 3 anchor quotes a spec row that no longer exists, so its `assert` would fire and
+write nothing. The steps are retained as the record of how the rule was reached.
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-10-02-model-matrix-expansion-design.md` (section 8 table, the Google row)
@@ -97,9 +109,9 @@ Phase 0. Research only.
 - Consumes: nothing.
 - Produces: a pinned URL and a verbatim statement that later phases rely on to decide which Google models are in scope. Not consumed by phase 1.
 
-- [ ] **Step 1: Find the candidate page and fetch it**
+- [x] **Step 1: Find the candidate page and fetch it**
 
-The spec's unpinned claim is "It is listed as a current model on the Gemini API models page, excluding entries that page marks preview or legacy". Fetch the Gemini API models list. Start from the documentation root rather than guessing a path:
+**This task is complete** (commits `053b923` through `20d86f4`); its steps are recorded for provenance, and the rule shipped is not the one this task set out to pin. The claim this task began from was the unpinned "It is listed as a current model on the Gemini API models page, excluding entries that page marks preview or legacy" — now **superseded**. Six revisions established that both halves of that claim fail: "current model" has no marking on the page, and a badge test cannot see still-served models that carry no badge. The shipped rule is an id-pattern test plus a section-membership test, with no badge clause; read it from section 8 rather than from this paragraph. The original fetch step follows:
 
 ```
 Fetch https://ai.google.dev/gemini-api/docs/models
@@ -107,13 +119,13 @@ Fetch https://ai.google.dev/gemini-api/docs/models
 
 Ask for the field, not for a value: request a verbatim list of every model name the page presents, together with any label the page attaches to each (for example `Preview`, `Legacy`, `Deprecated`, `Stable`).
 
-- [ ] **Step 2: Decide whether the rule is falsifiable, and record the evidence**
+- [x] **Step 2: Decide whether the rule is falsifiable, and record the evidence**
 
 The rule is falsifiable only if the page both (a) enumerates models and (b) marks at least one of them in a way that excludes it. Write down, verbatim, one model the rule admits and one it excludes.
 
 If the page does **not** distinguish current from preview or legacy, the rule as written is not falsifiable. Do not invent a distinction. Record that finding and leave the row unpinned with the reason — that is a legitimate outcome of this task and an input to the owner's decision, not a failure.
 
-- [ ] **Step 3: Update the spec's section 8 row**
+- [x] **Step 3: Update the spec's section 8 row**
 
 Read the exact bytes first:
 
@@ -130,6 +142,7 @@ Then replace that row, filling the URL and date you actually used:
 ```python
 p = "docs/superpowers/specs/2026-10-02-model-matrix-expansion-design.md"
 s = open(p, encoding="utf-8").read()
+# HISTORICAL — this row is gone from the spec; s.count(old) is now 0 and the assert below would fire.
 old = "| Google | It is listed as a current model on the Gemini API models page, excluding entries that page marks preview or legacy | the Gemini API models list | **no** — pin the URL and confirm the page distinguishes current from preview/legacy |"
 new = "| Google | It is listed as a current model on the Gemini API models page, excluding entries that page marks preview or legacy | `<URL YOU FETCHED>` | yes, read <DATE> |"
 assert s.count(old) == 1
@@ -138,7 +151,7 @@ open(p, "w", encoding="utf-8").write(s.replace(old, new))
 
 Then append the verbatim evidence directly beneath the table, as a short paragraph naming the admitted and excluded model, so a later reader can check the rule without re-fetching.
 
-- [ ] **Step 4: Verify nothing outside the spec changed**
+- [x] **Step 4: Verify nothing outside the spec changed**
 
 ```bash
 cd /Users/marcusklein/dev/llm-guides && git status --porcelain
@@ -146,7 +159,7 @@ cd /Users/marcusklein/dev/llm-guides && git status --porcelain
 
 Expected: exactly one modified file, `docs/superpowers/specs/...`. No file under `guides/` or `data/`. If anything else appears, stop and investigate — this task touches no corpus content.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Users/marcusklein/dev/llm-guides
@@ -158,7 +171,10 @@ git commit -m "docs: pin the Google inclusion rule for the model matrix"
 
 ## Task 2: Pin the open-weights inclusion rule
 
-Phase 0. Research only.
+Phase 0. Research only. **COMPLETE for Qwen; Meta deliberately unpinned** — shipped in
+commits `6c46c8c` and `9e7c2f6`. Do not re-run the steps below: the Step 3 anchor quotes a
+spec row that no longer exists, so its `assert` would fire and write nothing. The steps are
+retained as the record of how the rule was reached.
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-10-02-model-matrix-expansion-design.md` (section 8 table, the Meta/Qwen row)
@@ -167,7 +183,7 @@ Phase 0. Research only.
 - Consumes: nothing.
 - Produces: two pinned collection URLs. Not consumed by phase 1.
 
-- [ ] **Step 1: Fetch each organisation's model listing**
+- [x] **Step 1: Fetch each organisation's model listing**
 
 The rule is "It is a member of the owning organisation's current model collection". Two organisations, two URLs. Fetch both:
 
@@ -180,17 +196,18 @@ Request a verbatim list of any **collections** the organisation publishes, with 
 
 **Do not read the item count from the embedded page blob.** The blob caps each collection's `items` array at a 4-item preview, so any count taken from it silently under-reports every collection with more than four members. Read membership from `https://huggingface.co/api/collections/<slug>` instead, and record that endpoint as the source rather than the browsable index page you fetched above.
 
-- [ ] **Step 2: Test the rule against a model that should fail it**
+- [x] **Step 2: Test the rule against a model that should fail it**
 
 This is the step that matters. Revision 2's rule ("the org still publishes the weights repository") was rejected precisely because nothing fails it. For each organisation, name one model whose repository still exists but which is **not** a member of the current collection. If you cannot find one for an organisation, the rule does not discriminate for that organisation and must be recorded as unpinned with that reason.
 
-- [ ] **Step 3: Update the spec's section 8 row**
+- [x] **Step 3: Update the spec's section 8 row**
 
 Read the exact bytes, then replace:
 
 ```python
 p = "docs/superpowers/specs/2026-10-02-model-matrix-expansion-design.md"
 s = open(p, encoding="utf-8").read()
+# HISTORICAL — this row is gone from the spec; s.count(old) is now 0 and the assert below would fire.
 old = "| Meta, Qwen | It is a member of the owning organisation's current model collection | the org's published collection | **no** — pin both URLs and confirm the collection has stable membership |"
 new = "| Meta, Qwen | It is a member of the owning organisation's current model collection | `<META COLLECTION URL>`, `<QWEN COLLECTION URL>` | yes, read <DATE> |"
 assert s.count(old) == 1
@@ -199,15 +216,15 @@ open(p, "w", encoding="utf-8").write(s.replace(old, new))
 
 Append the verbatim evidence beneath the table, naming for each organisation one admitted model and one excluded model.
 
-- [ ] **Step 4: Confirm both rows are now resolved, or explicitly not**
+- [x] **Step 4: Confirm both rows are now resolved, or explicitly not**
 
 ```bash
-cd /Users/marcusklein/dev/llm-guides && grep -n '\*\*no\*\*' docs/superpowers/specs/2026-10-02-model-matrix-expansion-design.md
+cd /Users/marcusklein/dev/llm-guides && grep -c '\*\*no\*\*' docs/superpowers/specs/2026-10-02-model-matrix-expansion-design.md
 ```
 
-Expected: no output, meaning every inclusion rule is pinned. If a row is still `**no**`, Step 2 found the rule undiscriminating; that must be reported to the owner before phase 3 and does not block phase 1.
+Expected: **exactly `1`** — the Meta cell. Meta is deliberately unpinned: every repository it publishes is already covered by a collection, so the test excludes nothing for that organisation, and the owner ratified recording that rather than inventing a discriminating rule. A count of `0` means someone removed a settled decision; a count of `2` or more means a rule this task was supposed to pin is still open. Either way, stop. Do not read this as "every inclusion rule is pinned" — that outcome is no longer reachable, and a check whose expected output cannot occur is worse than no check.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /Users/marcusklein/dev/llm-guides
@@ -309,7 +326,7 @@ cd /Users/marcusklein/dev/llm-guides
 sed -n '/^### 4\.7/,/^## 5\./p' guides/models/claude-models.md | grep -nE "$VALUE_SCAN" || echo "clean: no value or default in the new prose"
 ```
 
-Expected: `clean: ...`. A hit on a whole word `medium` or `high` means a parameter default was written as a value — rephrase to a relation ("lower than Fable 5.1's") instead. The word boundaries matter: without them this check matches "higher", which appears legitimately in the relational phrasing the constraint asks for.
+Expected: `clean: ...`. A hit on a whole word `medium` or `high` means a parameter default was written as a value — rephrase to a relation ("lower than Fable 5.1's") instead. The delimiters matter: without them this check matches "higher", which appears legitimately in the relational phrasing the constraint asks for, and a `\b`-delimited version would also fire on hyphen-joined prose like "high-volume" (see the value-scan definition above).
 
 - [ ] **Step 5: Run the four gates**
 
@@ -377,7 +394,7 @@ entries = """#### Claude Fable 5.1
 **Limits**
 
 - It is the most expensive current model in both directions, so using it where Opus 5.5 would do is the easiest way to overspend on this lineup. Evidence: **Documented** for the price ordering — the table in section 2, from the [pricing page](https://platform.claude.com/docs/en/about-claude/pricing), read 2026-10-02. That this is the commonest overspend is **Plausible** — practitioner inference, not a vendor claim.
-- Its default effort is the higher of the two adaptive-thinking settings in the lineup, so an unconfigured call spends more reasoning than the same call on Opus 5.5. Evidence: **Documented** — [models overview](https://platform.claude.com/docs/en/models/overview), read 2026-10-02.
+- Its default effort is the higher of the two adaptive-thinking settings in the lineup. Evidence: **Documented** for the setting — [models overview](https://platform.claude.com/docs/en/models/overview), read 2026-10-02. That an unconfigured call therefore spends more reasoning than the same call on Opus 5.5 is **Plausible** — practitioner inference from the setting; the vendor states the default but not its effect on reasoning spend.
 
 **Reach for it when** a task has already failed on Claude Opus 5.5 at higher effort, or when the run is long-horizon enough that a mid-run failure costs more than the price difference.
 
@@ -418,7 +435,7 @@ entries = """#### Claude Fable 5.1
 
 - Its context window and output ceiling are both the smallest in the lineup, so a prompt that fits the other three may not fit here. This is the trap when swapping it in to save money. Evidence: **Documented** — the table in section 2, from the [models overview](https://platform.claude.com/docs/en/models/overview), read 2026-10-02.
 - It does not support a default effort setting at all. Evidence: **Documented** — [models overview](https://platform.claude.com/docs/en/models/overview), read 2026-10-02. That effort-based tuning which works on the rest of the lineup therefore does not transfer is **Plausible** — practitioner inference from the absent setting.
-- It is the oldest model in the current lineup and carries the nearest retirement commitment, so code pinned to it needs a migration plan sooner than code pinned to the others. Evidence: **Documented** — [model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations), read 2026-10-02.
+- It is the oldest model in the current lineup and carries the nearest retirement commitment. Evidence: **Documented** for the release and retirement dates — [model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations), read 2026-10-02. That code pinned to it therefore needs a migration plan sooner than code pinned to the others is **Plausible** — practitioner inference; how soon depends on the reader's own migration cost, which the vendor does not address.
 
 **Reach for it when** volume is high, each call is small, and the work is classification, extraction or routing rather than open-ended reasoning.
 
@@ -490,7 +507,7 @@ This is the task the spec was revised for. The vendor publishes no positioning s
 
 As in Task 4: every `read 2026-10-02` in this task's prewritten prose must be replaced with the date you actually re-read the page.
 
-While you are on these pages, settle one thing the prewritten prose assumes. It records that both pages carried `Status Active (legacy)`. The vendor's deprecations table uses a four-state vocabulary — Active, Legacy, Deprecated, Retired — and `Legacy` currently has zero members, so `Active (legacy)` is probably the individual model page's own phrasing rather than a state from that table. Confirm which surface the string comes from and say so, because a lifecycle claim sourced to the wrong surface is the kind of error the deprecations table exists to prevent.
+While you are on these pages, settle one thing the prewritten prose assumes. It records that both pages carried `Status Active (legacy)`. The spec's section 1 now quotes the vendor's own lifecycle definitions from the deprecations table — a four-state vocabulary, Active, Legacy, Deprecated, Retired, of which only Retired is not callable — and `Legacy` currently has zero members, so `Active (legacy)` is probably the individual model page's own phrasing rather than a state from that table. Read that spec paragraph first; the question is already half answered. Confirm which surface the string comes from and say so, because a lifecycle claim sourced to the wrong surface is the kind of error the deprecations table exists to prevent.
 
 ```
 Fetch https://platform.claude.com/docs/en/models/opus-5/overview
