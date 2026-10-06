@@ -243,6 +243,17 @@ Each page states its own test, in its own section 6, with the page it is read fr
 A rule must be **falsifiable**: it must be possible to point at a source and say a
 named model fails it.
 
+**The criterion every rule below approximates: the model is a text LLM the vendor
+currently serves.** Where a rule and that criterion disagree, the criterion governs and
+the rule is the defect, not the definition. No rule states the criterion directly, because
+providers share no lifecycle vocabulary (D5) and no page exposes serving status as a field;
+each rule therefore tests a vendor-specific **proxy** for it — a lifecycle label, an index
+listing, a section, a collection — and a proxy holds only while its correlation with serving
+status holds. Two have already broken: a badge test excluded three served Gemini models that
+carry no badge, and the section test that replaced it will exclude a deprecated-but-callable
+model the moment Google files one under `previous_models`, which that section's own intro
+defines as its purpose. Treat a proxy's drift as the expected failure mode, not a surprise.
+
 | Provider | A model is in scope when | Read from | Pinned? |
 | --- | --- | --- | --- |
 | Anthropic | Its lifecycle state is not `Retired` | `https://platform.claude.com/docs/en/about-claude/model-deprecations` | yes, read 2026-10-02 |
