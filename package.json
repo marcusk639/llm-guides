@@ -16,7 +16,8 @@
     "site": "node tools/corpus/cli.mjs site"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "marked": "^18.1.0"
   },
   "engines": {
     "node": ">=22"
