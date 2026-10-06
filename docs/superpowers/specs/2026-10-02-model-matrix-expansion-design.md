@@ -360,7 +360,9 @@ all and sit in their own `gemini_25_pro`, `gemini_25_flash` and `gemini_25_flash
 the page states verbatim: "These models are not deprecated and will continue to be served until
 further notice through the API."
 
-This is the fifth revision of this rule. The first three were each phrased as an exclusion over an
+This rule has been revised repeatedly, and `git log` on this file is authoritative for how many
+times — a count written here rots on the next revision, which is how this very sentence came to
+read "fifth" after the sixth. The first three were each phrased as an exclusion over an
 open set — exclude "legacy" (no such marking existed), then exclude unbadged entries (an entire
 unbadged media section slipped through), then exclude by badge alone (modality was never tested). The
 set of things to exclude is unbounded, so each of those repairs closed only the hole it was shown. The
