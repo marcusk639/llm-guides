@@ -48,6 +48,7 @@ import {
   renderArtifactSkeleton,
 } from "./refresh-artifact.mjs";
 import { stampUnit, revertUnit } from "./refresh-stamp.mjs";
+import { siteCorpus } from "./site.mjs";
 
 function guidePaths(root) {
   const dir = path.join(root, "guides");
@@ -466,7 +467,7 @@ function main(argv) {
   const root = rest.find((a) => !a.startsWith("--")) ?? process.cwd();
   const usage = () => {
     console.error(
-      "usage: corpus <render|lint|verify|ledger|refresh> [--write] [dir]",
+      "usage: corpus <render|lint|verify|ledger|refresh|site> [--write] [dir]",
     );
     console.error("       corpus render --check [dir]");
     console.error(
@@ -524,6 +525,18 @@ function main(argv) {
     console.log(
       `ledger: ${ledger.entries.length} entries${write ? " written" : ""}`,
     );
+  } else if (command === "site") {
+    const { pages, issues } = siteCorpus(root, { write });
+    for (const i of issues)
+      console.error(
+        `${i.path}${i.line ? `:${i.line}` : ""} [${i.rule}] ${i.message}`,
+      );
+    console.log(
+      issues.length === 0
+        ? `site: ${pages.length} pages`
+        : `site: ${issues.length} issue(s)`,
+    );
+    process.exit(issues.length === 0 ? 0 : 1);
   } else if (command === "refresh") {
     const { code, out, err: errs } = refreshCorpus(root, rest);
     // A usage error prints its reason ABOVE the usage block, not instead of it:
