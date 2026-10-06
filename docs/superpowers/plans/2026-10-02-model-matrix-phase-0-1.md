@@ -8,7 +8,9 @@
 
 **Tech Stack:** Node 22+, the corpus CLI at `tools/corpus/cli.mjs`, `node:test`. No new dependencies. Markdown and YAML only.
 
-**Spec:** `docs/superpowers/specs/2026-10-02-model-matrix-expansion-design.md` (revision 3). Read sections 7, 8, 9, 11 and 12 before starting.
+**Spec:** `docs/superpowers/specs/2026-10-02-model-matrix-expansion-design.md`. Read sections 7, 8, 9, 11 and 12 before starting.
+
+Read the spec as it stands on your branch; do not trust a revision number written here. Section 8 has now been revised six times and this reference has already gone stale once. The state this plan assumes is described by content, not by number: section 8 opens with a **stated criterion** — the model is a text LLM the vendor currently serves — that every per-provider rule approximates and that governs when a rule disagrees with it; the Google rule is an id-pattern test plus a section-membership test, with no badge clause; and section 8 carries no vendor-inventory counts. If what you read differs from that, the spec is the newer document and this plan is the stale one — stop and reconcile before editing.
 
 **Scope note:** This plan deliberately stops at the end of phase 1. The spec names phase 1 as the kill point — if the entry shape cannot carry six models honestly, the design is wrong and phases 2–5 do not start. Planning them now would plan work that may never happen.
 
@@ -55,6 +57,22 @@ Every task's requirements implicitly include all of these. Values are copied ver
 - **Stage by filename.** Never `git add -A` or `git add .`.
 - **A Prettier hook reformats Markdown after every write.** That is expected; run `render --check` after it fires, not before.
 - **Do not regenerate `meta/ledger.yaml`.** It is rebuilt on `master` after merge, one file one writer.
+
+**The value scan, defined once and only here.** Tasks 3, 4 and 5 all add prose to the same
+`### 4.7` range and all scan it for bare values. They previously each carried their own
+pattern, which had drifted apart: one scanned for the `medium`/`high` effort defaults but not
+the bare window figures, the next for the figures but not the defaults, and the last for
+neither. Because they scan the same range, the weakest pattern to run last silently governed.
+Export it once per shell session and let every task reference `"$VALUE_SCAN"`:
+
+```bash
+export VALUE_SCAN='claude-[a-z0-9-]+|\$[0-9]|[0-9]+K tokens|1M tokens|\b[0-9]+K\b|\b1M\b|\b(medium|high)\b'
+```
+
+It covers model ids, prices, window and output ceilings in both the `200K tokens` and bare
+`200K` spellings, and the `medium`/`high` effort settings — those are **parameter defaults**,
+which the contract classes as values, not identifiers. Change the pattern here and nowhere
+else; a task that restates it reintroduces the drift.
 
 ## Review Focus
 
@@ -159,6 +177,8 @@ Fetch https://huggingface.co/Qwen
 ```
 
 Request a verbatim list of any **collections** the organisation publishes, with each collection's title and item count. A Hugging Face collection is a curated, named set with stable membership; the organisation's full model list is not a collection and does not satisfy this rule.
+
+**Do not read the item count from the embedded page blob.** The blob caps each collection's `items` array at a 4-item preview, so any count taken from it silently under-reports every collection with more than four members. Read membership from `https://huggingface.co/api/collections/<slug>` instead, and record that endpoint as the source rather than the browsable index page you fetched above.
 
 - [ ] **Step 2: Test the rule against a model that should fail it**
 
@@ -267,7 +287,7 @@ table, which is the only place a value may appear on this page.
 **Limits**
 
 - It is not the vendor's recommendation for the hardest reasoning. The overview routes demanding reasoning and long-horizon agentic work to Claude Fable 5.1, and says to move up when evals here at higher effort still fall short. Evidence: **Documented** — [models overview](https://platform.claude.com/docs/en/models/overview), read 2026-10-02.
-- Prompt-cache reads cost a larger fraction of its base input price than they do on Claude Fable 5.1, so heavy cache reuse narrows the gap between the two by less than the base prices suggest. Evidence: **Documented** — [pricing page](https://platform.claude.com/docs/en/about-claude/pricing), read 2026-10-02.
+- Prompt-cache reads cost a larger fraction of its base input price than they do on Claude Fable 5.1. Evidence: **Documented** for both price ratios — [pricing page](https://platform.claude.com/docs/en/about-claude/pricing), read 2026-10-02. That heavy cache reuse therefore narrows the gap between the two by less than the base prices suggest is **Plausible** — practitioner inference from the ratio; the vendor does not state the comparison.
 
 **Reach for it when** the work is long-running agentic coding or knowledge work and you have no evidence you need more than this.
 
@@ -286,7 +306,7 @@ The entry must contain no API id, price, context window, output limit or effort 
 
 ```bash
 cd /Users/marcusklein/dev/llm-guides
-sed -n '/^### 4.7/,/^## 5\./p' guides/models/claude-models.md | grep -nE 'claude-[a-z0-9-]+|\$[0-9]|[0-9]+K tokens|1M tokens|\b(medium|high)\b' || echo "clean: no value or default in the new prose"
+sed -n '/^### 4\.7/,/^## 5\./p' guides/models/claude-models.md | grep -nE "$VALUE_SCAN" || echo "clean: no value or default in the new prose"
 ```
 
 Expected: `clean: ...`. A hit on a whole word `medium` or `high` means a parameter default was written as a value — rephrase to a relation ("lower than Fable 5.1's") instead. The word boundaries matter: without them this check matches "higher", which appears legitimately in the relational phrasing the constraint asks for.
@@ -324,6 +344,8 @@ git commit -m "docs: add the per-model entry shape and the Claude Opus 5.5 entry
 
 - [ ] **Step 1: Re-read the overview and compare**
 
+Every `read <DATE>` in this task's prewritten prose says `2026-10-02`. Those dates are the day the prose was drafted, not the day you verify it. Replace each one with the date you actually re-read the page in this step — a stale read date under fresh prose asserts verification that did not happen.
+
 Fetch `https://platform.claude.com/docs/en/models/overview`, asking for each current model's verbatim one-line description and the verbatim `Thinking` and `Default effort` rows. Read 2026-10-02, the descriptions were:
 
 - Fable 5.1: `For demanding reasoning and long-horizon agentic work`
@@ -350,7 +372,7 @@ entries = """#### Claude Fable 5.1
 **Strengths**
 
 - It is where the vendor sends work that Claude Opus 5.5 cannot finish: the overview names it for demanding reasoning and long-horizon agentic work, and as the escalation when evals on Opus 5.5 at higher effort fall short. Evidence: **Documented** — [models overview](https://platform.claude.com/docs/en/models/overview), read 2026-10-02.
-- Prompt-cache reads cost a smaller fraction of its base input price than on any other current model, so a large reused context is cheaper here relative to its own input price than the headline figures suggest. Evidence: **Documented** — [pricing page](https://platform.claude.com/docs/en/about-claude/pricing), read 2026-10-02.
+- Prompt-cache reads cost a smaller fraction of its base input price than they do on the other three current models. Evidence: **Documented** for the price ratios of the four current models — [pricing page](https://platform.claude.com/docs/en/about-claude/pricing), read 2026-10-02. That this makes a large reused context cheaper here relative to its own input price than the headline figures suggest is **Plausible** — practitioner inference. The vendor states neither the comparison nor any ranking across its whole catalogue, so the claim is scoped to the four current models and must not be written as a superlative.
 
 **Limits**
 
@@ -395,7 +417,7 @@ entries = """#### Claude Fable 5.1
 **Limits**
 
 - Its context window and output ceiling are both the smallest in the lineup, so a prompt that fits the other three may not fit here. This is the trap when swapping it in to save money. Evidence: **Documented** — the table in section 2, from the [models overview](https://platform.claude.com/docs/en/models/overview), read 2026-10-02.
-- It does not support a default effort setting at all, so effort-based tuning that works on the rest of the lineup does not transfer. Evidence: **Documented** — [models overview](https://platform.claude.com/docs/en/models/overview), read 2026-10-02.
+- It does not support a default effort setting at all. Evidence: **Documented** — [models overview](https://platform.claude.com/docs/en/models/overview), read 2026-10-02. That effort-based tuning which works on the rest of the lineup therefore does not transfer is **Plausible** — practitioner inference from the absent setting.
 - It is the oldest model in the current lineup and carries the nearest retirement commitment, so code pinned to it needs a migration plan sooner than code pinned to the others. Evidence: **Documented** — [model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations), read 2026-10-02.
 
 **Reach for it when** volume is high, each call is small, and the work is classification, extraction or routing rather than open-ended reasoning.
@@ -426,7 +448,7 @@ Expected order: `Claude Fable 5.1`, `Claude Opus 5.5`, `Claude Sonnet 5.5`, `Cla
 
 ```bash
 cd /Users/marcusklein/dev/llm-guides
-sed -n '/^### 4.7/,/^## 5\./p' guides/models/claude-models.md | grep -nE 'claude-[a-z0-9-]+|\$[0-9]|[0-9]+K tokens|1M tokens|200K|64K|128K' || echo "clean: no value in the new prose"
+sed -n '/^### 4\.7/,/^## 5\./p' guides/models/claude-models.md | grep -nE "$VALUE_SCAN" || echo "clean: no value in the new prose"
 ```
 
 Expected: `clean: ...`.
@@ -465,6 +487,10 @@ This is the task the spec was revised for. The vendor publishes no positioning s
 - Produces: entries for Claude Opus 5 and Claude Sonnet 5, demonstrating a short, honest legacy entry.
 
 - [ ] **Step 1: Re-read both legacy model pages**
+
+As in Task 4: every `read 2026-10-02` in this task's prewritten prose must be replaced with the date you actually re-read the page.
+
+While you are on these pages, settle one thing the prewritten prose assumes. It records that both pages carried `Status Active (legacy)`. The vendor's deprecations table uses a four-state vocabulary — Active, Legacy, Deprecated, Retired — and `Legacy` currently has zero members, so `Active (legacy)` is probably the individual model page's own phrasing rather than a state from that table. Confirm which surface the string comes from and say so, because a lifecycle claim sourced to the wrong surface is the kind of error the deprecations table exists to prevent.
 
 ```
 Fetch https://platform.claude.com/docs/en/models/opus-5/overview
@@ -512,7 +538,7 @@ entries = """#### Claude Opus 5 (legacy)
 **Limits**
 
 - It is Active but legacy, so it receives no further updates and may be deprecated in future. Evidence: **Documented** — [model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations), read 2026-10-02.
-- Its retirement commitment is the nearest of the two legacy rows, so it is the more urgent migration of the two. Evidence: **Documented** — compare the retirement column in the legacy table in section 2, read 2026-10-02.
+- Its retirement commitment is the nearest of the two legacy rows. Evidence: **Documented** — compare the retirement column in the legacy table in section 2, read 2026-10-02. That this makes it the more urgent migration of the two is **Plausible** — practitioner inference; urgency depends on the reader's own migration cost, which the vendor does not address.
 
 **Reach for it when** you are already pinned to it and have not yet validated Claude Sonnet 5.5.
 
@@ -539,12 +565,26 @@ Every `Evidence:` line in the new section labelled `**Documented**` must carry a
 
 ```bash
 cd /Users/marcusklein/dev/llm-guides
-sed -n '/^### 4.7/,/^## 5\./p' guides/models/claude-models.md \
+sed -n '/^### 4\.7/,/^## 5\./p' guides/models/claude-models.md \
   | grep 'Evidence:' | grep '\*\*Documented\*\*' | grep -v 'https://\|section 2' \
   || echo "clean: every Documented claim cites a page or the record-backed table"
+
+sed -n '/^### 4\.7/,/^## 5\./p' guides/models/claude-models.md | grep -nE "$VALUE_SCAN" \
+  || echo "clean: no value or default in the new prose"
 ```
 
-Expected: `clean: ...`. Any line printed is an inference wearing a `**Documented**` label — relabel it `**Plausible**` or delete it.
+Expected `clean: ...` from both. Any line from the first is a `**Documented**` label with no
+citation on its line; any line from the second is a bare value. Task 5 adds prose to the same
+`### 4.7` range as Tasks 3 and 4, so it runs the shared value scan too — it is the last task to
+touch the range, and a range is only as clean as the last scan over it.
+
+**This check cannot see the defect it looks like it covers.** It tests whether a `**Documented**`
+line carries a *link*, which is orthogonal to whether the claim is an *inference*. A bullet
+reading "X is true, so you should do Y" with a valid vendor link passes this grep and still
+violates the contract. Four such bullets shipped in this plan's own prewritten prose and were
+caught by reading, not by this command. Splitting a mixed bullet into a `**Documented**` clause
+and a `**Plausible**` clause is a judgement you have to make by reading every new
+`Evidence:` line; treat a clean run here as necessary, never sufficient.
 
 - [ ] **Step 6: Run the four gates**
 
@@ -595,17 +635,56 @@ Also add, beside the section 2 tables, the convention that a blank cell means th
 
 - [ ] **Step 2: Confirm no bare id anywhere in the body (Review Focus 3)**
 
-Lint catches ids that have records; it is blind to ids that do not. Check all six by hand:
+Lint catches ids that have records; it is blind to ids that do not. Check all six — and let the
+check decide, not your eye.
+
+The previous version of this step was wrong twice over. `grep -c` counts matching **lines**, so
+an id appearing twice on one line reported `1`. And an unanchored `claude-opus-5` also matches
+every `claude-opus-5-5`, so two of the six ids silently absorbed their successor's count — the
+same substring trap that makes `grep -c claude-fable-5` return 3 in `data/models.yaml` when the
+boundary-anchored answer is 0. This version counts occurrences, anchors each id, and asserts
+the property the step actually cares about: every occurrence sits inside a rendered marker
+block or inside a URL.
 
 ```bash
-cd /Users/marcusklein/dev/llm-guides
-for id in claude-fable-5-1 claude-opus-5-5 claude-sonnet-5-5 claude-haiku-4-5 claude-opus-5 claude-sonnet-5; do
-  n=$(grep -c "$id" guides/models/claude-models.md)
-  echo "$id: $n occurrence(s)"
-done
+cd /Users/marcusklein/dev/llm-guides && python3 - <<'PY'
+import re, sys
+
+s = open("guides/models/claude-models.md", encoding="utf-8").read()
+
+# Ranges where an id may legally appear: terminated corpus marker blocks, and URLs.
+covered = []
+for m in re.finditer(r"<!--\s*corpus:(data|table)\b[^>]*-->", s):
+    kind = m.group(1)
+    close = re.search(r"<!--\s*/corpus:" + kind + r"\s*-->", s[m.end():])
+    if close:
+        covered.append((m.start(), m.end() + close.end()))
+for m in re.finditer(r"https?://[^\s)>\]\"',|<*`]+", s):
+    covered.append((m.start(), m.end()))
+
+IDS = ["claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5-5",
+       "claude-haiku-4-5", "claude-opus-5", "claude-sonnet-5"]
+
+bare = 0
+for mid in IDS:
+    hits = [m.start() for m in re.finditer(re.escape(mid) + r"(?![-.\w])", s)]
+    outside = [h for h in hits if not any(a <= h < b for a, b in covered)]
+    print(f"{mid:18} occurrences={len(hits):3}  outside marker/URL={len(outside)}")
+    for h in outside:
+        bare = 1
+        print(f"    BARE at line {s[:h].count(chr(10)) + 1}")
+
+print("clean: every id occurrence is inside a marker block or a URL" if not bare
+      else "FAIL: bare id in the page body")
+sys.exit(bare)
+PY
 ```
 
-Every occurrence must be inside a rendered `corpus:table` block or inside a URL. Confirm by eye against the table line numbers; `lint: clean` already proves no tracked id is bare, so any surprise here is in a URL.
+Expected: a per-id line with `outside marker/URL=0` for all six, then `clean: ...`, exit 0. Any
+`BARE at line N` is a real defect with its line number — no interpretation required. The
+occurrence counts are printed for information only; the pass/fail condition is the `outside`
+column, because the right number of occurrences is whatever the rendered tables produce and
+will change when a row is added.
 
 - [ ] **Step 3: Run the four gates plus the proof**
 
