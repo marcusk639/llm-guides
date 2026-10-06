@@ -16,11 +16,12 @@ records:
     max_output: 128K tokens
     input_price: $10 / MTok
     output_price: $50 / MTok
-    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price]
+    retirement: Not sooner than September 1, 2027
+    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price, retirement]
     volatility: high
     source: https://platform.claude.com/docs/en/models/overview
     price_source: https://platform.claude.com/docs/en/about-claude/pricing
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [claude-current, comparison-hosted]
   - key: anthropic.models.opus-5-5
     value: claude-opus-5-5
@@ -32,11 +33,12 @@ records:
     max_output: 128K tokens
     input_price: $4 / MTok
     output_price: $20 / MTok
-    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price]
+    retirement: Not sooner than September 22, 2027
+    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price, retirement]
     volatility: high
     source: https://platform.claude.com/docs/en/models/overview
     price_source: https://platform.claude.com/docs/en/about-claude/pricing
-    verified: "2026-10-02"
+    verified: "2026-10-06"
     tags: [claude-current, comparison-hosted]
   - key: anthropic.models.sonnet-5-5
     value: claude-sonnet-5-5
@@ -48,11 +50,12 @@ records:
     max_output: 128K tokens
     input_price: $2 / MTok
     output_price: $10 / MTok
-    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price]
+    retirement: Not sooner than September 28, 2027
+    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price, retirement]
     volatility: high
     source: https://platform.claude.com/docs/en/models/overview
     price_source: https://platform.claude.com/docs/en/about-claude/pricing
-    verified: "2026-10-02"
+    verified: "2026-10-06"
     tags: [claude-current]
   - key: anthropic.models.opus-5
     value: claude-opus-5
@@ -69,7 +72,7 @@ records:
     volatility: high
     source: https://platform.claude.com/docs/en/models/opus-5/overview
     price_source: https://platform.claude.com/docs/en/about-claude/pricing
-    verified: "2026-10-02"
+    verified: "2026-10-06"
     tags: [claude-legacy]
   - key: anthropic.models.sonnet-5
     value: claude-sonnet-5
@@ -86,7 +89,7 @@ records:
     volatility: high
     source: https://platform.claude.com/docs/en/models/sonnet-5/overview
     price_source: https://platform.claude.com/docs/en/about-claude/pricing
-    verified: "2026-10-02"
+    verified: "2026-10-06"
     tags: [claude-legacy]
   - key: anthropic.models.haiku-4-5
     value: claude-haiku-4-5-20251001
@@ -98,9 +101,10 @@ records:
     max_output: 64K tokens
     input_price: $1 / MTok
     output_price: $5 / MTok
-    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price]
+    retirement: Not sooner than October 15, 2026
+    lint_fields: [api_id, api_alias, context_window, max_output, input_price, output_price, retirement]
     volatility: high
     source: https://platform.claude.com/docs/en/models/overview
     price_source: https://platform.claude.com/docs/en/about-claude/pricing
-    verified: "2026-09-16"
+    verified: "2026-10-06"
     tags: [claude-current, comparison-hosted]

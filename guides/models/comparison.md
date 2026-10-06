@@ -8,7 +8,7 @@ summary: >-
   look, how to pull the live figures from each vendor's API, and how to choose
   without trusting a leaderboard.
 topic: models
-verified: 2026-09-16
+verified: 2026-10-06
 applies_to:
   - "Anthropic Claude API, OpenAI API and Google Gemini API documentation as published on 2026-09-16; the Anthropic rows re-read 2026-10-02, when Claude Opus 5.5 replaced Claude Opus 5 in the hosted table"
   - "Hugging Face model cards in the meta-llama and Qwen organisations as published on 2026-09-16"
@@ -29,6 +29,7 @@ sources:
 related:
   - guides/models/claude-models.md
   - guides/context/context-management.md
+research: research/models/2026-10-06-claude-models-comparison-refresh.md
 seed: true
 ---
 
@@ -83,9 +84,9 @@ Hosted models, as published on the verification date. Prices are base paid-tier 
 | Google | Gemini 3.8 Flash | gemini-3.8-flash |  | 1,048,576 tokens | 65,536 tokens | $0.75 / MTok | $3.75 / MTok | Paid-tier prices shown apply through 2026-12-31; from 2027-01-01 the listed prices are $1.50 / MTok input and $7.50 / MTok output. Output price includes thinking tokens. |
 | Google | Gemini 3.1 Pro Preview | gemini-3.1-pro-preview |  | 1,048,576 tokens | 65,536 tokens | $2 / MTok | $12 / MTok | Preview model. Prices shown are for prompts up to 200k tokens; longer prompts are $4 / MTok input and $18 / MTok output. Output price includes thinking tokens. |
 | Google | Gemini 3.5 Flash-Lite | gemini-3.5-flash-lite |  | 1,048,576 tokens | 65,536 tokens | $0.30 / MTok | $2.50 / MTok | Input price covers text, image, video and audio. Output price includes thinking tokens. |
-| OpenAI | GPT-6 Astra | gpt-6-astra | 1,050,000 tokens |  | 128,000 tokens | $10 / MTok | $50 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
-| OpenAI | GPT-5.6 Terra | gpt-5.6-terra | 1,050,000 tokens |  | 128,000 tokens | $2 / MTok | $12 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
-| OpenAI | GPT-5.6 Luna | gpt-5.6-luna | 1,050,000 tokens |  | 128,000 tokens | $0.20 / MTok | $1.20 / MTok | Prompts above 272K input tokens are billed at higher rates for the whole request. |
+| OpenAI | GPT-6 Astra | gpt-6-astra | 1,050,000 tokens |  | 128,000 tokens | $10 / MTok | $50 / MTok | Prompts with more than 272K input tokens are priced at 2x input and cache rates and 1.5x output for the full request. |
+| OpenAI | GPT-5.6 Terra | gpt-5.6-terra | 1,050,000 tokens |  | 128,000 tokens | $2 / MTok | $12 / MTok | Prompts with >272K input tokens are priced at 2x input and 1.5x output for the full request. |
+| OpenAI | GPT-5.6 Luna | gpt-5.6-luna | 1,050,000 tokens |  | 128,000 tokens | $0.20 / MTok | $1.20 / MTok | Prompts with >272K input tokens are priced at 2x input and 1.5x output for the full request. |
 <!-- /corpus:table -->
 
 Open-weight models, as stated in each official model card on the verification date. There is no price column: what you pay depends on where and how you run the weights.
