@@ -15,6 +15,8 @@ sources:
   - https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct
   - https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B
   - https://huggingface.co/Qwen/Qwen3.8-27B
+  - https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B/blob/main/LICENSE
+  - https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/LICENSE
 related:
   - guides/models/comparison.md
 research: research/models/2026-10-06-claude-models-comparison-refresh.md
@@ -64,8 +66,9 @@ materially from one another and several carry conditions on commercial use that
 depend on your revenue or user count. The licence column records which licence
 applies; the card is the authority on its terms.
 
-Evidence: **Documented** — the model cards linked in section 8, read on the
-verification date in the front matter.
+Evidence: **Documented** — licence names from each card's metadata and, for the
+Qwen models, its linked licence file, read 2026-09-16. The Llama licence text
+is distributed with the weights rather than linked from the card.
 
 **Treat a released checkpoint as immutable.** A given model id names a fixed set
 of weights. What changes is the lineup around it: new generations arrive and
@@ -119,5 +122,7 @@ Verified rather than Documented.
 - [Llama 4 Scout model card](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct)
 - [Qwen3.8-2.4T-A95B model card](https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B)
 - [Qwen3.8-27B model card](https://huggingface.co/Qwen/Qwen3.8-27B)
+- [Qwen3.8-2.4T-A95B licence](https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B/blob/main/LICENSE)
+- [Qwen3.8-27B licence](https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/LICENSE)
 
 Related: [Comparing models across vendors](../models/comparison.md).

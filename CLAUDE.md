@@ -17,12 +17,14 @@ coverage, with dedicated pages for smaller providers and for running models
 locally. Concepts are written so they hold across providers; mechanisms are
 documented where the vendor documents them.
 
-**The quarantine principle.** Volatile values live in the `providers` topic
-and nowhere else. Every other page is written free of data records and links
-to the provider page that owns the figure. This is finding F2's workaround
-promoted to a rule: page cadence is the maximum volatility of any record the
-page references, so a single model price on a concept page puts that page on
-a 30-day clock permanently.
+**The quarantine principle.** High-volatility values — model ids, prices and
+lineups — live only on the pages that own them under `providers` and `models`.
+A concept page never carries one; it links the page that does. A page that
+documents a mechanism may carry that mechanism's own `medium` defaults, as
+`claude-code/hooks.md` and `context/context-management.md` do. This is finding
+F2's workaround promoted to a rule, and it exists for cadence: page cadence is
+the maximum volatility of any record the page references, so one model price on
+a concept page puts that page on a 30-day clock permanently.
 
 The hazard every rule below exists for: the corpus documents systems whose model ids,
 prices, limits and defaults change on a timescale of weeks, and a wrong-but-plausible
@@ -53,8 +55,8 @@ This supersedes the previous convention of root-level topic directories
 - `local/` — **gitignored.** Harvest output and anything derived from session
   transcripts. Nothing here may enter a committed document.
 
-The eleven topics, from `meta/taxonomy.yaml`: foundations, prompting, context, agents,
-claude-code, cowork, harness, models, tools, building, domains. `claude-code` is
+The fifteen topics, from `meta/taxonomy.yaml`: foundations, prompting, context, agents,
+claude-code, cowork, harness, models, tools, building, domains, providers, evals, multimodal, orchestration. `claude-code` is
 intentionally the largest. `harness` carries guardrails, long-running automation, trust,
 and observability. `domains` ships with one exemplar playbook plus the generation recipe
 (see "Domain playbook shape") rather than many thin pages.

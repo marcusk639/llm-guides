@@ -1,4 +1,4 @@
-# Volatile values backing guides/models/claude-models.md.
+# Volatile values backing guides/providers/anthropic.md.
 # One record per current Claude model (a table row), per controller ruling R3.
 # `value` is the Claude API ID so the record is well-formed; `lint_fields`
 # names every volatile field in the row so the closed-world lint indexes the

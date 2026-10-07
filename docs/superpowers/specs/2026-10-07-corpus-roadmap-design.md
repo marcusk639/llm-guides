@@ -82,7 +82,8 @@ So per-provider depth is cheap, and breadth of _values_ is expensive.
 
 ## The quarantine principle
 
-**Volatile values live in the `providers` topic and nowhere else.** Every other
+**High-volatility values live only on the pages that own them under `providers`
+and `models`.** Every concept
 page is written free of data records and links to the provider page that owns the
 figure.
 

@@ -23,7 +23,8 @@ they disagree the earlier one wins:
    corpus is shaped as it is.
 3. `docs/superpowers/specs/2026-10-03-static-site-design.md` — the published
    site, including its "Deliberately absent" section.
-4. `meta/taxonomy.yaml` — the eleven topics. This file is contract-governed.
+4. `meta/taxonomy.yaml` — the topic list. This file is contract-governed; read the
+   current slugs from it rather than trusting any count quoted elsewhere.
 5. `meta/ledger.yaml` — what exists today and when each page expires.
 6. One seed guide of each archetype, listed in `CLAUDE.md`'s seed table.
 
