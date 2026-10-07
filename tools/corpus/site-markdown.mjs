@@ -34,3 +34,16 @@ marked.use(headingIds);
 export function renderMarkdown(md) {
   return marked.parse(md);
 }
+
+// Only these schemes become a live href. Content is authored in-repo, so the
+// reach of a javascript:/data: URL here is self-XSS rather than an attack path,
+// but a figure's attribution should never be executable. A rejected URL is
+// still shown as text, so nothing disappears from the page.
+const SAFE_SCHEME = /^(https?:|mailto:)/i;
+
+export function safeHref(url) {
+  const u = String(url).trim();
+  return SAFE_SCHEME.test(u) || u.startsWith("/") || u.startsWith("./") || u.startsWith("../")
+    ? u
+    : null;
+}

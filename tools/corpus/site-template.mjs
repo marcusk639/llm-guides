@@ -1,5 +1,5 @@
 // tools/corpus/site-template.mjs
-import { headingSlug, renderMarkdown } from "./site-markdown.mjs";
+import { headingSlug, renderMarkdown, safeHref } from "./site-markdown.mjs";
 import { navTopics, loadTopics } from "./site-nav.mjs";
 import { searchScript } from "./site-search.mjs";
 import { annotateBody, injectProvenance } from "./site-provenance.mjs";
@@ -60,7 +60,12 @@ export function renderPage(model, byKey = new Map(), records = []) {
     .map((a) => `<li>${esc(a)}</li>`)
     .join("\n      ");
   const sources = model.sources
-    .map((s) => `<li><a href="${esc(s)}">${esc(s)}</a></li>`)
+    .map((s) => {
+      const href = safeHref(s);
+      return href === null
+        ? `<li>${esc(s)}</li>`
+        : `<li><a href="${esc(href)}">${esc(s)}</a></li>`;
+    })
     .join("\n      ");
   const related = model.related
     .map((r) => `<li>${esc(r)}</li>`)

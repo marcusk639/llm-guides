@@ -7,6 +7,7 @@
 
 import { findBlocks } from "./markers.mjs";
 import { isValidIsoDate } from "./ledger.mjs";
+import { safeHref } from "./site-markdown.mjs";
 
 // A link whose text names the vendor page rather than showing a bare URL.
 export function sourceLabel(url) {
@@ -54,11 +55,11 @@ export function renderSubRow(entries, columnCount) {
   // Identical dates and sources are stated once rather than per column.
   const text =
     dates.size === 1 && sources.size === 1
-      ? `Read ${esc([...dates][0])} from <a href="${esc(entries[0].source)}">${esc(entries[0].label)}</a>`
+      ? `Read ${esc([...dates][0])} from ${link(entries[0])}`
       : entries
           .map(
             (e) =>
-              `${esc(e.key)}: read ${esc(e.verified)} from <a href="${esc(e.source)}">${esc(e.label)}</a>`,
+              `${esc(e.key)}: read ${esc(e.verified)} from ${link(e)}`,
           )
           .join("; ");
 
@@ -117,10 +118,19 @@ function entryFor(key, byKey, issues) {
   };
 }
 
+// A record's source is authored in-repo, but an attribution must never be an
+// executable href. A rejected scheme still shows the label as text.
+function link(entry) {
+  const href = safeHref(entry.source);
+  return href === null
+    ? esc(entry.label)
+    : `<a href="${esc(href)}">${esc(entry.label)}</a>`;
+}
+
 function renderInline(entry) {
   return `<span class="provenance" data-record-key="${esc(entry.key)}">read ${esc(
     entry.verified,
-  )} from <a href="${esc(entry.source)}">${esc(entry.label)}</a></span>`;
+  )} from ${link(entry)}</span>`;
 }
 
 // A generated row's cells are exactly its record's `fields` values, so a row is

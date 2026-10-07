@@ -237,3 +237,13 @@ test("no rendered figure ever states 'read null'", () => {
   assert.equal(html.includes("read null"), false);
   assert.equal(html.includes("class=\"provenance\""), false);
 });
+
+test("a record whose source is a javascript: URL gets no live provenance link", () => {
+  const hostile = recordsByKey([
+    { key: "a.bad", value: "x", verified: "2026-10-06", source: "javascript:alert(1)" },
+  ]);
+  const body =
+    "## 1. A\n\nValue <!-- corpus:data key=a.bad -->x<!-- /corpus:data --> here.\n";
+  const html = renderPage({ ...model, body }, hostile, []);
+  assert.equal(/href="javascript:/.test(html), false);
+});

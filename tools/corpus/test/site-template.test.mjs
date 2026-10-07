@@ -133,3 +133,18 @@ test("every tier-navigation anchor resolves to a heading id in the article", () 
     );
   }
 });
+
+// Review finding (declined to judge, fixed anyway): a javascript: or data: URL
+// in `sources` rendered as a live href. All content is authored in-repo so the
+// reach is self-XSS, but a scheme allowlist costs four lines.
+test("a non-http source is not rendered as a live link", () => {
+  const html = renderPage({
+    ...model,
+    sources: ["javascript:alert(1)", "data:text/html,x", "https://ok.invalid/p"],
+  });
+  assert.equal(/href="javascript:/.test(html), false);
+  assert.equal(/href="data:/.test(html), false);
+  assert.match(html, /href="https:\/\/ok\.invalid\/p"/);
+  // The value is still shown, so nothing is silently dropped from the page.
+  assert.match(html, /javascript:alert\(1\)/);
+});
