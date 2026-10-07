@@ -71,3 +71,23 @@ test("the fetch path is relative, so it survives a project-subpath deploy", () =
   assert.equal(searchScript().includes('fetch("/search-index.json")'), false);
   assert.match(searchScript(), /fetch\("search-index\.json"\)/);
 });
+
+// Review finding (re-graded from Minor): the index carries `freshness` and the
+// test at :42 justifies it "so a result can show staleness", but no consumer
+// rendered it. Task 8's brief requires results to show the page's state.
+test("a search result renders the page's freshness state", () => {
+  const js = searchScript();
+  assert.match(js, /stateLabel/);
+  assert.match(js, /page\.freshness/);
+  assert.match(js, /badge-/);
+});
+
+// Review finding (Minor 5): the two substring greps would still pass if
+// stateLabel grew a module-scope helper, leaving a script that throws
+// ReferenceError at view time. This drives the serialised function instead.
+test("the serialised client script is valid standalone JavaScript", () => {
+  const body = searchScript()
+    .replace(/^<script>\n?/, "")
+    .replace(/\n?<\/script>$/, "");
+  assert.doesNotThrow(() => new Function(body), "client script is not valid JS");
+});

@@ -5,7 +5,7 @@
 // else in the site depends on how matching works — so a real index can replace
 // the matching later without touching anything but this file.
 import { numberedHeadings } from "./site-template.mjs";
-import { freshnessFacts } from "./site-freshness.mjs";
+import { freshnessFacts, stateLabel } from "./site-freshness.mjs";
 
 export function sectionTexts(body) {
   const headings = numberedHeadings(body);
@@ -55,6 +55,15 @@ export function buildSearchIndex(models) {
 export function searchScript() {
   return `<script>
 (function () {
+  // The SAME stateLabel the banner and the tests use, serialised for the same
+  // reason: a result for a stale page must say so at the point of choosing.
+  var stateLabel = ${stateLabel.toString()};
+  function localToday(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
   var field = document.querySelector("[data-search]");
   if (!field) return;
   var index = null;
@@ -83,6 +92,14 @@ export function searchScript() {
           a.href = page.path.replace(/\\.md$/, ".html");
           a.textContent = page.title + " — " + s.heading;
           li.appendChild(a);
+          var state = stateLabel(page.freshness, localToday(new Date()));
+          if (state) {
+            var badge = document.createElement("span");
+            badge.className = "badge badge-" + state;
+            badge.textContent = state;
+            li.appendChild(document.createTextNode(" "));
+            li.appendChild(badge);
+          }
           out.appendChild(li);
         });
       });

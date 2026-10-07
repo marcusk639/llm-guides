@@ -108,3 +108,24 @@ test("the client script carries the same stateLabel the tests drive", () => {
   assert.match(js, /todayIso <= facts\.expires/);
   assert.match(js, /todayIso <= facts\.hardFail/);
 });
+
+// Review finding (Minor 5): asserting two substrings of the serialised script
+// would not catch stateLabel gaining a module-scope helper — toString() would
+// emit a script throwing ReferenceError at view time with every test green.
+test("the serialised stateLabel is valid standalone JS and behaves identically", () => {
+  const body = clientScript()
+    .replace(/^<script>\n?/, "")
+    .replace(/\n?<\/script>$/, "");
+  assert.doesNotThrow(() => new Function(body), "client script is not valid JS");
+  const extracted = new Function(
+    `${clientScript().match(/var stateLabel = ([\s\S]*?);\n  function localToday/)[1]}; return stateLabel;`,
+  )();
+  const f = freshnessFacts(high);
+  for (const [day, want] of [
+    ["2026-11-05", "fresh"],
+    ["2026-11-06", "due"],
+    ["2026-12-06", "expired"],
+  ])
+    assert.equal(extracted(f, day), stateLabel(f, day), `client disagrees on ${day}`);
+  assert.equal(extracted(f, "2026-12-06"), "expired");
+});
