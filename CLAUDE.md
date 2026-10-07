@@ -12,8 +12,17 @@ wins.
 
 A long-lived reference corpus on effective LLM use: how a document is shaped, how a
 claim earns its confidence level, where volatile facts live, and how staleness is
-detected. Claude-first depth today, with a documented recipe for expanding to other
-models and domains on demand.
+detected. Provider-weighted depth: Anthropic, OpenAI and Google carry the bulk of the
+coverage, with dedicated pages for smaller providers and for running models
+locally. Concepts are written so they hold across providers; mechanisms are
+documented where the vendor documents them.
+
+**The quarantine principle.** Volatile values live in the `providers` topic
+and nowhere else. Every other page is written free of data records and links
+to the provider page that owns the figure. This is finding F2's workaround
+promoted to a rule: page cadence is the maximum volatility of any record the
+page references, so a single model price on a concept page puts that page on
+a 30-day clock permanently.
 
 The hazard every rule below exists for: the corpus documents systems whose model ids,
 prices, limits and defaults change on a timescale of weeks, and a wrong-but-plausible
