@@ -90,6 +90,12 @@ zero, unlimited, or derivable from another column.
 **A host's context is not the card's context.** Serving configuration can be
 lower; check the endpoint, not this page.
 
+Evidence: **Documented** — the mixture-of-experts parameter counts and the
+native-versus-extended context wording come from the four cards, read
+2026-09-16. The inference that a host may serve a shorter context than the card
+states is **Plausible**: the cards say hosted versions differ in defaults, but
+none states a floor.
+
 ## 6. Where this rots
 
 | Claim                      | Record                            | Volatility | Why it moves                                        |
@@ -99,13 +105,22 @@ lower; check the endpoint, not this page.
 | Qwen3.8-2.4T-A95B row      | `qwen.models.qwen3-8-2-4t-a95b`                                                       | medium       | Fast Qwen release cadence; licence terms                    |
 | Qwen3.8-27B row            | `qwen.models.qwen3-8-27b`                                                             | medium       | Same                                                        |
 
+Not lint-guarded, so re-check it by hand: the Qwen3.8-27B parameter count. Its
+value is embedded in the model id, so the record omits it from `lint_literals`
+(see the header comment in `data/models-other.yaml`) and the bare-value scan
+cannot catch it drifting.
+
 Identifiers to re-check against `applies_to`: the model card URLs themselves,
 which move when a vendor reorganises its Hugging Face organisation, and the
 licence names, which change only when a vendor relicenses a release.
 
 These records sit at `medium` volatility rather than `high` because a released
-checkpoint is immutable and carries no price. What moves is the lineup, on a
-release cadence rather than a repricing cadence.
+checkpoint's weights are immutable and carry no price, so the repricing that
+drives the hosted pages' 30-day cadence cannot happen here. What does move is
+the lineup, on a release cadence — and, as the table above says, licence terms,
+which a vendor can revise on an already-published model. If a licence revision
+is ever missed by more than a few weeks, that is the signal these records belong
+back at `high`.
 
 Deliberately absent: benchmark scores, which this corpus links but never
 transcribes; and any figure about serving cost, which depends on the host.

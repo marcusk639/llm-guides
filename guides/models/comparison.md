@@ -33,7 +33,7 @@ seed: true
 
 ## 1. What this covers / who it's for
 
-A small, dated comparison of current models from three hosted APIs (Anthropic, OpenAI, Google) and two open-weight families (Meta Llama, Alibaba Qwen), limited to what each vendor states on its own pages. It is not a ranking and has no benchmark scores.
+A small, dated comparison of current models from three hosted APIs (Anthropic, OpenAI, Google) and two open-weight families (Meta Llama, Alibaba Qwen), limited to what each vendor states on its own pages. The open-weight rows now live on [Open-weight models](../providers/open-weight.md), which refreshes on a slower cadence; this page keeps the discussion of how the two kinds compare. It is not a ranking and has no benchmark scores.
 For anyone shortlisting models for a project or estimating cost across providers. Beginners can stop after section 2; section 5 is for people who will actually switch vendors.
 
 ## 2. The 60-second version
