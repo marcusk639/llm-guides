@@ -2,9 +2,8 @@
 title: Comparing models across vendors
 summary: >-
   A dated side-by-side of hosted frontier models from Anthropic, OpenAI and
-  Google and open-weight models from Meta Llama and Alibaba Qwen: ids, stated
-  limits, list prices, parameter counts and licences, each copied from the
-  vendor's own page. Also covers why the columns are less comparable than they
+  Google: ids, stated limits and list prices, each copied from the vendor's own
+  page. Open-weight models have their own page. Also covers why the columns are less comparable than they
   look, how to pull the live figures from each vendor's API, and how to choose
   without trusting a leaderboard.
 topic: models
@@ -12,7 +11,7 @@ verified: 2026-10-06
 applies_to:
   - "Anthropic Claude API, OpenAI API and Google Gemini API documentation as published on 2026-10-06"
   - "Hugging Face model cards in the meta-llama and Qwen organisations as published on 2026-10-06"
-  - "Rows: Claude Fable 5.1, Claude Opus 5.5, Claude Haiku 4.5; GPT-6 Astra, GPT-5.6 Terra, GPT-5.6 Luna; Gemini 3.8 Flash, Gemini 3.1 Pro Preview, Gemini 3.5 Flash-Lite; Llama 4 Maverick, Llama 4 Scout; Qwen3.8-2.4T-A95B, Qwen3.8-27B"
+  - "Rows: Claude Fable 5.1, Claude Opus 5.5, Claude Haiku 4.5; GPT-6 Astra, GPT-5.6 Terra, GPT-5.6 Luna; Gemini 3.8 Flash, Gemini 3.1 Pro Preview, Gemini 3.5 Flash-Lite"
 sources:
   - https://platform.claude.com/docs/en/models/overview
   - https://platform.claude.com/docs/en/about-claude/pricing
@@ -22,12 +21,9 @@ sources:
   - https://ai.google.dev/gemini-api/docs/models
   - https://ai.google.dev/gemini-api/docs/pricing
   - https://ai.google.dev/api/models
-  - https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct
-  - https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct
-  - https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B
-  - https://huggingface.co/Qwen/Qwen3.8-27B
 related:
   - guides/models/claude-models.md
+  - guides/providers/open-weight.md
   - guides/context/context-management.md
 research: research/models/2026-10-06-claude-models-comparison-refresh.md
 seed: true
@@ -87,17 +83,6 @@ Hosted models, as published on the verification date. Prices are base paid-tier 
 | OpenAI | GPT-6 Astra | gpt-6-astra | 1,050,000 tokens |  | 128,000 tokens | $10 / MTok | $50 / MTok | Prompts with more than 272K input tokens are priced at 2x input and cache rates and 1.5x output for the full request. |
 | OpenAI | GPT-5.6 Terra | gpt-5.6-terra | 1,050,000 tokens |  | 128,000 tokens | $2 / MTok | $12 / MTok | Prompts with >272K input tokens are priced at 2x input and 1.5x output for the full request. |
 | OpenAI | GPT-5.6 Luna | gpt-5.6-luna | 1,050,000 tokens |  | 128,000 tokens | $0.20 / MTok | $1.20 / MTok | Prompts with >272K input tokens are priced at 2x input and 1.5x output for the full request. |
-<!-- /corpus:table -->
-
-Open-weight models, as stated in each official model card on the verification date. There is no price column: what you pay depends on where and how you run the weights.
-
-<!-- corpus:table fields=vendor,name,model_id,parameters,context_length,licence,notes headers="Vendor,Model,Model ID,Parameters,Context length,Licence,Notes" sort=vendor tag=comparison-open-weight -->
-| Vendor | Model | Model ID | Parameters | Context length | Licence | Notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| Alibaba Qwen | Qwen3.8-2.4T-A95B | Qwen/Qwen3.8-2.4T-A95B | 2.4T in total and 95B activated | 262,144 natively and extensible up to 1,010,000 tokens | Qwen3.8-Max License |  |
-| Alibaba Qwen | Qwen3.8-27B | Qwen/Qwen3.8-27B | 27B | 262,144 natively and extensible up to 1,000,000 tokens | Apache License 2.0 | Hugging Face lists this repository's pipeline_tag as image-text-to-text rather than text-generation, and the model card carries a VL Performance section beside its Text Performance section. Whether the vendor states a text-only output modality is not established by the pages read on 2026-10-06. |
-| Meta | Llama 4 Maverick | meta-llama/Llama-4-Maverick-17B-128E-Instruct | 17B (Activated), 400B (Total) | 1M | Llama 4 Community License Agreement |  |
-| Meta | Llama 4 Scout | meta-llama/Llama-4-Scout-17B-16E-Instruct | 17B (Activated), 109B (Total) | 10M | Llama 4 Community License Agreement |  |
 <!-- /corpus:table -->
 
 If a table and the vendor page it came from disagree, the vendor page wins. Section 8 lists every page.
@@ -183,15 +168,11 @@ Evidence: **Plausible** — inferred from the cards' native-versus-extended cont
 | Gemini 3.8 Flash row       | `google.models.gemini-3-8-flash`                                                      | high       | Scheduled price change; new Flash releases                  |
 | Gemini 3.1 Pro Preview row | `google.models.gemini-3-1-pro-preview`                                                | high       | Preview status; a stable Pro may replace it                 |
 | Gemini 3.5 Flash-Lite row  | `google.models.gemini-3-5-flash-lite`                                                 | high       | Newer Flash-Lite generations                                |
-| Llama 4 Maverick row       | `meta.models.llama-4-maverick`                                                        | high       | A new Llama generation would supersede it                   |
-| Llama 4 Scout row          | `meta.models.llama-4-scout`                                                           | high       | Same                                                        |
-| Qwen3.8-2.4T-A95B row      | `qwen.models.qwen3-8-2-4t-a95b`                                                       | high       | Fast Qwen release cadence; licence terms                    |
-| Qwen3.8-27B row            | `qwen.models.qwen3-8-27b`                                                             | high       | Same                                                        |
 | Claude rows                | `anthropic.models.fable-5-1`, `anthropic.models.opus-5-5`, `anthropic.models.haiku-4-5` | high       | Owned by [Claude models](claude-models.md); refreshed there. The hosted row tracks the current Opus; Opus 5 is now legacy and is listed on that page, not here |
 
 Re-check on refresh, against the pages in section 8, **which win whenever they and this page disagree**:
 
-- which models each vendor currently features (a new flagship or cheap tier means a new record; a demoted one means removing its `comparison-hosted` or `comparison-open-weight` tag);
+- which models each vendor currently features (a new flagship or cheap tier means a new record; a demoted one means removing its `comparison-hosted` tag);
 - every field in every record, including the `notes` thresholds and dates;
 - the untracked claims in sections 3–5: vendor self-descriptions, which limit each vendor states, Google's thinking-token and free-tier notes, OpenAI's whole-request threshold rule, Qwen's native-versus-extended context wording, and the licence summaries;
 - the leaderboard links in 4.3 (still live, still measuring what the page says).
