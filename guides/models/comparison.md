@@ -101,7 +101,7 @@ If a table and the vendor page it came from disagree, the vendor page wins. Sect
 
 - OpenAI: GPT-6 Astra is "our flagship model for complex reasoning and coding"; choose GPT-5.6 Terra "to balance intelligence and cost", or GPT-5.6 Luna "for cost-sensitive, high-volume workloads" ([OpenAI models](https://developers.openai.com/api/docs/models)).
 - Google: Gemini 3.8 Flash is "our most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and complex enterprise workflows"; Gemini 3.1 Pro (listed as Preview) offers "Advanced intelligence, complex problem-solving skills, and powerful agentic and vibe coding capabilities"; Gemini 3.5 Flash-Lite is "Our fastest, most cost-effective 3.5 model for high-throughput execution" ([Gemini models](https://ai.google.dev/gemini-api/docs/models)).
-- Anthropic: see [Claude models, section 3](claude-models.md#3-how-it-actually-works) for the overview's tier descriptions.
+- Anthropic: see [Claude models, section 3](../providers/anthropic.md#3-how-it-actually-works) for the overview's tier descriptions.
 - Meta: the Llama 4 card introduces Scout and Maverick as "two efficient models in the Llama 4 series", both mixture-of-experts.
 - Qwen: the Qwen3.8 cards describe the generation as "the most capable generation in the Qwen open-model family to date", and the largest card says it "brings a Qwen-Max-class model to open release".
 
@@ -119,7 +119,7 @@ Evidence: **Documented** for each vendor's description of its own models ([OpenA
 
 Tokenizers differ between vendors, and Anthropic documents that its own tokenizer changed between model generations, so the same prompt is a different number of tokens on different models. Reasoning or thinking tokens are billed as output on at least some rows (Google states this explicitly). A lower per-token price can still cost more per finished task. Run a representative task set on each candidate and compare total spend and success rate.
 
-Evidence: **Plausible** — inferred from per-token billing, the tokenizer note on the [Claude models overview](https://platform.claude.com/docs/en/models/overview) and the thinking-token note on the [Gemini pricing page](https://ai.google.dev/gemini-api/docs/pricing), read 2026-09-16. No vendor publishes a cross-vendor cost comparison. See also [Claude models, 4.4](claude-models.md#44-compare-cost-per-completed-task-not-price-per-token).
+Evidence: **Plausible** — inferred from per-token billing, the tokenizer note on the [Claude models overview](https://platform.claude.com/docs/en/models/overview) and the thinking-token note on the [Gemini pricing page](https://ai.google.dev/gemini-api/docs/pricing), read 2026-09-16. No vendor publishes a cross-vendor cost comparison. See also [Claude models, 4.4](../providers/anthropic.md#44-compare-cost-per-completed-task-not-price-per-token).
 
 ### 4.3 Read benchmark leaderboards for direction, and check the task matches yours
 

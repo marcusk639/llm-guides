@@ -64,7 +64,7 @@ Seed guides to copy from, one per archetype:
 | Archetype                   | Page                                     | Shows                                                       |
 | --------------------------- | ---------------------------------------- | ----------------------------------------------------------- |
 | Evergreen concept           | `guides/context/context-management.md`   | inline `corpus:data` blocks; values kept off a concept page |
-| High-volatility model facts | `guides/models/claude-models.md`         | row records and a `corpus:table` with `headers=`            |
+| High-volatility model facts | `guides/providers/anthropic.md`         | row records and a `corpus:table` with `headers=`            |
 | Tool reference              | `guides/claude-code/hooks.md`            | context-bound `lint_literals` for generic figures           |
 | Domain playbook             | `guides/domains/software-engineering.md` | task map, per-part labels, dated studies, `lint: false`     |
 | Cross-model comparison      | `guides/models/comparison.md`            | shared row records across files, `sort=`, `lint_fields`     |
@@ -353,7 +353,7 @@ Scope of the bare-value scan:
   page's `topic`.
 
 Code examples therefore must not contain a known value outside a marker block. Obtain
-model ids and limits at runtime (the Models API in `guides/models/claude-models.md` §2),
+model ids and limits at runtime (the Models API in `guides/providers/anthropic.md` §2),
 or write the example so it takes the value as input. A value-bearing fence can only be
 data-backed as the `display` of a record wrapped in a `corpus:data` block, which is
 unreadable; templated snippets are deferred (F3).
