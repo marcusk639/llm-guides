@@ -178,3 +178,29 @@ test("prose without a table gains no scroll container", () => {
   const html = renderPage({ ...model, body: "## 1. A\n\ntext only\n" });
   assert.equal(html.includes("table-scroll"), false);
 });
+
+// Found by looking at the rendered page: guide bodies open with their own
+// `# Title`, which the template already renders from front-matter, so every
+// page showed its title twice and shipped two <h1> elements.
+test("a guide renders its title once, not twice", () => {
+  const html = renderPage({
+    ...model,
+    body: "# Claude models\n\n## 1. What this covers\n\ntext\n",
+  });
+  assert.equal((html.match(/<h1/g) || []).length, 1);
+  assert.equal((html.match(/Claude models/g) || []).length >= 1, true);
+});
+
+test("a body heading that is not the leading title is left alone", () => {
+  const html = renderPage({
+    ...model,
+    body: "## 1. A\n\ntext\n\n# Not a title\n",
+  });
+  assert.match(html, /Not a title/);
+});
+
+test("the front page states what the corpus is", () => {
+  const html = renderFrontPage([model], ["models"]);
+  assert.match(html, /class="tagline"/);
+  assert.match(html, /verification date/);
+});

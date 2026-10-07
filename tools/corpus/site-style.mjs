@@ -11,35 +11,39 @@
 // a redefinition rather than a second set of rules.
 
 const LIGHT = `
-  --bg: #fdfdfb;
-  --surface: #f4f3ee;
-  --fg: #1b1b18;
-  --fg-muted: #5c5a52;
-  --rule: #dddbd2;
-  --accent: #7a2e1d;
-  --accent-soft: #f0e6e2;
-  --fresh-fg: #1f4620;
-  --fresh-bg: #e3efe1;
-  --due-fg: #6b4a07;
-  --due-bg: #faeecd;
-  --expired-fg: #7a1f1f;
-  --expired-bg: #f7dfdf;
+  --bg: #fbfaf7;
+  --surface: #f2efe8;
+  --surface-2: #e9e5db;
+  --fg: #1a1814;
+  --fg-muted: #635e54;
+  --rule: #ddd8cc;
+  --rule-strong: #1a1814;
+  --accent: #8a3115;
+  --accent-soft: #f3e7e1;
+  --fresh-fg: #1d4a22;
+  --fresh-bg: #dfeedd;
+  --due-fg: #7a5206;
+  --due-bg: #f9ecc6;
+  --expired-fg: #8c1f1f;
+  --expired-bg: #f8dcdc;
 `;
 
 const DARK = `
-  --bg: #16171a;
-  --surface: #1f2126;
-  --fg: #e8e6e0;
-  --fg-muted: #a3a09a;
-  --rule: #33353b;
-  --accent: #e39480;
-  --accent-soft: #2b2320;
-  --fresh-fg: #a9d6a6;
-  --fresh-bg: #1e2c1e;
-  --due-fg: #e8c97a;
-  --due-bg: #322a16;
-  --expired-fg: #efa3a3;
-  --expired-bg: #351d1d;
+  --bg: #15140f;
+  --surface: #1e1c16;
+  --surface-2: #2a271f;
+  --fg: #ece7dc;
+  --fg-muted: #a8a194;
+  --rule: #332f26;
+  --rule-strong: #ece7dc;
+  --accent: #e8a07f;
+  --accent-soft: #2c2219;
+  --fresh-fg: #a6d9a2;
+  --fresh-bg: #1b2a1b;
+  --due-fg: #ecc87a;
+  --due-bg: #2e2714;
+  --expired-fg: #f0a39f;
+  --expired-bg: #331c1b;
 `;
 
 export function styleSheet() {
@@ -70,12 +74,24 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-main {
-  max-width: var(--measure);
-  /* 16px side gutter at phone width. */
-  padding: 0 1rem 6rem;
-  margin: 0 auto;
+/* Editorial layout: prose holds a fixed measure while figures break out of it.
+   A 9-column table constrained to 68ch is unreadable, and a page that centres
+   one narrow column in a 1512px viewport reads as unfinished. Named grid lines
+   let a table claim the wider band without any wrapper markup. */
+main, article {
+  display: grid;
+  grid-template-columns:
+    [full-start] minmax(1rem, 1fr)
+    [wide-start] minmax(0, 7rem)
+    [content-start] minmax(0, var(--measure)) [content-end]
+    minmax(0, 7rem) [wide-end]
+    minmax(1rem, 1fr) [full-end];
 }
+
+main { padding-bottom: 7rem; }
+main > *, article > * { grid-column: content; }
+article { grid-column: full; }
+article > .table-scroll { grid-column: wide; }
 
 /* --- Site chrome ------------------------------------------------------- */
 
@@ -91,18 +107,31 @@ nav.site a { color: var(--fg-muted); text-decoration: none; }
 nav.site a:hover { color: var(--accent); text-decoration: underline; }
 
 h1 {
-  font-size: clamp(1.75rem, 1.2rem + 2.4vw, 2.5rem);
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  margin: 1.5rem 0 0.5rem;
+  font-size: clamp(2rem, 1.3rem + 3vw, 3.25rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  margin: 2rem 0 0.75rem;
+  text-wrap: balance;
+}
+
+p.tagline {
+  font-size: clamp(1.0625rem, 1rem + 0.5vw, 1.3125rem);
+  line-height: 1.45;
+  color: var(--fg-muted);
+  max-width: 46ch;
+  margin: 0 0 2.5rem;
+  text-wrap: pretty;
 }
 
 p.summary {
   font-size: 1.1875rem;
+  line-height: 1.5;
   color: var(--fg-muted);
-  margin: 0 0 2rem;
-  padding-bottom: 1.5rem;
+  margin: 0 0 2.25rem;
+  padding-bottom: 1.75rem;
   border-bottom: 1px solid var(--rule);
+  text-wrap: pretty;
 }
 
 /* --- Freshness banner -------------------------------------------------- */
@@ -111,11 +140,12 @@ p.summary {
   background: var(--surface);
   border: 1px solid var(--rule);
   border-left: 3px solid var(--accent);
-  border-radius: 2px;
-  padding: 0.875rem 1rem;
-  margin: 0 0 2rem;
+  border-radius: 3px;
+  padding: 1rem 1.125rem;
+  margin: 0 0 2.5rem;
   font-family: var(--sans);
   font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .freshness p { margin: 0; }
@@ -183,15 +213,22 @@ p.summary {
 .sources a { color: var(--accent); word-break: break-word; }
 
 nav.tiers {
-  background: var(--surface);
-  border-radius: 2px;
-  padding: 1.25rem;
-  margin: 2.5rem 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 1.25rem 0;
+  margin: 2.5rem 0 3rem;
 }
 
 nav.tiers::before { content: "Sections"; display: block; }
 
-nav.tiers li { margin: 0.2rem 0; }
+nav.tiers ul {
+  columns: 2;
+  column-gap: 2rem;
+}
+
+@media (max-width: 34rem) { nav.tiers ul { columns: 1; } }
+
+nav.tiers li { margin: 0.25rem 0; break-inside: avoid; }
 
 nav.tiers a {
   font-family: var(--sans);
@@ -206,14 +243,24 @@ nav.tiers a:hover { color: var(--accent); border-bottom-color: var(--accent); }
 /* --- Prose ------------------------------------------------------------- */
 
 article h2 {
-  font-size: 1.5rem;
-  line-height: 1.25;
-  margin: 3rem 0 0.25rem;
-  padding-bottom: 0.4rem;
-  border-bottom: 2px solid var(--fg);
+  font-size: clamp(1.375rem, 1.2rem + 0.8vw, 1.75rem);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 3.5rem 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--rule-strong);
+  text-wrap: balance;
 }
 
-article h3 { font-size: 1.1875rem; margin: 2rem 0 0.25rem; }
+article > h2:first-child { margin-top: 1rem; }
+
+article h3 {
+  font-size: 1.1875rem;
+  font-weight: 600;
+  margin: 2.25rem 0 0.5rem;
+  color: var(--fg);
+}
 article h4 { font-size: 1rem; margin: 1.5rem 0 0.25rem; }
 
 /* Scroll-margin so an anchor jump does not hide the heading under nothing;
@@ -265,10 +312,19 @@ pre code { background: none; padding: 0; }
    from the row it describes. */
 .table-scroll {
   overflow-x: auto;
-  margin: 1.5rem 0;
+  margin: 1.75rem 0;
   border: 1px solid var(--rule);
   border-radius: 3px;
+  /* A table cut off at the container edge reads as broken rather than
+     scrollable. The right-edge shadow is painted on a scroll-attached
+     background so it disappears once the reader reaches the last column. */
+  background:
+    linear-gradient(to left, var(--bg) 40%, transparent) right / 2.5rem 100% no-repeat local,
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.28), transparent)
+      right / 0.75rem 100% no-repeat scroll;
 }
+
+article > pre { grid-column: wide; }
 
 table {
   border-collapse: collapse;
@@ -285,8 +341,10 @@ th, td {
   white-space: nowrap;
 }
 
+tbody tr:not(.provenance):hover td { background: var(--surface); }
+
 thead th {
-  background: var(--surface);
+  background: var(--surface-2);
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.05em;

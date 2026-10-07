@@ -52,6 +52,13 @@ export function assetHref(mdPath, name) {
   return depthPrefix(mdPath) + name;
 }
 
+// A guide body opens with its own `# Title`, which the template already renders
+// from front-matter. Without this the page shows its title twice and ships two
+// <h1> elements. Only a LEADING h1 is removed; one later in the body is content.
+export function stripLeadingTitle(html) {
+  return html.replace(/^\s*<h1[^>]*>[\s\S]*?<\/h1>\s*/, "");
+}
+
 // marked emits a bare <table>; sticky-first-column needs an element to scroll.
 export function wrapTables(html) {
   return html.replace(
@@ -65,11 +72,13 @@ export function renderPage(model, byKey = new Map(), records = []) {
   const facts = freshnessFacts(model);
   const { body: annotated } = annotateBody(model.body, byKey, records);
   const article = wrapTables(
-    injectProvenance(
+    stripLeadingTitle(
+      injectProvenance(
       renderMarkdown(stripMarkerComments(annotated)),
       model,
-      byKey,
-      records,
+        byKey,
+        records,
+      ),
     ),
   );
   const nav = headings
@@ -164,6 +173,7 @@ ${t.pages.map((p) => `        <li><a href="${esc(htmlPathFor(p.path))}">${esc(p.
 <body>
 <main>
   <h1>LLM guides</h1>
+  <p class="tagline">A reference corpus on effective LLM use, where every page and every figure carries a verification date.</p>
   <form class="search" role="search" onsubmit="return false"><label for="q">Search the corpus</label> <input id="q" type="search" data-search autocomplete="off"></form>
   <ul data-search-results></ul>
   <section class="method">
