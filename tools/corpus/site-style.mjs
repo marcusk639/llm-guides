@@ -51,6 +51,7 @@ export function styleSheet() {
 
 :root {${LIGHT}
   --measure: 68ch;
+  --bleed: 7rem;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --sans: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -82,10 +83,17 @@ main, article {
   display: grid;
   grid-template-columns:
     [full-start] minmax(1rem, 1fr)
-    [wide-start] minmax(0, 7rem)
+    [wide-start] minmax(0, var(--bleed))
     [content-start] minmax(0, var(--measure)) [content-end]
-    minmax(0, 7rem) [wide-end]
+    minmax(0, var(--bleed)) [wide-end]
     minmax(1rem, 1fr) [full-end];
+}
+
+/* The bleed bands are fixed-width, so below a certain viewport they would eat
+   the space the prose needs — at 390px two 7rem bands left the text ~134px in
+   a 390px screen. They collapse before that can happen. */
+@media (max-width: 64rem) {
+  :root { --bleed: 0rem; }
 }
 
 main { padding-bottom: 7rem; }
@@ -178,7 +186,7 @@ p.summary {
 
 /* --- Applies-to, section nav, sources, related ------------------------- */
 
-.applies-to, .sources, .related { margin: 2.5rem 0; }
+.applies-to, .sources, .related { margin: 0 0 2.5rem; }
 
 .applies-to h2, .sources h2, .related h2, nav.tiers::before {
   font-family: var(--sans);
@@ -216,7 +224,7 @@ nav.tiers {
   border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
   padding: 1.25rem 0;
-  margin: 2.5rem 0 3rem;
+  margin: 0 0 3rem;
 }
 
 nav.tiers::before { content: "Sections"; display: block; }
