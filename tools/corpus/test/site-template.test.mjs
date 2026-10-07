@@ -1,0 +1,206 @@
+// tools/corpus/test/site-template.test.mjs
+import test from "node:test";
+import assert from "node:assert/strict";
+import { renderFrontPage, renderPage } from "../site-template.mjs";
+
+const model = {
+  path: "guides/models/claude-models.md",
+  title: "Claude models",
+  summary: "Current Claude model ids, limits and prices.",
+  topic: "models",
+  verified: "2026-10-06",
+  status: null,
+  seed: true,
+  appliesTo: ["Claude API, read 2026-10-06"],
+  sources: ["https://example.invalid/models"],
+  related: ["guides/models/comparison.md"],
+  body: "## 1. What this covers\n\ntext\n\n## 6. Where this rots\n\nrot text\n",
+  keys: [],
+  volatility: "high",
+};
+
+test("the page is a complete HTML document with a title", () => {
+  const html = renderPage(model);
+  assert.match(html, /^<!doctype html>/i);
+  assert.match(html, /<title>Claude models<\/title>/);
+  assert.match(html, /<\/html>\s*$/);
+});
+
+test("summary is emitted as the meta description", () => {
+  const html = renderPage(model);
+  assert.match(
+    html,
+    /<meta name="description" content="Current Claude model ids, limits and prices\.">/,
+  );
+});
+
+test("applies_to is stated plainly, not hidden", () => {
+  const html = renderPage(model);
+  assert.match(html, /Claude API, read 2026-10-06/);
+});
+
+test("tier navigation links to the numbered sections in the body", () => {
+  const html = renderPage(model);
+  assert.match(html, /href="#1-what-this-covers"/);
+  assert.match(html, /href="#6-where-this-rots"/);
+});
+
+test("sources and related links are rendered", () => {
+  const html = renderPage(model);
+  assert.match(html, /https:\/\/example\.invalid\/models/);
+  assert.match(html, /guides\/models\/comparison\.md/);
+});
+
+test("marker comments do not appear in the rendered output", () => {
+  const withMarkers = {
+    ...model,
+    body:
+      "## 1. What this covers\n\n<!-- corpus:data key=a.b -->\n$5\n<!-- /corpus:data -->\n",
+  };
+  const html = renderPage(withMarkers);
+  assert.equal(html.includes("corpus:data"), false);
+});
+
+test("the banner states the facts without a badge in the markup", () => {
+  const html = renderPage(model);
+  assert.match(html, /Verified 2026-10-06 · re-check every 30 days/);
+  assert.match(html, /data-freshness=/);
+  assert.equal(html.includes("badge-fresh"), false);
+});
+
+test("a seed page discloses that its date predates the pipeline", () => {
+  const html = renderPage(model);
+  assert.match(html, /authored before the refresh pipeline existed/);
+});
+
+test("a deprecated page renders no freshness banner at all", () => {
+  const html = renderPage({ ...model, status: "deprecated" });
+  assert.equal(html.includes("data-freshness"), false);
+  assert.equal(html.includes("re-check every"), false);
+});
+
+test("the front page leads with method before topics", () => {
+  const html = renderFrontPage([model], ["models"]);
+  const method = html.indexOf("How claims here earn their confidence");
+  const topics = html.indexOf("<h2>Guides</h2>");
+  assert.equal(method > -1, true);
+  assert.equal(method < topics, true);
+});
+
+test("the front page links pages as .html, not .md", () => {
+  const html = renderFrontPage([model], ["models"]);
+  assert.match(html, /href="guides\/models\/claude-models\.html"/);
+});
+
+test("the front page omits a topic with no pages", () => {
+  const html = renderFrontPage([model], ["models", "cowork"]);
+  assert.equal(html.includes("Cowork"), false);
+});
+
+// The brief's Files block promises "a nav block in renderPage" that no step
+// adds. A site-wide topic menu would need models and topics, which Task 4 froze
+// out of renderPage's signature, so the nav block is a root-relative home link.
+test("a page links back to the front page at the right depth", () => {
+  const html = renderPage(model);
+  assert.match(html, /href="\.\.\/\.\.\/index\.html"/);
+});
+
+test("a page one directory deep links one level up, not two", () => {
+  const html = renderPage({ ...model, path: "guides/orphan.md" });
+  assert.match(html, /href="\.\.\/index\.html"/);
+  assert.equal(html.includes('href="../../index.html"'), false);
+});
+
+test("the front page carries the search field and its script", () => {
+  const html = renderFrontPage([model], ["models"]);
+  assert.match(html, /<input[^>]*data-search/);
+  assert.match(html, /data-search-results/);
+  assert.match(html, /search-index\.json/);
+});
+
+// Review finding (Critical): marked 18 removed headerIds, so every nav anchor
+// pointed at a heading that carried no id. The original nav test asserted only
+// that the link was WRITTEN. This asserts the link RESOLVES.
+test("every tier-navigation anchor resolves to a heading id in the article", () => {
+  const html = renderPage(model);
+  const targets = [...html.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(targets.length > 0, "no nav anchors found — fixture lost its headings");
+  for (const t of targets) {
+    assert.match(
+      html,
+      new RegExp(`<h[1-6] id="${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`),
+      `nav anchor #${t} has no heading with that id`,
+    );
+  }
+});
+
+// Review finding (declined to judge, fixed anyway): a javascript: or data: URL
+// in `sources` rendered as a live href. All content is authored in-repo so the
+// reach is self-XSS, but a scheme allowlist costs four lines.
+test("a non-http source is not rendered as a live link", () => {
+  const html = renderPage({
+    ...model,
+    sources: ["javascript:alert(1)", "data:text/html,x", "https://ok.invalid/p"],
+  });
+  assert.equal(/href="javascript:/.test(html), false);
+  assert.equal(/href="data:/.test(html), false);
+  assert.match(html, /href="https:\/\/ok\.invalid\/p"/);
+  // The value is still shown, so nothing is silently dropped from the page.
+  assert.match(html, /javascript:alert\(1\)/);
+});
+
+test("a guide links the stylesheet at its own depth", () => {
+  const html = renderPage(model);
+  assert.match(html, /<link rel="stylesheet" href="\.\.\/\.\.\/style\.css">/);
+});
+
+test("a guide one directory deep links the stylesheet one level up", () => {
+  const html = renderPage({ ...model, path: "guides/orphan.md" });
+  assert.match(html, /<link rel="stylesheet" href="\.\.\/style\.css">/);
+});
+
+test("the front page links the stylesheet at the root", () => {
+  const html = renderFrontPage([model], ["models"]);
+  assert.match(html, /<link rel="stylesheet" href="style\.css">/);
+});
+
+// Sticky-first-column needs a scroll container, which marked does not emit.
+test("a table is wrapped in a scroll container", () => {
+  const body =
+    "## 1. A\n\n| key | value |\n| --- | --- |\n| a | b |\n";
+  const html = renderPage({ ...model, body });
+  assert.match(html, /<div class="table-scroll"><table>/);
+  assert.match(html, /<\/table><\/div>/);
+  assert.equal(html.includes("<div class=\"table-scroll\"><div"), false);
+});
+
+test("prose without a table gains no scroll container", () => {
+  const html = renderPage({ ...model, body: "## 1. A\n\ntext only\n" });
+  assert.equal(html.includes("table-scroll"), false);
+});
+
+// Found by looking at the rendered page: guide bodies open with their own
+// `# Title`, which the template already renders from front-matter, so every
+// page showed its title twice and shipped two <h1> elements.
+test("a guide renders its title once, not twice", () => {
+  const html = renderPage({
+    ...model,
+    body: "# Claude models\n\n## 1. What this covers\n\ntext\n",
+  });
+  assert.equal((html.match(/<h1/g) || []).length, 1);
+  assert.equal((html.match(/Claude models/g) || []).length >= 1, true);
+});
+
+test("a body heading that is not the leading title is left alone", () => {
+  const html = renderPage({
+    ...model,
+    body: "## 1. A\n\ntext\n\n# Not a title\n",
+  });
+  assert.match(html, /Not a title/);
+});
+
+test("the front page states what the corpus is", () => {
+  const html = renderFrontPage([model], ["models"]);
+  assert.match(html, /class="tagline"/);
+  assert.match(html, /verification date/);
+});

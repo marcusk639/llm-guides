@@ -12,10 +12,12 @@
     "verify": "node tools/corpus/cli.mjs verify",
     "render": "node tools/corpus/cli.mjs render",
     "render:check": "node tools/corpus/cli.mjs render --check",
-    "ledger": "node tools/corpus/cli.mjs ledger"
+    "ledger": "node tools/corpus/cli.mjs ledger",
+    "site": "node tools/corpus/cli.mjs site"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "marked": "^18.1.0"
   },
   "engines": {
     "node": ">=22"
