@@ -197,3 +197,43 @@ test("provenance is absent when renderPage is called without records", () => {
   const html = renderPage({ ...model, body: tableBody });
   assert.equal(/class="provenance"/.test(html), false);
 });
+
+// Review finding (Important): entryFor rejected a missing source but not a
+// missing verified, so a figure shipped the literal claim "read null from ...".
+// Review Focus 1 forbids a provenance claim the corpus cannot source.
+test("a record with no verified date reports an issue rather than claiming 'read null'", () => {
+  const dateless = recordsByKey([
+    { key: "a.models.undated", value: "x", source: "https://example.invalid/x" },
+  ]);
+  const block = {
+    kind: "data",
+    attrs: { key: "a.models.undated" },
+    unterminated: false,
+    content: "x",
+  };
+  const { entries, issues } = provenanceFor(block, dateless);
+  assert.deepEqual(entries, []);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "site-provenance-no-verified");
+});
+
+test("a malformed verified date is rejected like a missing one", () => {
+  const bad = recordsByKey([
+    { key: "a.models.bad", value: "x", verified: "2026-02-30", source: "https://e.invalid/x" },
+  ]);
+  const block = { kind: "data", attrs: { key: "a.models.bad" }, unterminated: false, content: "x" };
+  const { entries, issues } = provenanceFor(block, bad);
+  assert.deepEqual(entries, []);
+  assert.equal(issues[0].rule, "site-provenance-no-verified");
+});
+
+test("no rendered figure ever states 'read null'", () => {
+  const dateless = recordsByKey([
+    { key: "a.models.undated", value: "x", source: "https://example.invalid/x" },
+  ]);
+  const body =
+    "## 1. What this covers\n\nValue <!-- corpus:data key=a.models.undated -->x<!-- /corpus:data --> here.\n";
+  const html = renderPage({ ...model, body }, dateless, []);
+  assert.equal(html.includes("read null"), false);
+  assert.equal(html.includes("class=\"provenance\""), false);
+});

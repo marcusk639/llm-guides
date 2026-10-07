@@ -6,6 +6,7 @@
 // (data.mjs), both of which already exist.
 
 import { findBlocks } from "./markers.mjs";
+import { isValidIsoDate } from "./ledger.mjs";
 
 // A link whose text names the vendor page rather than showing a bare URL.
 export function sourceLabel(url) {
@@ -99,9 +100,18 @@ function entryFor(key, byKey, issues) {
     });
     return null;
   }
+  // A figure with no readable date cannot carry a provenance claim: rendering
+  // one produces the literal text "read null". Treated like a missing source.
+  if (!rec.verified || !isValidIsoDate(rec.verified)) {
+    issues.push({
+      rule: "site-provenance-no-verified",
+      message: `record ${key} has no readable verified date, so its figure cannot be dated`,
+    });
+    return null;
+  }
   return {
     key,
-    verified: rec.verified ?? null,
+    verified: rec.verified,
     source: rec.source,
     label: sourceLabel(rec.source),
   };

@@ -25,3 +25,17 @@ test("deploy is gated on master pushes only", () => {
   assert.match(text, /refs\/heads\/master/);
   assert.match(text, /github\.event_name == 'push'/);
 });
+
+// Review finding (Important): workflow-level pages:write and id-token:write are
+// held by the build job, which runs `npm ci` and `npm test` from a pull request
+// branch. Deploy privileges belong to the job that deploys.
+test("the build job holds no deploy privileges", () => {
+  const text = fs.readFileSync(WF, "utf8");
+  const top = text.slice(0, text.indexOf("jobs:"));
+  assert.match(top, /permissions:\s*\n\s+contents: read\s*\n/);
+  assert.equal(/^\s*pages: write/m.test(top), false, "pages:write is workflow-wide");
+  assert.equal(/^\s*id-token: write/m.test(top), false, "id-token:write is workflow-wide");
+  const deploy = text.slice(text.indexOf("deploy:"));
+  assert.match(deploy, /pages: write/);
+  assert.match(deploy, /id-token: write/);
+});

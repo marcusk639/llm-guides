@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -36,6 +34,10 @@ jobs:
           path: dist
 
   deploy:
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     # Pull requests gate and build but never publish.
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     needs: build
