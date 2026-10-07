@@ -148,3 +148,33 @@ test("a non-http source is not rendered as a live link", () => {
   // The value is still shown, so nothing is silently dropped from the page.
   assert.match(html, /javascript:alert\(1\)/);
 });
+
+test("a guide links the stylesheet at its own depth", () => {
+  const html = renderPage(model);
+  assert.match(html, /<link rel="stylesheet" href="\.\.\/\.\.\/style\.css">/);
+});
+
+test("a guide one directory deep links the stylesheet one level up", () => {
+  const html = renderPage({ ...model, path: "guides/orphan.md" });
+  assert.match(html, /<link rel="stylesheet" href="\.\.\/style\.css">/);
+});
+
+test("the front page links the stylesheet at the root", () => {
+  const html = renderFrontPage([model], ["models"]);
+  assert.match(html, /<link rel="stylesheet" href="style\.css">/);
+});
+
+// Sticky-first-column needs a scroll container, which marked does not emit.
+test("a table is wrapped in a scroll container", () => {
+  const body =
+    "## 1. A\n\n| key | value |\n| --- | --- |\n| a | b |\n";
+  const html = renderPage({ ...model, body });
+  assert.match(html, /<div class="table-scroll"><table>/);
+  assert.match(html, /<\/table><\/div>/);
+  assert.equal(html.includes("<div class=\"table-scroll\"><div"), false);
+});
+
+test("prose without a table gains no scroll container", () => {
+  const html = renderPage({ ...model, body: "## 1. A\n\ntext only\n" });
+  assert.equal(html.includes("table-scroll"), false);
+});

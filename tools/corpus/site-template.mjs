@@ -38,20 +38,39 @@ export function stripMarkerComments(body) {
 // A page at guides/<topic>/<name>.html reaches the front page two levels up.
 // renderPage is never given the topic list, so site-wide navigation is a home
 // link rather than a menu.
+function depthPrefix(mdPath) {
+  return "../".repeat(Math.max(0, String(mdPath).split("/").length - 1));
+}
+
 export function homeHref(mdPath) {
-  const depth = String(mdPath).split("/").length - 1;
-  return depth > 0 ? "../".repeat(depth) + "index.html" : "index.html";
+  return depthPrefix(mdPath) + "index.html";
+}
+
+// dist/style.css sits at the deploy root, so a guide two directories deep
+// reaches it the same way it reaches the front page.
+export function assetHref(mdPath, name) {
+  return depthPrefix(mdPath) + name;
+}
+
+// marked emits a bare <table>; sticky-first-column needs an element to scroll.
+export function wrapTables(html) {
+  return html.replace(
+    /<table>([\s\S]*?)<\/table>/g,
+    '<div class="table-scroll"><table>$1</table></div>',
+  );
 }
 
 export function renderPage(model, byKey = new Map(), records = []) {
   const headings = numberedHeadings(model.body);
   const facts = freshnessFacts(model);
   const { body: annotated } = annotateBody(model.body, byKey, records);
-  const article = injectProvenance(
-    renderMarkdown(stripMarkerComments(annotated)),
-    model,
-    byKey,
-    records,
+  const article = wrapTables(
+    injectProvenance(
+      renderMarkdown(stripMarkerComments(annotated)),
+      model,
+      byKey,
+      records,
+    ),
   );
   const nav = headings
     .map((h) => `<li><a href="#${esc(h.slug)}">${esc(h.text)}</a></li>`)
@@ -78,6 +97,7 @@ export function renderPage(model, byKey = new Map(), records = []) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(model.title)}</title>
 <meta name="description" content="${esc(model.summary)}">
+<link rel="stylesheet" href="${esc(assetHref(model.path, "style.css"))}">
 </head>
 <body>
 <main>
@@ -139,6 +159,7 @@ ${t.pages.map((p) => `        <li><a href="${esc(htmlPathFor(p.path))}">${esc(p.
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LLM guides</title>
 <meta name="description" content="A reference corpus on effective LLM use, where every page and every figure carries a verification date.">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>

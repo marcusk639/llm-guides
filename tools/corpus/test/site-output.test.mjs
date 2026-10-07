@@ -79,3 +79,11 @@ test("a stale page from a previous build does not survive the next one", () => {
     true,
   );
 });
+
+test("write emits the stylesheet next to the front page", () => {
+  const root = tmpCopy();
+  siteCorpus(root, { write: true });
+  const css = path.join(root, "dist", "style.css");
+  assert.equal(fs.existsSync(css), true);
+  assert.match(fs.readFileSync(css, "utf8"), /prefers-color-scheme: dark/);
+});
