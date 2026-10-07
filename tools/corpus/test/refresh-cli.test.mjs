@@ -969,7 +969,13 @@ test("--revert refuses a receipt record file that escapes data/", () => {
 // out-of-root write is the containment check.
 test("a records[].file pointing above the corpus root writes nothing and names the escape", () => {
   const root = sandbox();
-  const outside = path.join(root, "..", "..", "ESCAPED.yaml");
+  // One level above the sandbox, which is os.tmpdir() and writable everywhere.
+  // Two levels up is os.tmpdir()'s own parent — on Linux that is "/", so this
+  // test died with EACCES the first time CI ran it on a non-macOS runner.
+  // dataFileRel's containment check is lexical and never writes outside the
+  // base, so the decoy only has to exist; it is the rule and the unchanged
+  // snapshot below that carry the assertion.
+  const outside = path.join(root, "..", "ESCAPED.yaml");
   const decoy = [
     "records:",
     "  - key: fix.shared.one",
