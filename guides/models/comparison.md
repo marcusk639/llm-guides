@@ -22,7 +22,7 @@ sources:
   - https://ai.google.dev/gemini-api/docs/pricing
   - https://ai.google.dev/api/models
 related:
-  - guides/models/claude-models.md
+  - guides/providers/anthropic.md
   - guides/providers/open-weight.md
   - guides/context/context-management.md
 research: research/models/2026-10-06-claude-models-comparison-refresh.md
@@ -91,7 +91,7 @@ If a table and the vendor page it came from disagree, the vendor page wins. Sect
 
 **"Context" is not one column across vendors.** Anthropic's overview states a context window. Google's model pages state an input token limit and an output token limit, with no separate window. OpenAI's model pages state a context window and a maximum output, but no separate maximum input. The table keeps these in separate columns rather than forcing one number per model, which is why cells are blank. A blank cell means the documentation page this row cites states no such figure — not that it is unlimited, and not that it may be derived: subtracting a max output from a context window yields a number the vendor never stated. Anthropic is a case worth knowing: its doc table states only a context window and a max output, but its Models API does return a per-model `max_input_tokens`, so the figure exists at runtime even though no page tabulates it. Read it from the endpoint in section 2 rather than inferring it here. Do not read Google's input limit and Anthropic's context window as the same measurement.
 
-**Model ids behave differently per vendor.** OpenAI's model pages name a "default snapshot" per model. Google's pages list a version per model labelled Stable or Preview, and document a separate model-version pattern page. Anthropic's overview states that every current Claude id is a pinned snapshot (see [Claude models](claude-models.md)). The id string alone does not tell you whether it will change under you; each vendor's own page does.
+**Model ids behave differently per vendor.** OpenAI's model pages name a "default snapshot" per model. Google's pages list a version per model labelled Stable or Preview, and document a separate model-version pattern page. Anthropic's overview states that every current Claude id is a pinned snapshot (see [Claude models](../providers/anthropic.md)). The id string alone does not tell you whether it will change under you; each vendor's own page does.
 
 **Prices are tiered in different ways.** All three hosted vendors bill input and output tokens separately, and output costs more than input on every row in the table. Beyond that the rules diverge: OpenAI's model pages bill the whole request at higher rates once the prompt crosses a stated size; Google's Pro Preview row has a prompt-size price step and Gemini 3.8 Flash has a dated price change; Anthropic's pricing page states that its current large-window models have no long-context surcharge. Google's pricing page also states that output prices include thinking tokens. The `notes` column carries the thresholds; the vendor pricing pages carry batch, cache and priority-tier rates, which this page deliberately does not copy.
 
@@ -168,7 +168,7 @@ Evidence: **Plausible** — inferred from the cards' native-versus-extended cont
 | Gemini 3.8 Flash row       | `google.models.gemini-3-8-flash`                                                      | high       | Scheduled price change; new Flash releases                  |
 | Gemini 3.1 Pro Preview row | `google.models.gemini-3-1-pro-preview`                                                | high       | Preview status; a stable Pro may replace it                 |
 | Gemini 3.5 Flash-Lite row  | `google.models.gemini-3-5-flash-lite`                                                 | high       | Newer Flash-Lite generations                                |
-| Claude rows                | `anthropic.models.fable-5-1`, `anthropic.models.opus-5-5`, `anthropic.models.haiku-4-5` | high       | Owned by [Claude models](claude-models.md); refreshed there. The hosted row tracks the current Opus; Opus 5 is now legacy and is listed on that page, not here |
+| Claude rows                | `anthropic.models.fable-5-1`, `anthropic.models.opus-5-5`, `anthropic.models.haiku-4-5` | high       | Owned by [Claude models](../providers/anthropic.md); refreshed there. The hosted row tracks the current Opus; Opus 5 is now legacy and is listed on that page, not here |
 
 Re-check on refresh, against the pages in section 8, **which win whenever they and this page disagree**:
 

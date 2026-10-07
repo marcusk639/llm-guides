@@ -31,7 +31,7 @@ sources:
 related:
   - guides/context/context-management.md
   - guides/claude-code/hooks.md
-  - guides/models/claude-models.md
+  - guides/providers/anthropic.md
 seed: true
 ---
 
@@ -375,7 +375,7 @@ Identifiers tied to `applies_to` (Claude Code 2.1.267, docs as of 2026-09-16), t
 
 The studies are dated evidence, not live values: they will not change, but they will age. METR's result is about early-2025 tools; Spracklen et al. tested 2024-era models; ImpossibleBench's per-model rates are for the models it names. When newer studies of the same questions appear, update the citations rather than extrapolating these numbers forward.
 
-Deliberately absent: productivity multipliers from vendor marketing or surveys, model rankings on coding benchmarks, and prices (see [Claude models](../models/claude-models.md)). Benchmark scores go stale within months and do not predict performance on your repository.
+Deliberately absent: productivity multipliers from vendor marketing or surveys, model rankings on coding benchmarks, and prices (see [Claude models](../providers/anthropic.md)). Benchmark scores go stale within months and do not predict performance on your repository.
 
 ## 7. Proofs
 
@@ -409,4 +409,4 @@ Tier 2 — papers:
 - Spracklen, Wijewickrama, Sakib, Maiti, [We Have a Package for You! A Comprehensive Analysis of Package Hallucinations by Code Generating LLMs](https://arxiv.org/abs/2406.10279) (USENIX Security 2025)
 - Becker, Rush, Barnes, Rein, [Measuring the Impact of Early-2025 AI on Experienced Open-Source Developer Productivity](https://arxiv.org/abs/2507.09089) (METR, arXiv, 2025-07)
 
-Related pages in this corpus: [Context management](../context/context-management.md), [Claude Code hooks](../claude-code/hooks.md), [Claude models](../models/claude-models.md).
+Related pages in this corpus: [Context management](../context/context-management.md), [Claude Code hooks](../claude-code/hooks.md), [Claude models](../providers/anthropic.md).
