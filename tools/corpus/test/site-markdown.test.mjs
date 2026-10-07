@@ -56,3 +56,8 @@ test("a real corpus guide's tables render without escaping their markup", () => 
   assert.equal(html.includes("&lt;table&gt;"), false);
   assert.equal(html.includes("&lt;br&gt;"), false);
 });
+
+test("a heading carries an id so in-page anchors can reach it", () => {
+  const html = renderMarkdown("## 6. Where this rots\n");
+  assert.match(html, /<h2 id="6-where-this-rots">/);
+});

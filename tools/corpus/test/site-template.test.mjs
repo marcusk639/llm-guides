@@ -117,3 +117,19 @@ test("the front page carries the search field and its script", () => {
   assert.match(html, /data-search-results/);
   assert.match(html, /search-index\.json/);
 });
+
+// Review finding (Critical): marked 18 removed headerIds, so every nav anchor
+// pointed at a heading that carried no id. The original nav test asserted only
+// that the link was WRITTEN. This asserts the link RESOLVES.
+test("every tier-navigation anchor resolves to a heading id in the article", () => {
+  const html = renderPage(model);
+  const targets = [...html.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(targets.length > 0, "no nav anchors found — fixture lost its headings");
+  for (const t of targets) {
+    assert.match(
+      html,
+      new RegExp(`<h[1-6] id="${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`),
+      `nav anchor #${t} has no heading with that id`,
+    );
+  }
+});

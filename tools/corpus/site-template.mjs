@@ -1,5 +1,5 @@
 // tools/corpus/site-template.mjs
-import { renderMarkdown } from "./site-markdown.mjs";
+import { headingSlug, renderMarkdown } from "./site-markdown.mjs";
 import { navTopics, loadTopics } from "./site-nav.mjs";
 import { searchScript } from "./site-search.mjs";
 import { annotateBody, injectProvenance } from "./site-provenance.mjs";
@@ -11,16 +11,6 @@ const esc = (s) =>
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-
-// Matches the slug marked generates for an ATX heading: lowercase, spaces to
-// hyphens, punctuation dropped. "## 6. Where this rots" -> "6-where-this-rots".
-export function headingSlug(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-}
 
 export function numberedHeadings(body) {
   const out = [];
