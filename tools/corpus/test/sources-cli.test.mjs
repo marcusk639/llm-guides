@@ -43,3 +43,17 @@ test("sources exits 2 when --check is passed, like every other non-render comman
   const r = run(["sources", "--check", "."], emptyCorpus());
   assert.equal(r.code, 2);
 });
+
+test("an unknown flag exits 2 and names itself", () => {
+  const r = run(["sources", "--achive", "."], emptyCorpus());
+  assert.equal(r.code, 2);
+  // Assert on the reason line's unique prefix, never on the flag name alone:
+  // the static usage block also contains flag names, so a substring match
+  // would pass even with the rejection code path fully removed.
+  assert.match(r.err, /^corpus: unknown flag --achive$/m);
+});
+
+test("known flags on known commands are still accepted", () => {
+  assert.equal(run(["sources", "--json", "."], emptyCorpus()).code, 0);
+  assert.equal(run(["lint", "."], emptyCorpus()).code, 0);
+});

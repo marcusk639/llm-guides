@@ -449,6 +449,37 @@ export function refreshCorpus(
   }
 }
 
+// Every flag any subcommand accepts. `rest.includes(...)` silently ignores an
+// unknown flag, which would make a mistyped mutating flag (e.g. --achive for
+// --archive) run a read-only path and exit 0, indistinguishable from success.
+// Enumerated from cli.mjs on 2026-10-09, not guessed:
+//   grep -oE "\-\-[a-z-]+=?" tools/corpus/cli.mjs | sort -u
+// --force and --stats are real and must stay accepted; there is no --base.
+const KNOWN_FLAGS = Object.freeze([
+  "--write",
+  "--check",
+  "--json",
+  "--archive",
+  "--order",
+  "--skeleton",
+  "--stamp",
+  "--revert",
+  "--force",
+  "--stats",
+  "--page",
+  "--key",
+]);
+const KNOWN_FLAG_PREFIXES = Object.freeze(["--page=", "--artifact=", "--key="]);
+
+function unknownFlags(rest) {
+  return rest.filter(
+    (a) =>
+      a.startsWith("--") &&
+      !KNOWN_FLAGS.includes(a) &&
+      !KNOWN_FLAG_PREFIXES.some((p) => a.startsWith(p)),
+  );
+}
+
 async function main(argv) {
   const [command, ...rest] = argv;
   const write = rest.includes("--write");
@@ -464,6 +495,10 @@ async function main(argv) {
     );
     process.exit(2);
   };
+  for (const flag of unknownFlags(rest)) {
+    console.error(`corpus: unknown flag ${flag}`);
+    process.exit(2);
+  }
   if (check && (command !== "render" || write)) usage();
   if (command === "lint") {
     const issues = lintCorpus(root);
