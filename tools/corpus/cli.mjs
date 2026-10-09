@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import yaml from "js-yaml";
 import { parseFrontmatter } from "./frontmatter.mjs";
+import { guidePaths } from "./paths.mjs";
 import { loadRecords, literalIndexForTopic, checkDataFiles } from "./data.mjs";
 import {
   validateFrontmatter,
@@ -49,21 +50,6 @@ import {
 } from "./refresh-artifact.mjs";
 import { stampUnit, revertUnit } from "./refresh-stamp.mjs";
 import { siteCorpus } from "./site.mjs";
-
-function guidePaths(root) {
-  const dir = path.join(root, "guides");
-  if (!fs.existsSync(dir)) return [];
-  const out = [];
-  const walk = (d) => {
-    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-      const p = path.join(d, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (e.name.endsWith(".md")) out.push(p);
-    }
-  };
-  walk(dir);
-  return out.sort();
-}
 
 function loadTopics(root) {
   const file = path.join(root, "meta", "taxonomy.yaml");

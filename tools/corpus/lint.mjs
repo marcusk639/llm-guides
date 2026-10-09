@@ -86,7 +86,7 @@ function isUrlLikeDestination(destination) {
   );
 }
 
-function urlRanges(text) {
+export function urlRanges(text) {
   const ranges = [];
   for (const m of text.matchAll(LINK_DESTINATION)) {
     if (isUrlLikeDestination(m[1])) ranges.push(m.indices[1]);
