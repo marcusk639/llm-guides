@@ -23,6 +23,7 @@
 - **Editing `CLAUDE.md` goes through a python read → `assert s.count(old) == 1` → replace → write script run via Bash.** The native edit tool refuses files that size. That path also bypasses the Prettier hook, so table pipes must be hand-aligned.
 - Creating a new directory can make a local hook drop a `.claude/` folder inside it. `rm -rf` it before staging. **Stage by filename** — never `git add -A`, `git add .`, or `git add -f`.
 - Work on branch `corpus-roadmap-spec`. Commit after every task.
+- **Rollback is per task.** Every task ends in exactly one commit, so undoing one is `git revert <that commit>`. No task writes `meta/ledger.yaml`, and no task deletes or rewrites an existing record value, so there is no irreversible step in this plan.
 
 ## Review Focus
 
@@ -36,7 +37,7 @@ Five input classes the spec implies but does not enumerate, each already assigne
 
 ---
 
-## Task 1: Share the URL-span and guide-discovery primitives
+## Task 1: Share the URL-span, guide-discovery and URL-shape primitives
 
 Pure extraction. No behavior change anywhere. The existing suite is the proof.
 
@@ -50,7 +51,7 @@ Pure extraction. No behavior change anywhere. The existing suite is the proof.
 **Interfaces:**
 
 - Consumes: nothing.
-- Produces: `urlRanges(text) -> Array<[number, number]>` exported from `tools/corpus/lint.mjs` — start/end index pairs of every URL span in `text`. `guidePaths(root) -> string[]` exported from `tools/corpus/paths.mjs` — absolute paths of every `.md` file under `<root>/guides`, recursively, or `[]` when that directory is absent.
+- Produces: `urlRanges(text) -> Array<[number, number]>` exported from `tools/corpus/lint.mjs` — start/end index pairs of every URL span in `text`. `guidePaths(root) -> string[]` exported from `tools/corpus/paths.mjs` — absolute paths of every `.md` file under `<root>/guides`, recursively, or `[]` when that directory is absent. `isAbsoluteHttpUrl(value) -> boolean` exported from the same module — true only for a string `new URL()` parses with an `http:` or `https:` protocol. Tasks 2, 3, 8 and 9 all consume this single definition, so the record rule, the artifact rule and the audit's URL filter cannot drift apart.
 
 - [ ] **Step 1: Write the failing test for `guidePaths`**
 
@@ -62,7 +63,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { guidePaths } from "../paths.mjs";
+import { guidePaths, isAbsoluteHttpUrl } from "../paths.mjs";
 
 function tmpCorpus() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "paths-"));
@@ -84,6 +85,32 @@ test("guidePaths finds .md files recursively and ignores other extensions", () =
 test("guidePaths returns [] when guides/ is absent", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "paths-empty-"));
   assert.deepEqual(guidePaths(root), []);
+});
+
+test("isAbsoluteHttpUrl accepts only absolute http and https strings", () => {
+  for (const good of [
+    "http://e.com/a",
+    "https://e.com/a?q=1#f",
+    "https://archive.example/w/1/https://e.com/a",
+  ]) {
+    assert.equal(isAbsoluteHttpUrl(good), true, good);
+  }
+  for (const bad of [
+    "./page.md",
+    "../providers/anthropic.md",
+    "/abs/path",
+    "#anchor",
+    "mailto:a@b.c",
+    "ftp://e.com/a",
+    "e.com/a",
+    "",
+    42,
+    null,
+    undefined,
+    ["https://e.com/a"],
+  ]) {
+    assert.equal(isAbsoluteHttpUrl(bad), false, JSON.stringify(bad));
+  }
 });
 ```
 
@@ -116,6 +143,28 @@ node --check tools/corpus/paths.mjs 2>/dev/null || node -e "import('./tools/corp
 ```
 
 Expected: `exports: [ 'guidePaths' ]`
+
+Then append the URL-shape predicate to the same module. It lives here because
+Tasks 2, 3, 8 and 9 all need it and Task 2 runs first; defining it in any of
+them would force a later task to retro-export it.
+
+```javascript
+// Shape only, and deliberately not any archive service's URL grammar: a
+// vendor-shaped pattern would make adopting a second service a contract
+// change. Liveness is the audit's job -- no gate opens a socket.
+export function isAbsoluteHttpUrl(value) {
+  if (typeof value !== "string") return false;
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+```
+
+Run: `node -e "import('./tools/corpus/paths.mjs').then(m=>console.log(Object.keys(m).sort().join(',')))"`
+Expected: `guidePaths,isAbsoluteHttpUrl`
 
 - [ ] **Step 4: Run the test to verify it passes**
 
@@ -196,7 +245,7 @@ git commit -m "refactor: share urlRanges and guidePaths as library primitives"
 **Interfaces:**
 
 - Consumes: `guidePaths(root)` from `tools/corpus/paths.mjs`; `urlRanges(text)` from `tools/corpus/lint.mjs`; `loadRecords(dataDir)` from `tools/corpus/data.mjs` (returns records with `file` injected); `parseFrontmatter(text)` from `tools/corpus/frontmatter.mjs` (returns `{ data, body, bodyOffset }`).
-- Produces: `CITATION_CLASSES` — a frozen array of the five class names in report order: `["record-source", "record-secondary", "page-frontmatter", "page-body", "snapshot"]`. `collectCitations(root) -> { citations, issues }` where each citation is `{ url, class, origin }` (`origin` is a record key or a repo-relative page path) and each issue is `{ class, origin, rule: "citation-malformed", message }`. URLs are deduplicated per `(url, class, origin)` triple.
+- Produces: `CITATION_CLASSES` — a frozen array of the five class names in report order: `["record-source", "record-secondary", "page-frontmatter", "page-body", "snapshot"]`. `collectCitations(root) -> { citations, issues }` where each citation is `{ url, class, origin }` (`origin` is a record key or a repo-relative page path) and each issue is `{ class, origin, rule: "citation-malformed", message }`. URLs are deduplicated per `(url, class, origin)` triple. The `page-body` class yields **absolute `http(s)` URLs only** — relative links, anchors and `mailto:` are skipped silently, because they are not citations and are not fetchable.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -323,6 +372,27 @@ test("a scalar sources: field is an issue and does not crash", () => {
   assert.equal(issues[0].class, "page-frontmatter");
 });
 
+test("page-body skips relative links, anchors and mailto", () => {
+  const root = corpus({
+    "guides/t/rel.md": [
+      "---",
+      "title: R",
+      "---",
+      "",
+      "see [sibling](../providers/anthropic.md) and [a](#anchor)",
+      "and [c](./local.md) and <mailto:a@b.c> and /abs/path",
+      "but https://example.com/real is a citation",
+      "",
+    ].join("\n"),
+  });
+  const { citations, issues } = collectCitations(root);
+  assert.deepEqual(issues, []);
+  assert.deepEqual(
+    citations.map((c) => c.url),
+    ["https://example.com/real"],
+  );
+});
+
 test("CITATION_CLASSES is the report order and is frozen", () => {
   assert.deepEqual(CITATION_CLASSES, [
     "record-source",
@@ -348,7 +418,7 @@ import path from "node:path";
 import { loadRecords } from "./data.mjs";
 import { parseFrontmatter } from "./frontmatter.mjs";
 import { urlRanges } from "./lint.mjs";
-import { guidePaths } from "./paths.mjs";
+import { guidePaths, isAbsoluteHttpUrl } from "./paths.mjs";
 
 export const CITATION_CLASSES = Object.freeze([
   "record-source",
@@ -417,8 +487,15 @@ export function collectCitations(root) {
         }
       }
     }
+    // `urlRanges` exists to tell the lint which spans to SKIP, so
+    // `isUrlLikeDestination` deliberately accepts `./x`, `../x`, `/x` and
+    // `mailto:`. Collecting those would hand the audit 29 unfetchable strings
+    // (measured against guides/ on 2026-10-09) and report every internal
+    // guide link as dead, so the body class keeps absolute http(s) only.
     for (const [a, b] of urlRanges(body)) {
-      add(body.slice(a, b), "page-body", origin);
+      const span = body.slice(a, b);
+      if (!isAbsoluteHttpUrl(span)) continue;
+      add(span, "page-body", origin);
     }
   }
 
@@ -538,22 +615,12 @@ Expected: FAIL — the relative/scheme-less case returns 0 issues, not 1.
 
 - [ ] **Step 3: Implement the check**
 
-Add this helper above `checkRecordFields` in `tools/corpus/verify-records.mjs`:
+Import the shared predicate at the top of `tools/corpus/verify-records.mjs` —
+do **not** define a second copy, or the record rule and the artifact rule of
+Task 8 will drift:
 
 ```javascript
-// `source_archived` is validated by shape only, and deliberately not against
-// any archive service's URL grammar: a vendor-shaped pattern here would make
-// adopting a second archive service a contract change. Liveness is the audit's
-// job -- `verify` never opens a socket.
-function isAbsoluteHttpUrl(value) {
-  if (typeof value !== "string") return false;
-  try {
-    const u = new URL(value);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+import { isAbsoluteHttpUrl } from "./paths.mjs";
 ```
 
 Then add this block inside `checkRecordFields`, beside the existing `record-source-missing` / `record-verified-*` checks, following their exact `issues.push({ ... })` style:
@@ -782,6 +849,13 @@ export async function probe(url, options = {}) {
       redirect: "follow",
       signal: controller.signal,
     });
+    // Only the status line matters. An unconsumed body holds the connection
+    // open, and this loop runs over every citation in the corpus.
+    try {
+      await res.body?.cancel?.();
+    } catch {
+      /* a fixture response has no body; nothing to release */
+    }
     return {
       url,
       outcome: classifyResponse(res),
@@ -1105,7 +1179,10 @@ and add this branch beside the existing `} else if (command === "site") {`:
   const results = await auditCitations(citations);
   const summary = summarise(results, issues);
   console.log(json ? formatJson(summary) : formatText(summary));
-  process.exit(0);
+  // Not process.exit(0): stdout is async on a pipe, and the --json report for
+  // ~64 citations is several KB, so exiting here can truncate it.
+  process.exitCode = 0;
+  return;
 }
 ```
 
@@ -1212,6 +1289,9 @@ In `tools/corpus/cli.mjs`, add above `function main(argv) {`:
 // Every flag any subcommand accepts. `rest.includes(...)` silently ignores an
 // unknown flag, which would make a mistyped mutating flag (e.g. --achive for
 // --archive) run a read-only path and exit 0, indistinguishable from success.
+// Enumerated from cli.mjs on 2026-10-09, not guessed:
+//   grep -oE "\-\-[a-z-]+=?" tools/corpus/cli.mjs | sort -u
+// --force and --stats are real and must stay accepted; there is no --base.
 const KNOWN_FLAGS = Object.freeze([
   "--write",
   "--check",
@@ -1221,13 +1301,12 @@ const KNOWN_FLAGS = Object.freeze([
   "--skeleton",
   "--stamp",
   "--revert",
+  "--force",
+  "--stats",
+  "--page",
+  "--key",
 ]);
-const KNOWN_FLAG_PREFIXES = Object.freeze([
-  "--page=",
-  "--artifact=",
-  "--key=",
-  "--base=",
-]);
+const KNOWN_FLAG_PREFIXES = Object.freeze(["--page=", "--artifact=", "--key="]);
 
 function unknownFlags(rest) {
   return rest.filter(
@@ -1462,7 +1541,6 @@ git commit -m "feat: insert and remove source_archived as a surgical record edit
 **Files:**
 
 - Modify: `tools/corpus/refresh-artifact.mjs` (`validateArtifact`, `renderArtifactSkeleton`)
-- Modify: `tools/corpus/verify-records.mjs` (export the absolute-URL predicate added in Task 3)
 - Test: `tools/corpus/test/refresh-artifact.test.mjs` (append)
 
 **Interfaces:**
@@ -1570,7 +1648,7 @@ export const ARCHIVE_OUTCOMES = Object.freeze([
 ]);
 ```
 
-Inside `validateArtifact`'s per-record loop, add the three checks. **Reuse, do not duplicate:** call the date validator that file already applies to `read` and `was`, including its future-date rejection — find it first. For the URL check, export the `isAbsoluteHttpUrl` predicate added in Task 3 from `tools/corpus/verify-records.mjs` and import it here, so the record rule and the artifact rule cannot drift apart.
+Inside `validateArtifact`'s per-record loop, add the three checks. **Reuse, do not duplicate:** call the date validator that file already applies to `read` and `was`, including its future-date rejection — find it first. For the URL check, import `isAbsoluteHttpUrl` from `tools/corpus/paths.mjs` — the single definition Task 1 created — so the record rule and the artifact rule cannot drift apart.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -1595,7 +1673,7 @@ Expected: `# fail 0`, exit 0, `lint: clean`, `verify: clean`.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add tools/corpus/refresh-artifact.mjs tools/corpus/verify-records.mjs \
+git add tools/corpus/refresh-artifact.mjs \
   tools/corpus/test/refresh-artifact.test.mjs
 git commit -m "feat: carry capture URL, outcome and date on refresh artifact entries"
 ```
@@ -1663,19 +1741,39 @@ test("captureOne reports a network error or timeout as failed", async () => {
   assert.match(r.error, /ECONNRESET/);
 });
 
-test("captureOne never returns an outcome outside the vocabulary", async () => {
-  for (const status of [200, 301, 403, 429, 500]) {
+// Asserting only "the outcome is one of the three strings" passes whatever
+// the mapping is, so it cannot detect a transient 429 being recorded as a
+// durable refusal. Pin each status to its exact outcome instead.
+test("captureOne maps each status to its exact outcome", async () => {
+  const cases = [
+    [200, "captured"],
+    [299, "captured"],
+    [403, "refused"],
+    [404, "refused"],
+    [429, "failed"],
+    [500, "failed"],
+    [503, "failed"],
+  ];
+  for (const [status, expected] of cases) {
     const submitImpl = async () => ({
       status,
       redirected: false,
       url: "https://archive.example/x",
     });
     const r = await captureOne("https://e.com/a", { submitImpl });
-    assert.ok(
-      ["captured", "refused", "failed"].includes(r.archive_outcome),
-      `status ${status}`,
-    );
+    assert.equal(r.archive_outcome, expected, `status ${status}`);
   }
+});
+
+test("a rate-limited capture is never recorded as refused", async () => {
+  const submitImpl = async () => ({
+    status: 429,
+    redirected: false,
+    url: null,
+  });
+  const r = await captureOne("https://e.com/a", { submitImpl });
+  assert.notEqual(r.archive_outcome, "refused");
+  assert.equal(r.archive_outcome, "failed");
 });
 
 const ARTIFACT = `---
@@ -1795,9 +1893,12 @@ export async function captureOne(url, options = {}) {
         error: null,
       };
     }
-    // 4xx is the service declining this URL (robots.txt opt-out, blocklist).
-    // Anything else is the service itself being unavailable.
-    const refused = status >= 400 && status < 500;
+    // 403/404 is the service declining this URL (robots.txt opt-out,
+    // blocklist): a durable fact. 429 is rate limiting and 5xx is the service
+    // being unavailable: both are transient. Recording either as `refused`
+    // would write a false permanence claim into the artifact and stop Task 10
+    // writing a record whose source archives perfectly well.
+    const refused = status === 403 || status === 404;
     return {
       url,
       archived: null,
@@ -2212,9 +2313,30 @@ Expected: `# fail 0`, exit 0, `lint: clean`, `verify: clean`.
 
 - [ ] **Step 7: Walk the nine acceptance criteria explicitly**
 
-Open the spec's "Acceptance criteria" section and check each one against the tree, recording the command that proves it. Criterion 3 is the four gates; criterion 8 is `git status --porcelain meta/ledger.yaml` being empty; criterion 4 is Task 9 Step 8's `repo untouched`; criterion 6 is the unknown-flag test. **Any criterion you cannot name a passing command for is not met** — fix it before the final commit.
+Open the spec's "Acceptance criteria" section and check each one against the tree, recording the command that proves it. Criterion 1's five classes and criterion 9's hand-run seam are proved by Step 8 below, not here. Criterion 3 is the four gates; criterion 8 is `git status --porcelain meta/ledger.yaml` being empty; criterion 4 is Task 9 Step 8's `repo untouched`; criterion 6 is the unknown-flag test. **Any criterion you cannot name a passing command for is not met** — fix it before the final commit.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 8: Run the audit against the real corpus, over the real network**
+
+Every network test injects a fake, by design — which means the feature can pass
+all eleven tasks and still fail the first time it is used. This step is the only
+end-to-end evidence that exists, and acceptance criterion 9 is what makes it
+hand-run rather than automated.
+
+```bash
+node tools/corpus/cli.mjs sources . ; echo "exit=$?"
+```
+
+Expected: `exit=0`. Read the per-class counts and sanity-check them:
+
+- `record-source` checks about 17 distinct URLs, `record-secondary` about 5.
+- `page-frontmatter` and `page-body` together check roughly 47.
+- **`page-body` dead count must be 0 or close to it.** If it is near 29, the
+  absolute-URL filter in Task 2 is not working and every internal guide link is
+  being fetched — stop and fix Task 2 before committing.
+
+Record the output in the commit message so the next session can compare.
+
+- [ ] **Step 9: Commit**
 
 ```bash
 git add CLAUDE.md tools/corpus/cli.mjs tools/corpus/test/contract.test.mjs
@@ -2250,5 +2372,20 @@ Run after the plan is written, before execution starts.
 **3. Type consistency.** Checked across tasks: `collectCitations` returns `{ citations, issues }` (Task 2) and Task 5 destructures exactly that. A citation is `{ url, class, origin }` throughout; `auditCitations` spreads it and adds `outcome`, `status`, `finalUrl`, `error` (Task 4), which is what `summarise` reads (Task 5). `captureOne` returns `archived` / `archive_outcome` / `error` (Task 9), matching the artifact fields Task 8 validates and the `archived` + `archive_outcome: "captured"` condition Task 10 branches on. `setRecordArchived(yamlText, key, url)` and `clearRecordArchived(yamlText, key)` keep the `(yamlText, key, ...)` argument order of the existing `setRecordVerified`. `CITATION_CLASSES` and `ARCHIVE_OUTCOMES` are each defined once and imported everywhere else.
 
 **4. Review Focus coverage.** All five are pinned to tasks and have tests: non-string URL (Task 2), missing or scalar front-matter (Task 2), fetch timeout (Task 4), existing `source_archived` not duplicated (Task 7), nested look-alike line untouched (Task 7).
+
+**5. Review pass applied 2026-10-09.** A plan review measured three defects
+against the tree and they are fixed above, not merely noted. (a) Reusing
+`urlRanges` to collect citations harvested 29 relative links from `guides/`,
+every one of which would have been fetched and reported dead; the body class now
+filters to absolute `http(s)`, and a test with relative, anchor and `mailto:`
+links pins it. (b) `captureOne` classified HTTP 429 as `refused`, writing a
+durable opt-out claim for a transient rate limit — and the test could not detect
+it, because it asserted only that the outcome was one of three strings; each
+status is now pinned to its exact outcome. (c) The flag allowlist omitted the
+real `--force` and `--stats` and invented a `--base` that does not exist, which
+would have broken working invocations; it is now enumerated from the source.
+Two smaller fixes came with them: `probe` releases the response body, and the
+`sources` branch sets `process.exitCode` rather than calling `process.exit`
+straight after writing several KB to a pipe.
 
 **One risk the plan cannot remove.** Task 1 exports `urlRanges` from the lint, and Task 2 consumes it over every guide body. A behaviour change there is a corpus-wide false negative in the bare-value scan — the worst failure class available in this repo — and the only proof available is the existing suite. Task 1 is therefore a pure extraction with no edit to the function body, and its step 8 runs the whole suite rather than only the new tests. If the suite count does not land at 474 plus the new tests, stop.
