@@ -57,3 +57,18 @@ test("known flags on known commands are still accepted", () => {
   assert.equal(run(["sources", "--json", "."], emptyCorpus()).code, 0);
   assert.equal(run(["lint", "."], emptyCorpus()).code, 0);
 });
+
+test("sources --archive without --artifact exits 2", () => {
+  const r = run(["sources", "--archive", "."], emptyCorpus());
+  assert.equal(r.code, 2);
+  assert.match(r.err, /^corpus: sources --archive requires --artifact=/m);
+});
+
+test("sources --archive with a missing artifact exits 2 and names the rule", () => {
+  const r = run(
+    ["sources", "--archive", "--artifact=research/t/nope.md", "."],
+    emptyCorpus(),
+  );
+  assert.equal(r.code, 2);
+  assert.match(r.err, /refresh-artifact-not-found/);
+});

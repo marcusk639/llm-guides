@@ -53,6 +53,7 @@ import { siteCorpus } from "./site.mjs";
 import { collectCitations } from "./citations.mjs";
 import { auditCitations } from "./sources.mjs";
 import { summarise, formatText, formatJson } from "./sources-report.mjs";
+import { captureOne, applyCaptures } from "./archive.mjs";
 
 function loadTopics(root) {
   const file = path.join(root, "meta", "taxonomy.yaml");
@@ -563,6 +564,46 @@ async function main(argv) {
     process.exit(issues.length === 0 ? 0 : 1);
   } else if (command === "sources") {
     const json = rest.includes("--json");
+    if (rest.includes("--archive")) {
+      const artifactRel = (
+        rest.find((a) => a.startsWith("--artifact=")) ?? ""
+      ).slice("--artifact=".length);
+      if (!artifactRel) {
+        console.error(
+          "corpus: sources --archive requires --artifact=<research/...>",
+        );
+        process.exit(2);
+      }
+      const artifactPath = path.join(root, artifactRel);
+      if (!fs.existsSync(artifactPath)) {
+        console.error(
+          `corpus: ${artifactRel} [refresh-artifact-not-found] no such file`,
+        );
+        process.exit(2);
+      }
+      const text = fs.readFileSync(artifactPath, "utf8");
+      const { data } = parseArtifact(text);
+      const captures = [];
+      for (const entry of data?.records ?? []) {
+        const c = await captureOne(entry.url);
+        captures.push({ key: entry.key, ...c });
+        console.error(
+          `${entry.key}: ${c.archive_outcome}${c.error ? ` (${c.error})` : ""}`,
+        );
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const next = applyCaptures(text, captures, { today });
+      // A failed write is a fact about this machine, not about a third party:
+      // exit 1. A refused capture is a finding and must not fail the command.
+      try {
+        fs.writeFileSync(artifactPath, next);
+      } catch (e) {
+        console.error(`corpus: could not write ${artifactRel}: ${e.message}`);
+        process.exit(1);
+      }
+      console.log(`archived: ${artifactRel}`);
+      process.exit(0);
+    }
     // Decision 1: no finding produces a nonzero exit. There is deliberately no
     // exit code to gate liveness on. Exit 1 is reserved for a failed write,
     // which only --archive can attempt; exit 2 is a usage error.
