@@ -111,6 +111,66 @@ export function setRecordVerified(yamlText, key, date) {
   );
 }
 
+// Anchored to the record's OWN field indent for exactly the reason RECORD_DATE
+// is: an unbounded `\s*` would match a `source_archived:`-looking line at any
+// depth inside the block — a nested mapping, or a line inside a `notes:` block
+// scalar, both of which the corpus writes — and the loop takes the FIRST match,
+// so the archive URL would be written into prose while the record's own field
+// stayed absent. Quote style is captured and re-emitted, as it is for the date.
+const recordArchivedPattern = (indent) =>
+  new RegExp(`^(${indent}source_archived:\\s*)(["']?)([^"'\\s]*)\\2([ \\t]*)$`);
+
+// `source:` at the field indent, and never `source_archived:` — the `_` after
+// `source` cannot satisfy the colon this pattern requires.
+const recordSourcePattern = (indent) => new RegExp(`^${indent}source:\\s`);
+
+function archiveRange(yamlText, key) {
+  const range = recordBlockRange(yamlText, key);
+  if (range === null)
+    throw new RefreshError(
+      "refresh-record-not-found",
+      `no record with key ${key} in this data file`,
+    );
+  return range;
+}
+
+export function setRecordArchived(yamlText, key, url) {
+  const { lines, start, end, indent } = archiveRange(yamlText, key);
+  const ARCHIVED = recordArchivedPattern(indent);
+  for (let i = start; i < end; i++) {
+    const m = ARCHIVED.exec(lines[i]);
+    if (m === null) continue;
+    lines[i] = `${m[1]}${m[2]}${url}${m[2]}${m[4]}`;
+    return lines.join("\n");
+  }
+  // Absent: insert one line immediately after the record's own `source:` line,
+  // so the snapshot sits beside the URL it is a snapshot of.
+  const SOURCE = recordSourcePattern(indent);
+  for (let i = start; i < end; i++) {
+    if (!SOURCE.test(lines[i])) continue;
+    lines.splice(i + 1, 0, `${indent}source_archived: ${url}`);
+    return lines.join("\n");
+  }
+  // Fail closed rather than guess a position: `source` is contract-required, and
+  // a record with none has no citation to have archived in the first place.
+  throw new RefreshError(
+    "refresh-record-source-missing",
+    `record ${key} has no source: line to anchor source_archived to`,
+  );
+}
+
+export function clearRecordArchived(yamlText, key) {
+  const { lines, start, end, indent } = archiveRange(yamlText, key);
+  const ARCHIVED = recordArchivedPattern(indent);
+  for (let i = start; i < end; i++) {
+    if (ARCHIVED.exec(lines[i]) === null) continue;
+    lines.splice(i, 1);
+    return lines.join("\n");
+  }
+  // No field at the field indent: byte-for-byte no-op, not a re-join.
+  return yamlText;
+}
+
 function frontmatterParts(pageText) {
   const m = FRONTMATTER.exec(pageText);
   if (m === null)
@@ -479,4 +539,3 @@ export function revertUnit(
     fs.writeFileSync(nodePath.join(root, rel), text);
   return { restored: [...pending.keys()].sort() };
 }
-
