@@ -13,7 +13,8 @@
     "render": "node tools/corpus/cli.mjs render",
     "render:check": "node tools/corpus/cli.mjs render --check",
     "ledger": "node tools/corpus/cli.mjs ledger",
-    "site": "node tools/corpus/cli.mjs site"
+    "site": "node tools/corpus/cli.mjs site",
+    "sources": "node tools/corpus/cli.mjs sources"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",

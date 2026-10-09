@@ -50,6 +50,9 @@ import {
 } from "./refresh-artifact.mjs";
 import { stampUnit, revertUnit } from "./refresh-stamp.mjs";
 import { siteCorpus } from "./site.mjs";
+import { collectCitations } from "./citations.mjs";
+import { auditCitations } from "./sources.mjs";
+import { summarise, formatText, formatJson } from "./sources-report.mjs";
 
 function loadTopics(root) {
   const file = path.join(root, "meta", "taxonomy.yaml");
@@ -446,14 +449,14 @@ export function refreshCorpus(
   }
 }
 
-function main(argv) {
+async function main(argv) {
   const [command, ...rest] = argv;
   const write = rest.includes("--write");
   const check = rest.includes("--check");
   const root = rest.find((a) => !a.startsWith("--")) ?? process.cwd();
   const usage = () => {
     console.error(
-      "usage: corpus <render|lint|verify|ledger|refresh|site> [--write] [dir]",
+      "usage: corpus <render|lint|verify|ledger|refresh|site|sources> [--write] [dir]",
     );
     console.error("       corpus render --check [dir]");
     console.error(
@@ -523,6 +526,19 @@ function main(argv) {
         : `site: ${issues.length} issue(s)`,
     );
     process.exit(issues.length === 0 ? 0 : 1);
+  } else if (command === "sources") {
+    const json = rest.includes("--json");
+    // Decision 1: no finding produces a nonzero exit. There is deliberately no
+    // exit code to gate liveness on. Exit 1 is reserved for a failed write,
+    // which only --archive can attempt; exit 2 is a usage error.
+    const { citations, issues } = collectCitations(root);
+    const results = await auditCitations(citations);
+    const summary = summarise(results, issues);
+    console.log(json ? formatJson(summary) : formatText(summary));
+    // Not process.exit(0): stdout is async on a pipe, and the --json report for
+    // ~64 citations is several KB, so exiting here can truncate it.
+    process.exitCode = 0;
+    return;
   } else if (command === "refresh") {
     const { code, out, err: errs } = refreshCorpus(root, rest);
     // A usage error prints its reason ABOVE the usage block, not instead of it:
