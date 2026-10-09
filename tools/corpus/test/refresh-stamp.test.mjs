@@ -1104,3 +1104,105 @@ test("setRecordArchived throws for a key the file does not hold", () => {
     setRecordArchived(ARCHIVE_YAML, "nope.key", "https://a.example/x"),
   );
 });
+
+// Task 10. Built on this file's own sandbox()/prepared()/read()/rewriteOnDisk
+// shape, not on a new fixture wrapper: the record file is data/units.yaml and
+// the stampable artifact comes from prepared().
+const withArchive = (root, artifact, fields) =>
+  rewriteOnDisk(root, {
+    ...artifact,
+    records: artifact.records.map((r, i) =>
+      i === 0 ? { ...r, ...fields } : r,
+    ),
+  });
+
+test("stampUnit writes source_archived when the entry says captured", () => {
+  const root = sandbox();
+  const artifact = withArchive(root, prepared(root), {
+    archived: "https://archive.example/s1",
+    archive_outcome: "captured",
+  });
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  assert.match(
+    read(root, "data/units.yaml"),
+    /source_archived: https:\/\/archive\.example\/s1/,
+  );
+});
+
+// Both fields are set, not just the outcome: that pins the OUTCOME as the gate.
+// Setting only archive_outcome would pass even if the real gate were "archived
+// is present", which is the mistake that would record a transient 429 as a
+// durable capture.
+test("stampUnit does not write source_archived for refused or failed", () => {
+  for (const outcome of ["refused", "failed"]) {
+    const root = sandbox();
+    const artifact = withArchive(root, prepared(root), {
+      archived: "https://archive.example/s1",
+      archive_outcome: outcome,
+    });
+    stampUnit(root, artifact, { today: "2026-09-28" });
+    assert.ok(
+      !read(root, "data/units.yaml").includes("source_archived"),
+      `outcome ${outcome}`,
+    );
+  }
+});
+
+// The insert must happen in the same in-memory pass as setRecordVerified. A
+// page snapshot that no longer matches disk fails in the PAGES loop, which runs
+// after every record body has been computed -- so if the archive insert escaped
+// the transaction, data/units.yaml would carry it with nothing else written.
+test("stampUnit writes nothing at all when a later transform fails", () => {
+  const root = sandbox();
+  const base = prepared(root);
+  const artifact = rewriteOnDisk(root, {
+    ...withArchive(root, base, {
+      archived: "https://archive.example/s1",
+      archive_outcome: "captured",
+    }),
+    unit_was: Object.fromEntries(
+      Object.keys(base.unit_was).map((k) => [k, "1999-01-01"]),
+    ),
+  });
+  const before = read(root, "data/units.yaml");
+  assert.throws(() => stampUnit(root, artifact, { today: "2026-09-28" }), {
+    rule: "refresh-page-drifted",
+  });
+  assert.equal(read(root, "data/units.yaml"), before, "all-or-nothing holds");
+});
+
+test("revertUnit removes a source_archived the stamp wrote", () => {
+  const root = sandbox();
+  const before = read(root, "data/units.yaml");
+  const artifact = withArchive(root, prepared(root), {
+    archived: "https://archive.example/s1",
+    archive_outcome: "captured",
+  });
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  assert.match(read(root, "data/units.yaml"), /source_archived/);
+  const stamped = parseArtifact(read(root, artifact.path)).data;
+  revertUnit(root, stamped, { today: "2026-09-29" });
+  assert.equal(read(root, "data/units.yaml"), before);
+});
+
+// A snapshot an EARLIER refresh captured is not this receipt's to remove.
+test("revertUnit leaves a source_archived the stamp did not write", () => {
+  const root = sandbox();
+  const file = nodePath.join(root, "data/units.yaml");
+  const artifact = prepared(root);
+  fs.writeFileSync(
+    file,
+    setRecordArchived(
+      fs.readFileSync(file, "utf8"),
+      artifact.records[0].key,
+      "https://archive.example/pre",
+    ),
+  );
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  const stamped = parseArtifact(read(root, artifact.path)).data;
+  revertUnit(root, stamped, { today: "2026-09-29" });
+  assert.match(
+    read(root, "data/units.yaml"),
+    /source_archived: https:\/\/archive\.example\/pre/,
+  );
+});

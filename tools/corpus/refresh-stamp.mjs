@@ -339,12 +339,26 @@ export function stampUnit(
         "refresh-record-drifted",
         `${entry.key} in ${file} now reads verified ${previous}, but --skeleton read ${entry.was}; something has written this record since, so the receipt would record a date that was never the record's true prior value — restore from version control, or regenerate the artifact`,
       );
-    pending.set(file, text);
+    // Same in-memory pass as the date bump and before any write, so the
+    // all-or-nothing property is unchanged. Only `captured` writes the field:
+    // `refused` and `failed` are facts about the ATTEMPT, not snapshots that
+    // exist, and writing either would put a URL in the corpus that 404s.
+    let nextText = text;
+    const archivedWritten =
+      entry.archive_outcome === "captured" &&
+      typeof entry.archived === "string" &&
+      entry.archived !== "";
+    if (archivedWritten)
+      nextText = setRecordArchived(nextText, entry.key, entry.archived);
+    pending.set(file, nextText);
     recordReceipts.push({
       key: entry.key,
       file,
       previous_verified: previous,
       new_verified: entry.read,
+      // Only on the entries it applies to, so a receipt from a run with no
+      // captures has exactly the shape it always had.
+      ...(archivedWritten ? { archived_written: true } : {}),
     });
   }
 
@@ -447,6 +461,13 @@ function assertReceiptShape(receipt) {
           "refresh-receipt-shape",
           `record ${r.key}: ${f} must be a real date written YYYY-MM-DD, got ${JSON.stringify(r?.[f])}`,
         );
+    // The flag decides whether a revert deletes a line from a data file, so it
+    // is validated like every other value the receipt is trusted for.
+    if (r.archived_written != null && typeof r.archived_written !== "boolean")
+      throw new RefreshError(
+        "refresh-receipt-shape",
+        `record ${r.key}: archived_written must be a boolean, got ${JSON.stringify(r.archived_written)}`,
+      );
   }
 }
 
@@ -514,7 +535,16 @@ export function revertUnit(
         "refresh-revert-drift",
         `record ${r.key} in ${file} now reads verified ${probe.previous}, not the ${r.new_verified} this receipt wrote; another unit has already changed it`,
       );
-    pending.set(file, probe.text);
+    // Only a field THIS receipt wrote comes off: a snapshot an earlier refresh
+    // captured is not this revert's to take away. `file` came through
+    // assertDataFile above, the same containment check the stamp path applies,
+    // so a hand-written archived_written cannot redirect a delete outside data/.
+    pending.set(
+      file,
+      r.archived_written === true
+        ? clearRecordArchived(probe.text, r.key)
+        : probe.text,
+    );
   }
 
   for (const p of receipt.pages ?? []) {
