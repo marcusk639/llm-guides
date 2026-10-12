@@ -143,7 +143,8 @@ Qwen, Ollama and others are expected later. Two notes for whoever adds them.
 Each costs ~0.3 h/yr and draws on the ~1.9 h/yr this spec leaves, so the
 budget is checked at each addition rather than assumed to hold. And the
 smaller vendors do not map one-to-one onto the first three: Qwen is a model
-family the corpus already covers under `providers/open-weight.md`, and Ollama
+family the corpus already covers under
+`guides/providers/open-weight.md`, and Ollama
 is a local runtime rather than a vendor at all. Whether those get their own
 practice pages or a section on an existing one is a question for the page that
 owns them, not a precedent this spec sets.
