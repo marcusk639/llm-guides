@@ -12,8 +12,19 @@ wins.
 
 A long-lived reference corpus on effective LLM use: how a document is shaped, how a
 claim earns its confidence level, where volatile facts live, and how staleness is
-detected. Claude-first depth today, with a documented recipe for expanding to other
-models and domains on demand.
+detected. Provider-weighted depth: Anthropic, OpenAI and Google carry the bulk of the
+coverage, with dedicated pages for smaller providers and for running models
+locally. Concepts are written so they hold across providers; mechanisms are
+documented where the vendor documents them.
+
+**The quarantine principle.** High-volatility values — model ids, prices and
+lineups — live only on the pages that own them under `providers` and `models`.
+A concept page never carries one; it links the page that does. A page that
+documents a mechanism may carry that mechanism's own `medium` defaults, as
+`claude-code/hooks.md` and `context/context-management.md` do. This is finding
+F2's workaround promoted to a rule, and it exists for cadence: page cadence is
+the maximum volatility of any record the page references, so one model price on
+a concept page puts that page on a 30-day clock permanently.
 
 The hazard every rule below exists for: the corpus documents systems whose model ids,
 prices, limits and defaults change on a timescale of weeks, and a wrong-but-plausible
@@ -44,8 +55,8 @@ This supersedes the previous convention of root-level topic directories
 - `local/` — **gitignored.** Harvest output and anything derived from session
   transcripts. Nothing here may enter a committed document.
 
-The eleven topics, from `meta/taxonomy.yaml`: foundations, prompting, context, agents,
-claude-code, cowork, harness, models, tools, building, domains. `claude-code` is
+The fifteen topics, from `meta/taxonomy.yaml`: foundations, prompting, context, agents,
+claude-code, cowork, harness, models, tools, building, domains, providers, evals, multimodal, orchestration. `claude-code` is
 intentionally the largest. `harness` carries guardrails, long-running automation, trust,
 and observability. `domains` ships with one exemplar playbook plus the generation recipe
 (see "Domain playbook shape") rather than many thin pages.
@@ -55,7 +66,7 @@ Seed guides to copy from, one per archetype:
 | Archetype                   | Page                                     | Shows                                                       |
 | --------------------------- | ---------------------------------------- | ----------------------------------------------------------- |
 | Evergreen concept           | `guides/context/context-management.md`   | inline `corpus:data` blocks; values kept off a concept page |
-| High-volatility model facts | `guides/models/claude-models.md`         | row records and a `corpus:table` with `headers=`            |
+| High-volatility model facts | `guides/providers/anthropic.md`         | row records and a `corpus:table` with `headers=`            |
 | Tool reference              | `guides/claude-code/hooks.md`            | context-bound `lint_literals` for generic figures           |
 | Domain playbook             | `guides/domains/software-engineering.md` | task map, per-part labels, dated studies, `lint: false`     |
 | Cross-model comparison      | `guides/models/comparison.md`            | shared row records across files, `sort=`, `lint_fields`     |
@@ -69,7 +80,7 @@ renderer, and ledger generator are required, because the freshness guarantee is 
 property of the corpus as a whole, not of any single document.
 
 Node 22 or later. The CLI is `tools/corpus/cli.mjs`:
-`node tools/corpus/cli.mjs <render|lint|verify|ledger|refresh> [--write] [dir]` or
+`node tools/corpus/cli.mjs <render|lint|verify|ledger|refresh|site|sources> [--write] [dir]` or
 `node tools/corpus/cli.mjs render --check [dir]` (`dir` defaults to the current
 directory; any other command, `--check` on a command other than `render`, or `--check`
 together with `--write` prints usage and exits 2).
@@ -81,8 +92,9 @@ together with `--write` prints usage and exits 2).
 | `node tools/corpus/cli.mjs render --write .` | `npm run render -- --write` | Rewrites marker-block content in place; prints `rendered: <path>`                | 1 if any render issue, else 0                                                         |
 | `node tools/corpus/cli.mjs lint .`           | `npm run lint`              | Record lint config, front-matter, bare values, unterminated markers, expiry      | 1 if any issue (`<path>:<line> [<rule>] <message>`), 0 with `lint: clean`             |
 | `node tools/corpus/cli.mjs verify .`         | `npm run verify`            | **Strictly read-only.** Record and page checks lint does not make: duplicate keys, record `source`/`verified`, `applies_to` shape, `related` paths, stale `lint_literals`, template sections, evidence-label spelling, section 6 completeness, lint-gap Form 1, `research:` on non-seed pages | 1 if any issue (same `<path>:<line> [<rule>] <message>` form), 0 with `verify: clean` |
-| `node tools/corpus/cli.mjs refresh --page=<guides/...> .` | — | Re-verify one refresh unit against its sources. `--order` (the default) prints the work order; `--skeleton` writes a fail-closed artifact under `research/<topic>/`; `--stamp --artifact=<path>` bumps dates and sets `research:`, all-or-nothing; `--revert --artifact=<path>` restores the prior bytes from the artifact's receipt. `--key=<record.key>` narrows a run to one record and then stamps **records only** — no page `verified`, no `research:`. Writes `guides/`, `data/` and `research/` — **never `meta/ledger.yaml`**. | 2 on a usage error, 1 on a blocking issue, else 0 |
+| `node tools/corpus/cli.mjs refresh --page=<guides/...> .` | — | Re-verify one refresh unit against its sources. `--order` (the default) prints the work order; `--skeleton` writes a fail-closed artifact under `research/<topic>/`; `--stamp --artifact=<path>` bumps dates and sets `research:`, all-or-nothing, and also inserts `source_archived` into a record when that record's artifact entry carries `archived` with `archive_outcome: captured` — `refused` and `failed` write nothing, being facts about the attempt rather than snapshots that exist; `--revert --artifact=<path>` restores the prior bytes from the artifact's receipt and removes exactly the `source_archived` fields the receipt marks `archived_written: true`, never one an earlier refresh captured. `--key=<record.key>` narrows a run to one record and then stamps **records only** — no page `verified`, no `research:`. Writes `guides/`, `data/` and `research/` — **never `meta/ledger.yaml`**. | 2 on a usage error, 1 on a blocking issue, else 0 |
 | `node tools/corpus/cli.mjs ledger --write .` | `npm run ledger -- --write` | Rebuilds `meta/ledger.yaml`; without `--write` only prints `ledger: N entries`   | 0                                                                                     |
+| `node tools/corpus/cli.mjs sources .`        | `npm run sources`           | **Not a gate.** Audits every citation URL in the corpus over the network and reports per class (`record-source`, `record-secondary`, `page-frontmatter`, `page-body`, `snapshot`); `--json` for the machine-readable form. `--archive --artifact=<research/...>` submits each of that artifact's record sources to the web archive and writes `archived`/`archive_outcome`/`archive_read` onto its entries — never into `data/` or `guides/`. | 0 whenever the audit ran, 1 only on a failed write, 2 on a usage error — deliberately no exit code for findings, so it cannot be gated on |
 | `npm test`                                   | —                           | `node --test "tools/corpus/test/**/*.test.mjs"`                                  | non-zero on any failing test                                                          |
 
 `verify` is strictly read-only: it never writes to the tree, which is what lets it run
@@ -229,6 +241,7 @@ unquoted `true`/`false` are booleans and bare numbers are numbers, so quote date
 | `volatility`    | yes         | Exactly `low`, `medium` or `high`. Drives page cadence. A missing or misspelled value is caught by lint (`record-volatility-invalid`, below) and is otherwise treated as unreferenced for cadence purposes — it never crashes `lint` or `ledger`.                                                                  |
 | `source`        | yes         | Canonical URL the value was read from. Per-model URLs that contain a model id belong here, not in prose.                                                                                                                                                                                                            |
 | `verified`      | yes         | Date read from `source`, `"YYYY-MM-DD"`.                                                                                                                                                                                                                                                                            |
+| `source_archived` | no        | Optional web-archive snapshot URL of `source`, absolute `http(s)`. Exempt from the freshness model: it carries no `verified` date and no volatility.                                                                                                                                                              |
 | `tags`          | for tables  | List of tags; `corpus:table tag=` selects on it.                                                                                                                                                                                                                                                                    |
 | `lint`          | no          | `lint: false` removes every literal of this record from the lint.                                                                                                                                                                                                                                                   |
 | `lint_literals` | no          | Explicit list of literal strings to lint for. **Overrides entirely**: `value`, `display` and `lint_fields` are then ignored.                                                                                                                                                                                        |
@@ -344,7 +357,7 @@ Scope of the bare-value scan:
   page's `topic`.
 
 Code examples therefore must not contain a known value outside a marker block. Obtain
-model ids and limits at runtime (the Models API in `guides/models/claude-models.md` §2),
+model ids and limits at runtime (the Models API in `guides/providers/anthropic.md` §2),
 or write the example so it takes the value as input. A value-bearing fence can only be
 data-backed as the `display` of a record wrapped in a `corpus:data` block, which is
 unreadable; templated snippets are deferred (F3).
@@ -380,6 +393,8 @@ Every rule name the tools emit, and what to do.
 | `render-sort-unknown`            | render | `sort` is malformed (empty, bare `-`) or names a field no selected row has.                    | Fix the field name. A field present on only some rows is fine.                                                                                                                      |
 | `render-missing-value`           | render | A `corpus:data` block's record has neither `display` nor `value`; the block keeps its content. | Add `value` (and `display` if needed) to the record.                                                                                                                                |
 | `record-duplicate-key`           | verify | A record `key` is defined more than once across `data/*.yaml` files; render silently keeps only the last one loaded. | Rename or remove the duplicate, or decide explicitly which definition should win. |
+| `record-archived-invalid`         | verify | A record's `source_archived` is present but is not an absolute `http(s)` URL. A relative or scheme-less snapshot path is unresolvable, so it would assert a preservation that cannot be reached. | Give the absolute snapshot URL the archive service returned, or remove the field. |
+| `citation-malformed`             | sources | A citation-carrying field (`source`, `price_source`, `licence_source`, `source_archived`, or a page's `sources`) holds something that is not a string. Reported by `sources`, which never fails on a finding, so this is a report line and not a gate. | Make the field a string URL. |
 | `record-source-missing`          | verify | A record has no `source`.                                                                        | Add the canonical URL the value was read from.                                                                                                                                      |
 | `record-verified-missing`        | verify | A record has no `verified` date.                                                                 | Add the date read from `source`, as a quoted `"YYYY-MM-DD"`.                                                                                                                        |
 | `record-verified-invalid`        | verify | A record's `verified` is not a quoted, real calendar date written `YYYY-MM-DD`.                  | Fix and quote the date.                                                                                                                                                              |
@@ -397,8 +412,12 @@ Every rule name the tools emit, and what to do.
 | `refresh-section-six-missing`     | refresh | A non-deprecated page in the unit has no `## 6.` section, so its checklist is empty.                 | Write section 6. An empty checklist is not "nothing to check". |
 | `refresh-record-unknown`          | refresh | A record key the unit references does not exist in any `data/` file.                                | Fix the key, or add the missing record. |
 | `refresh-record-source-missing`   | refresh | A referenced record has no `source`, so there is nothing to re-read it against.                       | Add the canonical URL the value was read from. |
+| `refresh-archive-outcome`         | refresh | An artifact record entry's `archive_outcome` is not one of `captured`, `refused`, `failed`.           | Use one of the three. `refused` is a durable service refusal (403/404); a transient 429 or 5xx is `failed`. |
+| `refresh-archive-url`             | refresh | An artifact record entry's `archived` is present but is not an absolute `http(s)` URL. Checked with the same `isAbsoluteHttpUrl` the `record-archived-invalid` rule uses, so what an artifact accepts and what a record may carry cannot drift. | Give the absolute snapshot URL, or drop the field. |
+| `refresh-archive-date`            | refresh | An artifact record entry's `archive_read` is not a real date written `YYYY-MM-DD`, or is after today. | Fix the date. A future one would claim a snapshot that does not exist yet. |
 | `refresh-key-out-of-unit`         | refresh | `--key` names a record the unit does not reference.                                                  | `--key` narrows a unit; enter from a page that references the record. |
 | `refresh-record-not-found`        | refresh | The data file holds no record with that key.                                                         | Fix the key, or the artifact entry's `file`. |
+| `refresh-record-archived-unparseable` | refresh | A record carries a `source_archived:` line at its own field indent that the stamp cannot rewrite — a trailing comment, or a quote inside the value. Deciding replace-vs-insert on the strict value pattern instead of the key made such a line fall through to the insert branch and write a SECOND `source_archived` key, which js-yaml rejects outright, so `loadRecords` threw and every command crashed. Fails closed like `refresh-record-verified-missing` rather than open, into corruption. | Normalise the line to a bare or quoted URL with nothing after it. |
 | `refresh-record-verified-missing` | refresh | A record block has no `verified:` line **at its own field indent**. A `verified:`-looking line nested more deeply — inside a `notes:` block scalar, say — does not count and is never rewritten. | Add `verified:` as a field of the record; skipping it would leave a stale record date under a freshly dated page. |
 | `refresh-frontmatter-missing`     | refresh | A page in the unit has no `---` front-matter.                                                        | Add front-matter. |
 | `refresh-page-verified-missing`   | refresh | A page's front-matter has no `verified:` line.                                                        | Add it. |
@@ -653,7 +672,12 @@ Two distinct units can also collide on one path, since the slug collapses above
 three pages. Its front-matter is
 machine-readable: `kind: refresh`, `unit`, `entry`, `topic`, `topics`, `slug`,
 `path`, `fetched`, `verdict`, `key_scoped`, `unit_keys`, `unit_was`, and one `records`
-entry per record carrying `key`, `file`, `verdict`, `url`, `stated`, `read` and `was`.
+entry per record carrying `key`, `file`, `verdict`, `url`, `stated`, `read` and `was`,
+plus three optional capture fields `sources --archive` writes: `archived` (the absolute
+`http(s)` snapshot URL), `archive_outcome` (one of `captured`, `refused`, `failed`) and
+`archive_read` (the date the capture was attempted). All three are optional and an entry
+carrying none validates exactly as it did before captures existed; an entry carrying one
+is checked by `refresh-archive-url`, `refresh-archive-outcome` and `refresh-archive-date`.
 `unit_was` and each entry's `was` are the **snapshot** `--skeleton` took: the date that
 page or record carried when the work order was built. Do not hand-edit them — `--stamp`
 requires the file to still agree (`refresh-page-drifted`, `refresh-record-drifted`), and
@@ -689,8 +713,10 @@ a run escape a blocked outcome.
 
 **A block must be harmless to merge.** When the verify agent blocks,
 `refresh --revert` restores every page and record date to its prior value and
-removes any `research:` the refresh added, from the artifact's `stamped:` receipt
-alone — no git needed. **The receipt is validated, not trusted.** Nothing
+removes any `research:` the refresh added, plus any `source_archived` the stamp
+wrote, from the artifact's `stamped:` receipt alone — no git needed. The
+`source_archived` insert is computed in the **same in-memory pass** as the date
+bump, so it is inside the all-or-nothing transform and cannot land on its own. **The receipt is validated, not trusted.** Nothing
 distinguishes a `stamped:` mapping stampUnit wrote from one typed by hand, and
 the artifact is the one file this pipeline is designed to have hand-edited, so
 `--revert` applies the same gates `--stamp` does: `validateArtifact` on the

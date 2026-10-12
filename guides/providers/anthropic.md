@@ -5,7 +5,7 @@ summary: >-
   API IDs, aliases, context windows, output limits, and list prices, plus how to
   read those numbers, how to discover them at runtime instead of hard-coding
   them, and the traps in pinning, platform IDs, and per-token pricing.
-topic: models
+topic: providers
 verified: 2026-10-06
 applies_to:
   - "Claude API (first-party) as documented on platform.claude.com on 2026-10-06"

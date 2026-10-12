@@ -11,6 +11,7 @@ import yaml from "js-yaml";
 import nodePath from "node:path";
 import { parseFrontmatter } from "./frontmatter.mjs";
 import { isValidIsoDate } from "./ledger.mjs";
+import { isAbsoluteHttpUrl } from "./paths.mjs";
 import { RefreshError } from "./refresh-units.mjs";
 
 // CONTAINMENT, not a string prefix. `data/../../x.yaml` begins with "data/" and
@@ -50,6 +51,15 @@ export const RECORD_VERDICTS = Object.freeze([
   "confirmed",
   "corrected",
   "unreachable",
+]);
+
+// A capture's outcome and date live on the artifact entry, not on the record:
+// without them, an absent `source_archived` conflates "never attempted",
+// "refused via robots.txt" and "submission failed". See Decision 4.
+export const ARCHIVE_OUTCOMES = Object.freeze([
+  "captured",
+  "refused",
+  "failed",
 ]);
 
 export const ARTIFACT_FIELDS = Object.freeze([
@@ -150,7 +160,13 @@ export function renderArtifactSkeleton(order, { fetched, artifactPath }) {
   return dumpArtifact(data, body);
 }
 
-export function validateArtifact(data) {
+export function validateArtifact(
+  data,
+  // Derived as a UTC date string and compared as a string, the way stampUnit
+  // does it, which is timezone-hazard-free. Injectable so the future-date
+  // boundary is testable without waiting for the calendar.
+  { today = new Date().toISOString().slice(0, 10) } = {},
+) {
   if (data == null || typeof data !== "object" || Array.isArray(data))
     return [
       {
@@ -244,6 +260,31 @@ export function validateArtifact(data) {
       issues.push({
         rule: "refresh-record-file-escapes-data",
         message: `record ${key}: file ${JSON.stringify(e.file)} does not resolve to a .yaml file inside data/; a refresh writes only records in the corpus's own data directory`,
+      });
+    // All three archive fields are optional: an entry carrying none validates
+    // exactly as it did before captures existed.
+    if (
+      e?.archive_outcome !== undefined &&
+      !ARCHIVE_OUTCOMES.includes(e.archive_outcome)
+    )
+      issues.push({
+        rule: "refresh-archive-outcome",
+        message: `record ${key}: archive_outcome must be one of ${ARCHIVE_OUTCOMES.join(", ")}, got ${JSON.stringify(e.archive_outcome)}`,
+      });
+    // Shares isAbsoluteHttpUrl with the record-archived-invalid verify rule, so
+    // what the artifact accepts and what a record may carry cannot drift.
+    if (e?.archived !== undefined && !isAbsoluteHttpUrl(e.archived))
+      issues.push({
+        rule: "refresh-archive-url",
+        message: `record ${key}: archived must be an absolute http(s) URL, got ${JSON.stringify(e.archived)}`,
+      });
+    if (
+      e?.archive_read !== undefined &&
+      (!isValidIsoDate(e.archive_read) || e.archive_read > today)
+    )
+      issues.push({
+        rule: "refresh-archive-date",
+        message: `record ${key}: archive_read must be a real date written YYYY-MM-DD and not after today (${today}), got ${JSON.stringify(e.archive_read)}`,
       });
   }
   if (

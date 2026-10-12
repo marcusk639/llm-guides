@@ -9,6 +9,7 @@ import fs from "node:fs";
 import nodePath from "node:path";
 import { parseFrontmatter } from "./frontmatter.mjs";
 import { isValidIsoDate } from "./ledger.mjs";
+import { isAbsoluteHttpUrl } from "./paths.mjs";
 import {
   dataFileRel,
   validateArtifact,
@@ -109,6 +110,91 @@ export function setRecordVerified(yamlText, key, date) {
     "refresh-record-verified-missing",
     `record ${key} has no verified: line to bump; skipping it would leave a stale record date under a freshly dated page`,
   );
+}
+
+// Anchored to the record's OWN field indent for exactly the reason RECORD_DATE
+// is: an unbounded `\s*` would match a `source_archived:`-looking line at any
+// depth inside the block — a nested mapping, or a line inside a `notes:` block
+// scalar, both of which the corpus writes — and the loop takes the FIRST match,
+// so the archive URL would be written into prose while the record's own field
+// stayed absent. Quote style is captured and re-emitted, as it is for the date.
+const recordArchivedPattern = (indent) =>
+  new RegExp(`^(${indent}source_archived:\\s*)(["']?)([^"'\\s]*)\\2([ \\t]*)$`);
+
+// Presence of the KEY at the field indent, independent of whether the value
+// parses. Replace-vs-insert is decided on this; the strict pattern above is
+// then used only to preserve quote style. Deciding on the strict pattern made
+// a trailing comment or an apostrophe in the URL fall through to the insert
+// branch and write a SECOND source_archived key, which js-yaml rejects
+// outright -- so a legal data file became unloadable by every command.
+const recordArchivedKeyPattern = (indent) =>
+  new RegExp(`^${indent}source_archived:`);
+
+// `source:` at the field indent, and never `source_archived:` — the `_` after
+// `source` cannot satisfy the colon this pattern requires.
+const recordSourcePattern = (indent) => new RegExp(`^${indent}source:\\s`);
+
+function archiveRange(yamlText, key) {
+  const range = recordBlockRange(yamlText, key);
+  if (range === null)
+    throw new RefreshError(
+      "refresh-record-not-found",
+      `no record with key ${key} in this data file`,
+    );
+  return range;
+}
+
+export function setRecordArchived(yamlText, key, url) {
+  const { lines, start, end, indent } = archiveRange(yamlText, key);
+  const ARCHIVED = recordArchivedPattern(indent);
+  const ARCHIVED_KEY = recordArchivedKeyPattern(indent);
+  for (let i = start; i < end; i++) {
+    if (!ARCHIVED_KEY.test(lines[i])) continue;
+    const m = ARCHIVED.exec(lines[i]);
+    // The key is here but the value is not one this can rewrite safely. Fail
+    // closed, the way setRecordVerified does for a date: inserting instead
+    // would duplicate the key and corrupt the file.
+    if (m === null)
+      throw new RefreshError(
+        "refresh-record-archived-unparseable",
+        `record ${key} has a source_archived: line this cannot rewrite (a trailing comment, or a quote inside the value): ${JSON.stringify(lines[i].trim())}`,
+      );
+    // Hand back what was overwritten. Without it the receipt cannot tell a
+    // field this run INSERTED from one it REPLACED, and --revert deletes a
+    // snapshot an earlier refresh captured. Mirrors setPageResearch.
+    const previous = m[3];
+    lines[i] = `${m[1]}${m[2]}${url}${m[2]}${m[4]}`;
+    return { text: lines.join("\n"), added: false, previous };
+  }
+  // Absent: insert one line immediately after the record's own `source:` line,
+  // so the snapshot sits beside the URL it is a snapshot of.
+  const SOURCE = recordSourcePattern(indent);
+  for (let i = start; i < end; i++) {
+    if (!SOURCE.test(lines[i])) continue;
+    lines.splice(i + 1, 0, `${indent}source_archived: ${url}`);
+    return { text: lines.join("\n"), added: true, previous: null };
+  }
+  // Fail closed rather than guess a position: `source` is contract-required, and
+  // a record with none has no citation to have archived in the first place.
+  throw new RefreshError(
+    "refresh-record-source-missing",
+    `record ${key} has no source: line to anchor source_archived to`,
+  );
+}
+
+export function clearRecordArchived(yamlText, key) {
+  const { lines, start, end, indent } = archiveRange(yamlText, key);
+  // Key-based, like setRecordArchived: a field with a trailing comment is
+  // still the field, and leaving it behind would strand a snapshot the
+  // receipt says was removed.
+  const ARCHIVED_KEY = recordArchivedKeyPattern(indent);
+  for (let i = start; i < end; i++) {
+    if (!ARCHIVED_KEY.test(lines[i])) continue;
+    lines.splice(i, 1);
+    return lines.join("\n");
+  }
+  // No field at the field indent: byte-for-byte no-op, not a re-join.
+  return yamlText;
 }
 
 function frontmatterParts(pageText) {
@@ -279,12 +365,39 @@ export function stampUnit(
         "refresh-record-drifted",
         `${entry.key} in ${file} now reads verified ${previous}, but --skeleton read ${entry.was}; something has written this record since, so the receipt would record a date that was never the record's true prior value — restore from version control, or regenerate the artifact`,
       );
-    pending.set(file, text);
+    // Same in-memory pass as the date bump and before any write, so the
+    // all-or-nothing property is unchanged. Only `captured` writes the field:
+    // `refused` and `failed` are facts about the ATTEMPT, not snapshots that
+    // exist, and writing either would put a URL in the corpus that 404s.
+    let nextText = text;
+    const archivedWritten =
+      entry.archive_outcome === "captured" &&
+      typeof entry.archived === "string" &&
+      entry.archived !== "";
+    let archivedSet = null;
+    if (archivedWritten) {
+      archivedSet = setRecordArchived(nextText, entry.key, entry.archived);
+      nextText = archivedSet.text;
+    }
+    pending.set(file, nextText);
     recordReceipts.push({
       key: entry.key,
       file,
       previous_verified: previous,
       new_verified: entry.read,
+      // Only on the entries it applies to, so a receipt from a run with no
+      // captures has exactly the shape it always had. `archived_written` is
+      // now ADDED, not merely "we wrote something": a replace carries the
+      // overwritten URL instead, because deleting it on revert would destroy
+      // an earlier refresh's snapshot that this run never owned.
+      ...(archivedWritten
+        ? {
+            archived_written: archivedSet.added,
+            ...(archivedSet.added
+              ? {}
+              : { previous_archived: archivedSet.previous }),
+          }
+        : {}),
     });
   }
 
@@ -387,6 +500,23 @@ function assertReceiptShape(receipt) {
           "refresh-receipt-shape",
           `record ${r.key}: ${f} must be a real date written YYYY-MM-DD, got ${JSON.stringify(r?.[f])}`,
         );
+    // The flag decides whether a revert deletes a line from a data file, so it
+    // is validated like every other value the receipt is trusted for.
+    if (r.archived_written != null && typeof r.archived_written !== "boolean")
+      throw new RefreshError(
+        "refresh-receipt-shape",
+        `record ${r.key}: archived_written must be a boolean, got ${JSON.stringify(r.archived_written)}`,
+      );
+    // A revert WRITES this value back into a data file, so it is validated
+    // exactly as strictly as the record rule validates source_archived.
+    if (
+      r.previous_archived != null &&
+      !isAbsoluteHttpUrl(r.previous_archived)
+    )
+      throw new RefreshError(
+        "refresh-receipt-shape",
+        `record ${r.key}: previous_archived must be an absolute http(s) URL, got ${JSON.stringify(r.previous_archived)}`,
+      );
   }
 }
 
@@ -454,7 +584,20 @@ export function revertUnit(
         "refresh-revert-drift",
         `record ${r.key} in ${file} now reads verified ${probe.previous}, not the ${r.new_verified} this receipt wrote; another unit has already changed it`,
       );
-    pending.set(file, probe.text);
+    // Only a field THIS receipt wrote comes off: a snapshot an earlier refresh
+    // captured is not this revert's to take away. `file` came through
+    // assertDataFile above, the same containment check the stamp path applies,
+    // so a hand-written archived_written cannot redirect a delete outside data/.
+    // Three cases, not two. INSERTED by this run -> remove it. REPLACED by
+    // this run -> put back exactly what it overwrote. Neither -> leave alone.
+    pending.set(
+      file,
+      r.archived_written === true
+        ? clearRecordArchived(probe.text, r.key)
+        : typeof r.previous_archived === "string"
+          ? setRecordArchived(probe.text, r.key, r.previous_archived).text
+          : probe.text,
+    );
   }
 
   for (const p of receipt.pages ?? []) {
@@ -479,4 +622,3 @@ export function revertUnit(
     fs.writeFileSync(nodePath.join(root, rel), text);
   return { restored: [...pending.keys()].sort() };
 }
-

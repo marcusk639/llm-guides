@@ -1,5 +1,6 @@
 import { isValidIsoDate } from "./ledger.mjs";
 import { isIndexableFieldValue } from "./data.mjs";
+import { isAbsoluteHttpUrl } from "./paths.mjs";
 
 // tools/corpus/verify-records.mjs
 // Record-level checks the contract assigns to the Verify stage: things lint
@@ -48,6 +49,15 @@ export function checkRecordFields(record) {
     issues.push({
       rule: "record-verified-invalid",
       message: `record ${record.key}: verified must be a quoted real date written YYYY-MM-DD; got ${JSON.stringify(record.verified)}`,
+    });
+  }
+  if (
+    record.source_archived != null &&
+    !isAbsoluteHttpUrl(record.source_archived)
+  ) {
+    issues.push({
+      rule: "record-archived-invalid",
+      message: `record ${record.key}: source_archived must be an absolute http(s) URL; got ${JSON.stringify(record.source_archived)}`,
     });
   }
   return issues;
