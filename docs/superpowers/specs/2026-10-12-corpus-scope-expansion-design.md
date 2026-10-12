@@ -1,7 +1,8 @@
 ---
 title: Corpus Scope Expansion — Design
 date: 2026-10-12
-status: draft
+revised: 2026-10-12
+status: approved
 ---
 
 # Corpus Scope Expansion — Design
@@ -54,12 +55,13 @@ has already spent most of the allowance. Using the roadmap's own figure of
 | Addition              | Pages | Cost          |
 | --------------------- | ----- | ------------- |
 | `security`            | ~3    | ~0.9 h/yr     |
-| Per-provider practice | ~4    | ~1.2 h/yr     |
+| Per-provider practice | 3     | ~0.9 h/yr     |
 | Skills                | 1     | ~0.3 h/yr     |
-| **Total**             | ~8    | **~2.4 h/yr** |
+| **Total**             | ~7    | **~2.1 h/yr** |
 
-Headroom after Stage 4 is 48 − 44 = **4 h/yr**. This fits, with ~1.6 h/yr
-left. It only fits because every page below is evergreen and carries **no
+Headroom after Stage 4 is 48 − 44 = **4 h/yr**. This fits, with ~1.9 h/yr
+left — which is the budget the vendors named in Decision 2 as _later_ additions
+will draw on, at ~0.3 h/yr each. It only fits because every page below is evergreen and carries **no
 `data/` records**. The moment one of them carries a high-volatility value it
 moves onto the 30-day clock and the arithmetic collapses — that is finding F2,
 and it is the reason each decision below states its record posture explicitly.
@@ -104,9 +106,11 @@ about long-running loops.
 injection, the control surfaces, the blast-radius model. See "Deliberately
 absent" for why an advisory database is excluded.
 
-**This is a contract change.** `CLAUDE.md` states that adding a topic is a
-contract change, so this decision needs the owner's sign-off before any page
-is written, independently of the rest of this spec.
+**Decided by the owner on 2026-10-12: `security` owns its own topic, and
+`harness` keeps its own.** `CLAUDE.md` makes adding a topic a contract change,
+so this is the sign-off that authorises it. Neither topic absorbs the other,
+which means the boundary between them has to be maintained rather than
+avoided — see Risks.
 
 ## Decision 2: provider practice is a separate page from provider facts
 
@@ -129,6 +133,20 @@ like the same subject and have opposite maintenance profiles.
 looking for "how do I work with this vendor" goes to that vendor, not to a
 cross-cutting topic. The facts page links to it; it links back and states no
 figures itself.
+
+**Which vendors, decided 2026-10-12.** Three to start: Anthropic, OpenAI and
+Google Gemini — the same three the corpus already weights its facts coverage
+toward, so each practice page has a facts page to sit beside and link to.
+
+**More will follow, and the pattern must absorb them without a redesign.**
+Qwen, Ollama and others are expected later. Two notes for whoever adds them.
+Each costs ~0.3 h/yr and draws on the ~1.9 h/yr this spec leaves, so the
+budget is checked at each addition rather than assumed to hold. And the
+smaller vendors do not map one-to-one onto the first three: Qwen is a model
+family the corpus already covers under `providers/open-weight.md`, and Ollama
+is a local runtime rather than a vendor at all. Whether those get their own
+practice pages or a section on an existing one is a question for the page that
+owns them, not a precedent this spec sets.
 
 ## Decision 3: where skills live depends on an answer the corpus does not have
 
@@ -182,18 +200,22 @@ puts it. Treating the placement as open is cheaper than placing it twice.
   taxonomy's promise and the corpus's contents wider, not narrower, until the
   research cycle runs.
 
-## Open questions
+## Resolved questions
 
-1. Does `security` earn its own topic, or does `harness` absorb it? Decision 1
-   argues for separate on a different-failure-model basis; the counter-argument
-   is a smaller taxonomy and no boundary to police. Taxonomy changes are
-   contract changes, so this one is the owner's.
-2. Which vendors get practice pages? The facts layer covers four. Practice for
-   all four doubles that page count; practice for the two largest keeps the
-   budget headroom closer to 2.5 h/yr.
-3. Should per-provider practice instead live under `prompting` as one
-   comparative page rather than one page per vendor? A single page compares
-   better and costs less; per-vendor pages are easier to find and easier to
-   refresh independently.
-4. Does anything here outrank the remaining roadmap stages? This spec assumes
-   it is additive to Stages 2-4, not a reordering of them.
+All four were open in the first draft and were decided by the owner on
+2026-10-12. Recorded so the reasoning survives, not so they can be retaken.
+
+1. **Does `security` earn its own topic, or does `harness` absorb it?** Its
+   own, and `harness` keeps its own. The different-failure-model argument in
+   Decision 1 carried: operating a trusted agent over time and defending
+   against adversarial input are different problems with different readers.
+   The accepted cost is a boundary that must be policed rather than avoided.
+2. **Which vendors get practice pages?** Anthropic, OpenAI and Google Gemini
+   to start, with Qwen, Ollama and others expected later. This is one page
+   fewer than the first draft assumed, which is where the budget gained its
+   extra headroom.
+3. **Should practice instead be one comparative page under `prompting`?** No.
+   Per-vendor pages stay, so each sits beside the facts page it belongs to and
+   refreshes independently of the others.
+4. **Does anything here outrank the remaining roadmap stages?** No — purely
+   additive to Stages 2-4, not a reordering.
