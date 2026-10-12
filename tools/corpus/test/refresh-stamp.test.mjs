@@ -1284,3 +1284,65 @@ test("assertReceiptShape rejects a non-URL previous_archived", () => {
     rule: "refresh-receipt-shape",
   });
 });
+
+// I1 (final review, re-graded Critical by effect): recordArchivedPattern requires
+// a bare value to EOL, so a trailing comment or an apostrophe in the URL did not
+// match and fell through to the INSERT branch, producing two source_archived keys
+// in one mapping. js-yaml rejects that outright, so loadRecords throws and render,
+// lint, verify, ledger, site and every refresh mode crash until a human finds it.
+// setRecordVerified fails CLOSED on an unmatched line; this failed OPEN, into
+// corruption.
+const archYaml = (line) =>
+  `# top
+records:
+  - key: a.one
+    value: "1"
+    volatility: high
+    source: https://example.com/a
+${line}
+    verified: "2026-01-01"
+    tags: [t]
+`;
+
+test("setRecordArchived never writes a second source_archived key", () => {
+  for (const line of [
+    "    source_archived: https://archive.example/old",
+    '    source_archived: "https://archive.example/old"',
+  ]) {
+    const out = setRecordArchived(
+      archYaml(line),
+      "a.one",
+      "https://archive.example/NEW",
+    ).text;
+    assert.equal(
+      (out.match(/^ {4}source_archived:/gm) ?? []).length,
+      1,
+      `duplicated the key for: ${line}`,
+    );
+  }
+});
+
+test("setRecordArchived fails closed when the field is present but unparseable", () => {
+  for (const line of [
+    "    source_archived: https://archive.example/old # captured 2026-10-01",
+    "    source_archived: https://web.archive.org/web/2026/https://x.test/a'b",
+  ]) {
+    assert.throws(
+      () =>
+        setRecordArchived(
+          archYaml(line),
+          "a.one",
+          "https://archive.example/NEW",
+        ),
+      { rule: "refresh-record-archived-unparseable" },
+      `should have failed closed for: ${line}`,
+    );
+  }
+});
+
+test("clearRecordArchived removes the field even with a trailing comment", () => {
+  const line =
+    "    source_archived: https://archive.example/old # captured 2026-10-01";
+  const out = clearRecordArchived(archYaml(line), "a.one");
+  assert.equal((out.match(/^ {4}source_archived:/gm) ?? []).length, 0);
+});

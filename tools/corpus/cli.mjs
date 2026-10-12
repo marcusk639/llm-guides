@@ -47,14 +47,13 @@ import { workOrder, renderWorkOrder } from "./refresh-order.mjs";
 import {
   parseArtifact,
   renderArtifactSkeleton,
-  validateArtifact,
 } from "./refresh-artifact.mjs";
 import { stampUnit, revertUnit } from "./refresh-stamp.mjs";
 import { siteCorpus } from "./site.mjs";
 import { collectCitations } from "./citations.mjs";
 import { auditCitations } from "./sources.mjs";
 import { summarise, formatText, formatJson } from "./sources-report.mjs";
-import { captureOne, applyCaptures } from "./archive.mjs";
+import { archiveArtifact } from "./archive.mjs";
 
 function loadTopics(root) {
   const file = path.join(root, "meta", "taxonomy.yaml");
@@ -575,63 +574,20 @@ async function main(argv) {
         );
         process.exit(2);
       }
-      const artifactPath = path.join(root, artifactRel);
-      // Containment by RESOLUTION, not by a startsWith on the given string:
-      // "research/../data/x.yaml" passes a prefix test while resolving out of
-      // research/. Same reasoning as dataFileRel's check in refresh-artifact.
-      const researchDir = path.resolve(root, "research");
-      if (!path.resolve(artifactPath).startsWith(researchDir + path.sep)) {
-        console.error(
-          `corpus: ${artifactRel} [refresh-artifact-outside-research] --archive writes refresh artifacts under research/ only, never data/ or guides/`,
-        );
-        process.exit(2);
-      }
-      if (!fs.existsSync(artifactPath)) {
-        console.error(
-          `corpus: ${artifactRel} [refresh-artifact-not-found] no such file`,
-        );
-        process.exit(2);
-      }
-      const text = fs.readFileSync(artifactPath, "utf8");
-      const { data } = parseArtifact(text);
-      // Validate BEFORE the capture loop: an invalid target should not cost a
-      // round of third-party submissions, and must never reach the write.
-      if (data?.kind !== "refresh") {
-        console.error(
-          `corpus: ${artifactRel} [refresh-artifact-kind] kind must be "refresh", got ${JSON.stringify(data?.kind)}`,
-        );
-        process.exit(2);
-      }
-      if (data.path !== artifactRel) {
-        console.error(
-          `corpus: ${artifactRel} [refresh-artifact-path-mismatch] but the artifact's own path field says ${JSON.stringify(data.path)}`,
-        );
-        process.exit(2);
-      }
-      const artifactIssues = validateArtifact(data);
-      if (artifactIssues.length > 0) {
-        for (const i of artifactIssues) {
-          console.error(`${artifactRel} [${i.rule}] ${i.message}`);
-        }
-        process.exit(2);
-      }
-      const captures = [];
-      for (const entry of data?.records ?? []) {
-        const c = await captureOne(entry.url);
-        captures.push({ key: entry.key, ...c });
-        console.error(
-          `${entry.key}: ${c.archive_outcome}${c.error ? ` (${c.error})` : ""}`,
-        );
-      }
-      const today = new Date().toISOString().slice(0, 10);
-      const next = applyCaptures(text, captures, { today });
-      // A failed write is a fact about this machine, not about a third party:
-      // exit 1. A refused capture is a finding and must not fail the command.
+      // Every guard lives in archiveArtifact so it is testable offline; this
+      // branch only maps its outcome onto exit codes. A failed write is a fact
+      // about this machine (exit 1); every other refusal is a usage error (2).
       try {
-        fs.writeFileSync(artifactPath, next);
+        await archiveArtifact(root, artifactRel, {
+          onProgress: (key, c) =>
+            console.error(
+              `${key}: ${c.archive_outcome}${c.error ? ` (${c.error})` : ""}`,
+            ),
+        });
       } catch (e) {
-        console.error(`corpus: could not write ${artifactRel}: ${e.message}`);
-        process.exit(1);
+        if (!(e instanceof RefreshError)) throw e;
+        console.error(`corpus: ${artifactRel} [${e.rule}] ${e.message}`);
+        process.exit(e.rule === "refresh-artifact-write-failed" ? 1 : 2);
       }
       console.log(`archived: ${artifactRel}`);
       process.exit(0);

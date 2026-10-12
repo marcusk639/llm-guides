@@ -121,6 +121,15 @@ export function setRecordVerified(yamlText, key, date) {
 const recordArchivedPattern = (indent) =>
   new RegExp(`^(${indent}source_archived:\\s*)(["']?)([^"'\\s]*)\\2([ \\t]*)$`);
 
+// Presence of the KEY at the field indent, independent of whether the value
+// parses. Replace-vs-insert is decided on this; the strict pattern above is
+// then used only to preserve quote style. Deciding on the strict pattern made
+// a trailing comment or an apostrophe in the URL fall through to the insert
+// branch and write a SECOND source_archived key, which js-yaml rejects
+// outright -- so a legal data file became unloadable by every command.
+const recordArchivedKeyPattern = (indent) =>
+  new RegExp(`^${indent}source_archived:`);
+
 // `source:` at the field indent, and never `source_archived:` — the `_` after
 // `source` cannot satisfy the colon this pattern requires.
 const recordSourcePattern = (indent) => new RegExp(`^${indent}source:\\s`);
@@ -138,9 +147,18 @@ function archiveRange(yamlText, key) {
 export function setRecordArchived(yamlText, key, url) {
   const { lines, start, end, indent } = archiveRange(yamlText, key);
   const ARCHIVED = recordArchivedPattern(indent);
+  const ARCHIVED_KEY = recordArchivedKeyPattern(indent);
   for (let i = start; i < end; i++) {
+    if (!ARCHIVED_KEY.test(lines[i])) continue;
     const m = ARCHIVED.exec(lines[i]);
-    if (m === null) continue;
+    // The key is here but the value is not one this can rewrite safely. Fail
+    // closed, the way setRecordVerified does for a date: inserting instead
+    // would duplicate the key and corrupt the file.
+    if (m === null)
+      throw new RefreshError(
+        "refresh-record-archived-unparseable",
+        `record ${key} has a source_archived: line this cannot rewrite (a trailing comment, or a quote inside the value): ${JSON.stringify(lines[i].trim())}`,
+      );
     // Hand back what was overwritten. Without it the receipt cannot tell a
     // field this run INSERTED from one it REPLACED, and --revert deletes a
     // snapshot an earlier refresh captured. Mirrors setPageResearch.
@@ -166,9 +184,12 @@ export function setRecordArchived(yamlText, key, url) {
 
 export function clearRecordArchived(yamlText, key) {
   const { lines, start, end, indent } = archiveRange(yamlText, key);
-  const ARCHIVED = recordArchivedPattern(indent);
+  // Key-based, like setRecordArchived: a field with a trailing comment is
+  // still the field, and leaving it behind would strand a snapshot the
+  // receipt says was removed.
+  const ARCHIVED_KEY = recordArchivedKeyPattern(indent);
   for (let i = start; i < end; i++) {
-    if (ARCHIVED.exec(lines[i]) === null) continue;
+    if (!ARCHIVED_KEY.test(lines[i])) continue;
     lines.splice(i, 1);
     return lines.join("\n");
   }
