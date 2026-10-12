@@ -16,6 +16,7 @@ const RULES = [
   "refresh-archive-outcome",
   "refresh-archive-url",
   "refresh-archive-date",
+  "refresh-record-archived-unparseable",
 ];
 
 for (const rule of RULES) {
