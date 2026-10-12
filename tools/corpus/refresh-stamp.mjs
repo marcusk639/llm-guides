@@ -9,6 +9,7 @@ import fs from "node:fs";
 import nodePath from "node:path";
 import { parseFrontmatter } from "./frontmatter.mjs";
 import { isValidIsoDate } from "./ledger.mjs";
+import { isAbsoluteHttpUrl } from "./paths.mjs";
 import {
   dataFileRel,
   validateArtifact,
@@ -140,8 +141,12 @@ export function setRecordArchived(yamlText, key, url) {
   for (let i = start; i < end; i++) {
     const m = ARCHIVED.exec(lines[i]);
     if (m === null) continue;
+    // Hand back what was overwritten. Without it the receipt cannot tell a
+    // field this run INSERTED from one it REPLACED, and --revert deletes a
+    // snapshot an earlier refresh captured. Mirrors setPageResearch.
+    const previous = m[3];
     lines[i] = `${m[1]}${m[2]}${url}${m[2]}${m[4]}`;
-    return lines.join("\n");
+    return { text: lines.join("\n"), added: false, previous };
   }
   // Absent: insert one line immediately after the record's own `source:` line,
   // so the snapshot sits beside the URL it is a snapshot of.
@@ -149,7 +154,7 @@ export function setRecordArchived(yamlText, key, url) {
   for (let i = start; i < end; i++) {
     if (!SOURCE.test(lines[i])) continue;
     lines.splice(i + 1, 0, `${indent}source_archived: ${url}`);
-    return lines.join("\n");
+    return { text: lines.join("\n"), added: true, previous: null };
   }
   // Fail closed rather than guess a position: `source` is contract-required, and
   // a record with none has no citation to have archived in the first place.
@@ -348,8 +353,11 @@ export function stampUnit(
       entry.archive_outcome === "captured" &&
       typeof entry.archived === "string" &&
       entry.archived !== "";
-    if (archivedWritten)
-      nextText = setRecordArchived(nextText, entry.key, entry.archived);
+    let archivedSet = null;
+    if (archivedWritten) {
+      archivedSet = setRecordArchived(nextText, entry.key, entry.archived);
+      nextText = archivedSet.text;
+    }
     pending.set(file, nextText);
     recordReceipts.push({
       key: entry.key,
@@ -357,8 +365,18 @@ export function stampUnit(
       previous_verified: previous,
       new_verified: entry.read,
       // Only on the entries it applies to, so a receipt from a run with no
-      // captures has exactly the shape it always had.
-      ...(archivedWritten ? { archived_written: true } : {}),
+      // captures has exactly the shape it always had. `archived_written` is
+      // now ADDED, not merely "we wrote something": a replace carries the
+      // overwritten URL instead, because deleting it on revert would destroy
+      // an earlier refresh's snapshot that this run never owned.
+      ...(archivedWritten
+        ? {
+            archived_written: archivedSet.added,
+            ...(archivedSet.added
+              ? {}
+              : { previous_archived: archivedSet.previous }),
+          }
+        : {}),
     });
   }
 
@@ -468,6 +486,16 @@ function assertReceiptShape(receipt) {
         "refresh-receipt-shape",
         `record ${r.key}: archived_written must be a boolean, got ${JSON.stringify(r.archived_written)}`,
       );
+    // A revert WRITES this value back into a data file, so it is validated
+    // exactly as strictly as the record rule validates source_archived.
+    if (
+      r.previous_archived != null &&
+      !isAbsoluteHttpUrl(r.previous_archived)
+    )
+      throw new RefreshError(
+        "refresh-receipt-shape",
+        `record ${r.key}: previous_archived must be an absolute http(s) URL, got ${JSON.stringify(r.previous_archived)}`,
+      );
   }
 }
 
@@ -539,11 +567,15 @@ export function revertUnit(
     // captured is not this revert's to take away. `file` came through
     // assertDataFile above, the same containment check the stamp path applies,
     // so a hand-written archived_written cannot redirect a delete outside data/.
+    // Three cases, not two. INSERTED by this run -> remove it. REPLACED by
+    // this run -> put back exactly what it overwrote. Neither -> leave alone.
     pending.set(
       file,
       r.archived_written === true
         ? clearRecordArchived(probe.text, r.key)
-        : probe.text,
+        : typeof r.previous_archived === "string"
+          ? setRecordArchived(probe.text, r.key, r.previous_archived).text
+          : probe.text,
     );
   }
 
