@@ -47,6 +47,7 @@ import { workOrder, renderWorkOrder } from "./refresh-order.mjs";
 import {
   parseArtifact,
   renderArtifactSkeleton,
+  validateArtifact,
 } from "./refresh-artifact.mjs";
 import { stampUnit, revertUnit } from "./refresh-stamp.mjs";
 import { siteCorpus } from "./site.mjs";
@@ -575,6 +576,16 @@ async function main(argv) {
         process.exit(2);
       }
       const artifactPath = path.join(root, artifactRel);
+      // Containment by RESOLUTION, not by a startsWith on the given string:
+      // "research/../data/x.yaml" passes a prefix test while resolving out of
+      // research/. Same reasoning as dataFileRel's check in refresh-artifact.
+      const researchDir = path.resolve(root, "research");
+      if (!path.resolve(artifactPath).startsWith(researchDir + path.sep)) {
+        console.error(
+          `corpus: ${artifactRel} [refresh-artifact-outside-research] --archive writes refresh artifacts under research/ only, never data/ or guides/`,
+        );
+        process.exit(2);
+      }
       if (!fs.existsSync(artifactPath)) {
         console.error(
           `corpus: ${artifactRel} [refresh-artifact-not-found] no such file`,
@@ -583,6 +594,27 @@ async function main(argv) {
       }
       const text = fs.readFileSync(artifactPath, "utf8");
       const { data } = parseArtifact(text);
+      // Validate BEFORE the capture loop: an invalid target should not cost a
+      // round of third-party submissions, and must never reach the write.
+      if (data?.kind !== "refresh") {
+        console.error(
+          `corpus: ${artifactRel} [refresh-artifact-kind] kind must be "refresh", got ${JSON.stringify(data?.kind)}`,
+        );
+        process.exit(2);
+      }
+      if (data.path !== artifactRel) {
+        console.error(
+          `corpus: ${artifactRel} [refresh-artifact-path-mismatch] but the artifact's own path field says ${JSON.stringify(data.path)}`,
+        );
+        process.exit(2);
+      }
+      const artifactIssues = validateArtifact(data);
+      if (artifactIssues.length > 0) {
+        for (const i of artifactIssues) {
+          console.error(`${artifactRel} [${i.rule}] ${i.message}`);
+        }
+        process.exit(2);
+      }
       const captures = [];
       for (const entry of data?.records ?? []) {
         const c = await captureOne(entry.url);

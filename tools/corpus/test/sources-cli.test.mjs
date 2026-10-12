@@ -72,3 +72,105 @@ test("sources --archive with a missing artifact exits 2 and names the rule", () 
   assert.equal(r.code, 2);
   assert.match(r.err, /refresh-artifact-not-found/);
 });
+
+// C1 (final review): --archive took any --artifact path, parsed it, and wrote
+// dumpArtifact() back over it. Pointed at data/*.yaml it prepended "---\nnull\n---"
+// and round-tripped a file whose top-of-file comments the contract requires;
+// pointed at guides/ it reformatted a page's front-matter; pointed at ../ it
+// wrote outside the corpus. All three exited 0 printing "archived: <path>".
+function archiveCorpus(artifactRel, artifactBody, extra = {}) {
+  const root = emptyCorpus();
+  for (const [rel, body] of Object.entries({
+    [artifactRel]: artifactBody,
+    ...extra,
+  })) {
+    const p = path.join(root, rel);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, body);
+  }
+  return root;
+}
+
+const DATA_YAML = `# Contract-required comment at the top of this file.
+records:
+  - key: a.one
+    value: "1"
+    volatility: high
+    source: https://example.com/a
+    verified: "2026-01-01"
+    tags: [t]
+`;
+
+const GUIDE_MD = `---
+title: One
+verified: "2026-09-01"
+---
+
+body
+`;
+
+test("--archive refuses a data/ file and leaves it byte-identical", () => {
+  const root = archiveCorpus("data/x.yaml", DATA_YAML);
+  const r = run(["sources", "--archive", "--artifact=data/x.yaml", "."], root);
+  assert.equal(r.code, 2);
+  assert.equal(fs.readFileSync(path.join(root, "data/x.yaml"), "utf8"), DATA_YAML);
+});
+
+test("--archive refuses a guides/ page and leaves it byte-identical", () => {
+  const root = archiveCorpus("guides/t/one.md", GUIDE_MD);
+  const r = run(
+    ["sources", "--archive", "--artifact=guides/t/one.md", "."],
+    root,
+  );
+  assert.equal(r.code, 2);
+  assert.equal(
+    fs.readFileSync(path.join(root, "guides/t/one.md"), "utf8"),
+    GUIDE_MD,
+  );
+});
+
+test("--archive refuses a path that escapes the corpus root", () => {
+  const root = archiveCorpus("research/t/a.md", "---\nkind: refresh\n---\n");
+  const outside = path.join(root, "..", `outside-${path.basename(root)}.md`);
+  fs.writeFileSync(outside, "untouched\n");
+  const r = run(
+    [
+      "sources",
+      "--archive",
+      `--artifact=../${path.basename(outside)}`,
+      ".",
+    ],
+    root,
+  );
+  assert.equal(r.code, 2);
+  assert.equal(fs.readFileSync(outside, "utf8"), "untouched\n");
+  fs.rmSync(outside);
+});
+
+test("--archive refuses a research/ file that is not kind: refresh", () => {
+  const body = "---\nkind: notes\npath: research/t/a.md\n---\n\nbody\n";
+  const root = archiveCorpus("research/t/a.md", body);
+  const r = run(
+    ["sources", "--archive", "--artifact=research/t/a.md", "."],
+    root,
+  );
+  assert.equal(r.code, 2);
+  assert.equal(
+    fs.readFileSync(path.join(root, "research/t/a.md"), "utf8"),
+    body,
+  );
+});
+
+test("--archive refuses an artifact whose own path field disagrees", () => {
+  const body = "---\nkind: refresh\npath: research/t/other.md\n---\n\nbody\n";
+  const root = archiveCorpus("research/t/a.md", body);
+  const r = run(
+    ["sources", "--archive", "--artifact=research/t/a.md", "."],
+    root,
+  );
+  assert.equal(r.code, 2);
+  assert.equal(
+    fs.readFileSync(path.join(root, "research/t/a.md"), "utf8"),
+    body,
+  );
+});
