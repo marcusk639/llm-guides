@@ -182,3 +182,40 @@ test("a literal is not satisfied by the record's own key or lint config", () => 
   assert.equal(checkLintLiteralsStale(viaFile).length, 1, "file must not satisfy a literal");
 });
 
+
+const archivedIssues = (record) =>
+  checkRecordFields(record).filter((i) => i.rule === "record-archived-invalid");
+
+test("an absent source_archived is not an issue", () => {
+  assert.deepEqual(archivedIssues(rec("x.one")), []);
+});
+
+test("an absolute https source_archived is accepted", () => {
+  assert.deepEqual(
+    archivedIssues(
+      rec("x.one", "models.yaml", {
+        source_archived: "https://archive.example/w/1/x",
+      }),
+    ),
+    [],
+  );
+});
+
+test("a relative, scheme-less, non-http or non-string source_archived is an issue", () => {
+  for (const bad of [
+    "./snap.html",
+    "/snap",
+    "archive.example/snap",
+    "mailto:a@b.c",
+    "ftp://example.com/x",
+    42,
+    ["https://archive.example/x"],
+  ]) {
+    assert.equal(
+      archivedIssues(rec("x.one", "models.yaml", { source_archived: bad }))
+        .length,
+      1,
+      `expected one issue for ${JSON.stringify(bad)}`,
+    );
+  }
+});

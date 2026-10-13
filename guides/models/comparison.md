@@ -2,9 +2,8 @@
 title: Comparing models across vendors
 summary: >-
   A dated side-by-side of hosted frontier models from Anthropic, OpenAI and
-  Google and open-weight models from Meta Llama and Alibaba Qwen: ids, stated
-  limits, list prices, parameter counts and licences, each copied from the
-  vendor's own page. Also covers why the columns are less comparable than they
+  Google: ids, stated limits and list prices, each copied from the vendor's own
+  page. Open-weight models have their own page. Also covers why the columns are less comparable than they
   look, how to pull the live figures from each vendor's API, and how to choose
   without trusting a leaderboard.
 topic: models
@@ -12,7 +11,7 @@ verified: 2026-10-06
 applies_to:
   - "Anthropic Claude API, OpenAI API and Google Gemini API documentation as published on 2026-10-06"
   - "Hugging Face model cards in the meta-llama and Qwen organisations as published on 2026-10-06"
-  - "Rows: Claude Fable 5.1, Claude Opus 5.5, Claude Haiku 4.5; GPT-6 Astra, GPT-5.6 Terra, GPT-5.6 Luna; Gemini 3.8 Flash, Gemini 3.1 Pro Preview, Gemini 3.5 Flash-Lite; Llama 4 Maverick, Llama 4 Scout; Qwen3.8-2.4T-A95B, Qwen3.8-27B"
+  - "Rows: Claude Fable 5.1, Claude Opus 5.5, Claude Haiku 4.5; GPT-6 Astra, GPT-5.6 Terra, GPT-5.6 Luna; Gemini 3.8 Flash, Gemini 3.1 Pro Preview, Gemini 3.5 Flash-Lite"
 sources:
   - https://platform.claude.com/docs/en/models/overview
   - https://platform.claude.com/docs/en/about-claude/pricing
@@ -22,12 +21,9 @@ sources:
   - https://ai.google.dev/gemini-api/docs/models
   - https://ai.google.dev/gemini-api/docs/pricing
   - https://ai.google.dev/api/models
-  - https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct
-  - https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct
-  - https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B
-  - https://huggingface.co/Qwen/Qwen3.8-27B
 related:
-  - guides/models/claude-models.md
+  - guides/providers/anthropic.md
+  - guides/providers/open-weight.md
   - guides/context/context-management.md
 research: research/models/2026-10-06-claude-models-comparison-refresh.md
 seed: true
@@ -37,7 +33,7 @@ seed: true
 
 ## 1. What this covers / who it's for
 
-A small, dated comparison of current models from three hosted APIs (Anthropic, OpenAI, Google) and two open-weight families (Meta Llama, Alibaba Qwen), limited to what each vendor states on its own pages. It is not a ranking and has no benchmark scores.
+A small, dated comparison of current models from three hosted APIs (Anthropic, OpenAI, Google) and two open-weight families (Meta Llama, Alibaba Qwen), limited to what each vendor states on its own pages. The open-weight rows now live on [Open-weight models](../providers/open-weight.md), which refreshes on a slower cadence; this page keeps the discussion of how the two kinds compare. It is not a ranking and has no benchmark scores.
 For anyone shortlisting models for a project or estimating cost across providers. Beginners can stop after section 2; section 5 is for people who will actually switch vendors.
 
 ## 2. The 60-second version
@@ -89,24 +85,13 @@ Hosted models, as published on the verification date. Prices are base paid-tier 
 | OpenAI | GPT-5.6 Luna | gpt-5.6-luna | 1,050,000 tokens |  | 128,000 tokens | $0.20 / MTok | $1.20 / MTok | Prompts with >272K input tokens are priced at 2x input and 1.5x output for the full request. |
 <!-- /corpus:table -->
 
-Open-weight models, as stated in each official model card on the verification date. There is no price column: what you pay depends on where and how you run the weights.
-
-<!-- corpus:table fields=vendor,name,model_id,parameters,context_length,licence,notes headers="Vendor,Model,Model ID,Parameters,Context length,Licence,Notes" sort=vendor tag=comparison-open-weight -->
-| Vendor | Model | Model ID | Parameters | Context length | Licence | Notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| Alibaba Qwen | Qwen3.8-2.4T-A95B | Qwen/Qwen3.8-2.4T-A95B | 2.4T in total and 95B activated | 262,144 natively and extensible up to 1,010,000 tokens | Qwen3.8-Max License |  |
-| Alibaba Qwen | Qwen3.8-27B | Qwen/Qwen3.8-27B | 27B | 262,144 natively and extensible up to 1,000,000 tokens | Apache License 2.0 | Hugging Face lists this repository's pipeline_tag as image-text-to-text rather than text-generation, and the model card carries a VL Performance section beside its Text Performance section. Whether the vendor states a text-only output modality is not established by the pages read on 2026-10-06. |
-| Meta | Llama 4 Maverick | meta-llama/Llama-4-Maverick-17B-128E-Instruct | 17B (Activated), 400B (Total) | 1M | Llama 4 Community License Agreement |  |
-| Meta | Llama 4 Scout | meta-llama/Llama-4-Scout-17B-16E-Instruct | 17B (Activated), 109B (Total) | 10M | Llama 4 Community License Agreement |  |
-<!-- /corpus:table -->
-
 If a table and the vendor page it came from disagree, the vendor page wins. Section 8 lists every page.
 
 ## 3. How it actually works
 
 **"Context" is not one column across vendors.** Anthropic's overview states a context window. Google's model pages state an input token limit and an output token limit, with no separate window. OpenAI's model pages state a context window and a maximum output, but no separate maximum input. The table keeps these in separate columns rather than forcing one number per model, which is why cells are blank. A blank cell means the documentation page this row cites states no such figure — not that it is unlimited, and not that it may be derived: subtracting a max output from a context window yields a number the vendor never stated. Anthropic is a case worth knowing: its doc table states only a context window and a max output, but its Models API does return a per-model `max_input_tokens`, so the figure exists at runtime even though no page tabulates it. Read it from the endpoint in section 2 rather than inferring it here. Do not read Google's input limit and Anthropic's context window as the same measurement.
 
-**Model ids behave differently per vendor.** OpenAI's model pages name a "default snapshot" per model. Google's pages list a version per model labelled Stable or Preview, and document a separate model-version pattern page. Anthropic's overview states that every current Claude id is a pinned snapshot (see [Claude models](claude-models.md)). The id string alone does not tell you whether it will change under you; each vendor's own page does.
+**Model ids behave differently per vendor.** OpenAI's model pages name a "default snapshot" per model. Google's pages list a version per model labelled Stable or Preview, and document a separate model-version pattern page. Anthropic's overview states that every current Claude id is a pinned snapshot (see [Claude models](../providers/anthropic.md)). The id string alone does not tell you whether it will change under you; each vendor's own page does.
 
 **Prices are tiered in different ways.** All three hosted vendors bill input and output tokens separately, and output costs more than input on every row in the table. Beyond that the rules diverge: OpenAI's model pages bill the whole request at higher rates once the prompt crosses a stated size; Google's Pro Preview row has a prompt-size price step and Gemini 3.8 Flash has a dated price change; Anthropic's pricing page states that its current large-window models have no long-context surcharge. Google's pricing page also states that output prices include thinking tokens. The `notes` column carries the thresholds; the vendor pricing pages carry batch, cache and priority-tier rates, which this page deliberately does not copy.
 
@@ -116,7 +101,7 @@ If a table and the vendor page it came from disagree, the vendor page wins. Sect
 
 - OpenAI: GPT-6 Astra is "our flagship model for complex reasoning and coding"; choose GPT-5.6 Terra "to balance intelligence and cost", or GPT-5.6 Luna "for cost-sensitive, high-volume workloads" ([OpenAI models](https://developers.openai.com/api/docs/models)).
 - Google: Gemini 3.8 Flash is "our most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and complex enterprise workflows"; Gemini 3.1 Pro (listed as Preview) offers "Advanced intelligence, complex problem-solving skills, and powerful agentic and vibe coding capabilities"; Gemini 3.5 Flash-Lite is "Our fastest, most cost-effective 3.5 model for high-throughput execution" ([Gemini models](https://ai.google.dev/gemini-api/docs/models)).
-- Anthropic: see [Claude models, section 3](claude-models.md#3-how-it-actually-works) for the overview's tier descriptions.
+- Anthropic: see [Claude models, section 3](../providers/anthropic.md#3-how-it-actually-works) for the overview's tier descriptions.
 - Meta: the Llama 4 card introduces Scout and Maverick as "two efficient models in the Llama 4 series", both mixture-of-experts.
 - Qwen: the Qwen3.8 cards describe the generation as "the most capable generation in the Qwen open-model family to date", and the largest card says it "brings a Qwen-Max-class model to open release".
 
@@ -134,7 +119,7 @@ Evidence: **Documented** for each vendor's description of its own models ([OpenA
 
 Tokenizers differ between vendors, and Anthropic documents that its own tokenizer changed between model generations, so the same prompt is a different number of tokens on different models. Reasoning or thinking tokens are billed as output on at least some rows (Google states this explicitly). A lower per-token price can still cost more per finished task. Run a representative task set on each candidate and compare total spend and success rate.
 
-Evidence: **Plausible** — inferred from per-token billing, the tokenizer note on the [Claude models overview](https://platform.claude.com/docs/en/models/overview) and the thinking-token note on the [Gemini pricing page](https://ai.google.dev/gemini-api/docs/pricing), read 2026-09-16. No vendor publishes a cross-vendor cost comparison. See also [Claude models, 4.4](claude-models.md#44-compare-cost-per-completed-task-not-price-per-token).
+Evidence: **Plausible** — inferred from per-token billing, the tokenizer note on the [Claude models overview](https://platform.claude.com/docs/en/models/overview) and the thinking-token note on the [Gemini pricing page](https://ai.google.dev/gemini-api/docs/pricing), read 2026-09-16. No vendor publishes a cross-vendor cost comparison. See also [Claude models, 4.4](../providers/anthropic.md#44-compare-cost-per-completed-task-not-price-per-token).
 
 ### 4.3 Read benchmark leaderboards for direction, and check the task matches yours
 
@@ -183,15 +168,11 @@ Evidence: **Plausible** — inferred from the cards' native-versus-extended cont
 | Gemini 3.8 Flash row       | `google.models.gemini-3-8-flash`                                                      | high       | Scheduled price change; new Flash releases                  |
 | Gemini 3.1 Pro Preview row | `google.models.gemini-3-1-pro-preview`                                                | high       | Preview status; a stable Pro may replace it                 |
 | Gemini 3.5 Flash-Lite row  | `google.models.gemini-3-5-flash-lite`                                                 | high       | Newer Flash-Lite generations                                |
-| Llama 4 Maverick row       | `meta.models.llama-4-maverick`                                                        | high       | A new Llama generation would supersede it                   |
-| Llama 4 Scout row          | `meta.models.llama-4-scout`                                                           | high       | Same                                                        |
-| Qwen3.8-2.4T-A95B row      | `qwen.models.qwen3-8-2-4t-a95b`                                                       | high       | Fast Qwen release cadence; licence terms                    |
-| Qwen3.8-27B row            | `qwen.models.qwen3-8-27b`                                                             | high       | Same                                                        |
-| Claude rows                | `anthropic.models.fable-5-1`, `anthropic.models.opus-5-5`, `anthropic.models.haiku-4-5` | high       | Owned by [Claude models](claude-models.md); refreshed there. The hosted row tracks the current Opus; Opus 5 is now legacy and is listed on that page, not here |
+| Claude rows                | `anthropic.models.fable-5-1`, `anthropic.models.opus-5-5`, `anthropic.models.haiku-4-5` | high       | Owned by [Claude models](../providers/anthropic.md); refreshed there. The hosted row tracks the current Opus; Opus 5 is now legacy and is listed on that page, not here |
 
 Re-check on refresh, against the pages in section 8, **which win whenever they and this page disagree**:
 
-- which models each vendor currently features (a new flagship or cheap tier means a new record; a demoted one means removing its `comparison-hosted` or `comparison-open-weight` tag);
+- which models each vendor currently features (a new flagship or cheap tier means a new record; a demoted one means removing its `comparison-hosted` tag);
 - every field in every record, including the `notes` thresholds and dates;
 - the untracked claims in sections 3–5: vendor self-descriptions, which limit each vendor states, Google's thinking-token and free-tier notes, OpenAI's whole-request threshold rule, Qwen's native-versus-extended context wording, and the licence summaries;
 - the leaderboard links in 4.3 (still live, still measuring what the page says).

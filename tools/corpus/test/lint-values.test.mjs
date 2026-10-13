@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findBareValues } from "../lint.mjs";
+import { findBareValues, urlRanges } from "../lint.mjs";
 
 const index = new Map([
   ["200K", ["example.model.context_window"]],
@@ -220,4 +220,29 @@ test("does not flag a literal in a URL-like link destination", () => {
 test("flags a literal run on after a bare URL through an em dash", () => {
   const body = "See https://a.example.invalid/x—claude-opus-5 here.";
   assert.equal(findBareValues(doc(body), urlIndex).length, 1);
+});
+
+test("urlRanges spans a bare URL, an autolink and a link destination", () => {
+  const text = [
+    "bare https://example.com/a and",
+    "auto <https://example.com/b> and",
+    "[text](https://example.com/c) end",
+  ].join("\n");
+  const spans = urlRanges(text).map(([a, b]) => text.slice(a, b));
+  // The bare-URL rule overlaps the autolink and link-destination rules, so
+  // urlRanges returns MORE ranges than there are distinct URLs (5 for these
+  // 3). That is by design: it is a skip-list for the bare-value scan, where
+  // overlap is harmless. It is also why any consumer that COLLECTS urls from
+  // it has to deduplicate -- which is what citations.mjs does in Task 2.
+  assert.deepEqual([...new Set(spans)].sort(), [
+    "https://example.com/a",
+    "https://example.com/b",
+    "https://example.com/c",
+  ]);
+  assert.ok(spans.length > 3, "overlapping ranges are expected, not a bug");
+});
+
+test("urlRanges does not span a non-URL link destination", () => {
+  const text = "call handlers[i](some-id) here";
+  assert.deepEqual(urlRanges(text), []);
 });

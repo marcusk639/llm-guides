@@ -178,7 +178,7 @@ records:
     context_length: 1M
     licence: Llama 4 Community License Agreement
     lint_fields: [model_id, parameters, context_length, licence]
-    volatility: high
+    volatility: medium
     source: https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct
     verified: "2026-10-06"
     tags: [comparison-open-weight]
@@ -191,7 +191,7 @@ records:
     context_length: 10M
     licence: Llama 4 Community License Agreement
     lint_fields: [model_id, parameters, context_length, licence]
-    volatility: high
+    volatility: medium
     source: https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct
     verified: "2026-10-06"
     tags: [comparison-open-weight]
@@ -205,7 +205,7 @@ records:
     context_length: 262,144 natively and extensible up to 1,010,000 tokens
     licence: Qwen3.8-Max License
     lint_fields: [model_id, parameters, context_length, licence]
-    volatility: high
+    volatility: medium
     source: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B
     licence_source: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B/blob/main/LICENSE
     verified: "2026-10-06"
@@ -226,7 +226,7 @@ records:
       - Qwen/Qwen3.8-27B
       - 262,144 natively and extensible up to 1,000,000 tokens
       - Apache License 2.0
-    volatility: high
+    volatility: medium
     source: https://huggingface.co/Qwen/Qwen3.8-27B
     licence_source: https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/LICENSE
     verified: "2026-10-06"

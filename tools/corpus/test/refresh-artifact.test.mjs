@@ -15,6 +15,7 @@ import {
   validateArtifact,
   withReceipt,
   withRevertMark,
+  ARCHIVE_OUTCOMES,
 } from "../refresh-artifact.mjs";
 
 const FIX = fileURLToPath(new URL("./fixtures/refresh/", import.meta.url));
@@ -383,4 +384,78 @@ test("a revert moves the receipt to reverted: and forces verdict blocked", () =>
   assert.equal("at" in RECEIPT, true);
   assert.deepEqual(reverted.reverted.records, RECEIPT.records);
   assert.deepEqual(reverted.reverted.pages, RECEIPT.pages);
+});
+
+test("an entry with no archive fields validates exactly as before", () => {
+  assert.deepEqual(validateArtifact(confirmed()), []);
+});
+
+test("a well-formed capture validates", () => {
+  const data = confirmed();
+  Object.assign(data.records[0], {
+    archived: "https://archive.example/w/1/x",
+    archive_outcome: "captured",
+    archive_read: "2026-10-08",
+  });
+  assert.deepEqual(validateArtifact(data), []);
+});
+
+test("refused and failed are legal outcomes without an archived URL", () => {
+  for (const outcome of ["refused", "failed"]) {
+    const data = confirmed();
+    Object.assign(data.records[0], {
+      archive_outcome: outcome,
+      archive_read: "2026-10-08",
+    });
+    assert.deepEqual(validateArtifact(data), [], `outcome ${outcome}`);
+  }
+});
+
+test("an out-of-vocabulary outcome is reported", () => {
+  const data = confirmed();
+  data.records[0].archive_outcome = "maybe";
+  assert.ok(
+    validateArtifact(data)
+      .map((i) => i.rule)
+      .includes("refresh-archive-outcome"),
+  );
+});
+
+test("a relative or non-http archived URL is reported", () => {
+  for (const bad of [
+    "./snap.html",
+    "archive.example/x",
+    "ftp://a.example/x",
+    7,
+  ]) {
+    const data = confirmed();
+    data.records[0].archived = bad;
+    data.records[0].archive_outcome = "captured";
+    assert.ok(
+      validateArtifact(data)
+        .map((i) => i.rule)
+        .includes("refresh-archive-url"),
+      `bad url ${JSON.stringify(bad)}`,
+    );
+  }
+});
+
+test("a malformed or future archive_read is reported", () => {
+  for (const bad of ["2026-13-01", "08-10-2026", "2099-01-01"]) {
+    const data = confirmed();
+    data.records[0].archive_outcome = "captured";
+    data.records[0].archived = "https://archive.example/x";
+    data.records[0].archive_read = bad;
+    assert.ok(
+      validateArtifact(data)
+        .map((i) => i.rule)
+        .includes("refresh-archive-date"),
+      `bad date ${bad}`,
+    );
+  }
+});
+
+test("ARCHIVE_OUTCOMES is frozen and holds exactly the three outcomes", () => {
+  assert.deepEqual([...ARCHIVE_OUTCOMES], ["captured", "refused", "failed"]);
+  assert.throws(() => ARCHIVE_OUTCOMES.push("x"));
 });

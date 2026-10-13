@@ -74,7 +74,7 @@ test("an unknown entry page raises rather than returning an empty unit", () => {
 test("the live model pages resolve to one unit", () => {
   const unit = resolveUnit(
     REPO,
-    "guides/models/claude-models.md",
+    "guides/providers/anthropic.md",
     repoRecords(),
   );
   assert.equal(
@@ -87,15 +87,30 @@ test("the live model pages resolve to one unit", () => {
   ]);
 });
 
+// The Stage 0 split decoupled the open-weight rows from the hosted table so
+// they refresh on the 90-day cadence. If they ever share a record with the
+// hosted set again, they silently rejoin its 30-day clock.
+test("the open-weight page is its own refresh unit", () => {
+  const unit = resolveUnit(REPO, "guides/providers/open-weight.md", repoRecords());
+  assert.deepEqual(
+    unit.pages.map((p) => p.path),
+    ["guides/providers/open-weight.md"],
+  );
+  assert.equal(
+    unit.pages.some((p) => p.path === "guides/models/comparison.md"),
+    false,
+  );
+});
+
 test("a slug joins sorted basenames", () => {
   const unit = resolveUnit(FIX, "guides/gamma/lonely.md", fixRecords());
   assert.equal(unitSlug(unit), "lonely");
   const live = resolveUnit(
     REPO,
-    "guides/models/claude-models.md",
+    "guides/providers/anthropic.md",
     repoRecords(),
   );
-  assert.equal(unitSlug(live), "claude-models-comparison");
+  assert.equal(unitSlug(live), "anthropic-comparison");
 });
 
 test("a slug above MAX_SLUG_PAGES collapses to first-plus-N", () => {

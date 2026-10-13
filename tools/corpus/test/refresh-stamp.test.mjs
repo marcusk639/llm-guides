@@ -8,6 +8,8 @@ import {
   setPageVerified,
   setPageResearch,
   removePageResearch,
+  setRecordArchived,
+  clearRecordArchived,
 } from "../refresh-stamp.mjs";
 
 // Review Focus 1: opus-5 must not match inside opus-5-preview, and the longer
@@ -348,7 +350,10 @@ const PAGE_QUOTED_VERIFIED = [
 ].join("\n");
 
 test("a quoted page verified: date keeps its quotes and its trailing whitespace", () => {
-  const { text, previous } = setPageVerified(PAGE_QUOTED_VERIFIED, "2026-09-28");
+  const { text, previous } = setPageVerified(
+    PAGE_QUOTED_VERIFIED,
+    "2026-09-28",
+  );
   assert.equal(previous, "2026-09-16");
   assert.equal(text.includes('verified: "2026-09-28"  '), true);
 });
@@ -510,7 +515,10 @@ test("a confirmed stamp bumps pages to fetched and records to their read date", 
   const { receipt, written } = stampUnit(root, artifact, {
     today: "2026-09-28",
   });
-  assert.equal(read(root, "guides/alpha/one.md").includes("verified: 2026-09-28"), true);
+  assert.equal(
+    read(root, "guides/alpha/one.md").includes("verified: 2026-09-28"),
+    true,
+  );
   // The record takes the date it was actually read, not today.
   assert.equal(
     read(root, "data/units.yaml").includes('verified: "2026-09-27"'),
@@ -531,8 +539,7 @@ test("a research: path that does not resolve is refused, and nothing is written"
   assert.throws(
     () => stampUnit(root, artifact, { today: "2026-09-28" }),
     (err) =>
-      err instanceof RefreshError &&
-      err.rule === "refresh-research-unresolved",
+      err instanceof RefreshError && err.rule === "refresh-research-unresolved",
   );
   assert.equal(read(root, "guides/alpha/one.md"), before);
 });
@@ -559,8 +566,7 @@ test("an incoherent artifact is refused before anything is written", () => {
   assert.throws(
     () => stampUnit(root, artifact, { today: "2026-09-28" }),
     (err) =>
-      err instanceof RefreshError &&
-      err.rule === "refresh-verdict-incoherent",
+      err instanceof RefreshError && err.rule === "refresh-verdict-incoherent",
   );
   assert.equal(read(root, "data/units.yaml"), before);
 });
@@ -578,10 +584,11 @@ test("a deprecated unit member gets neither a bumped date nor a research: field"
     false,
   );
   // Every other member of the unit was stamped.
-  assert.deepEqual(
-    receipt.pages.map((p) => p.path).sort(),
-    ["guides/alpha/one.md", "guides/alpha/two.md", "guides/beta/three.md"],
-  );
+  assert.deepEqual(receipt.pages.map((p) => p.path).sort(), [
+    "guides/alpha/one.md",
+    "guides/alpha/two.md",
+    "guides/beta/three.md",
+  ]);
 });
 
 test("a record outside unit_keys is refused before anything is written", () => {
@@ -682,7 +689,6 @@ test("a key-scoped artifact widened by hand is refused before anything is writte
   );
   assert.equal(read(root, "data/units.yaml"), before);
 });
-
 
 // C2: stampUnit derives `previous` from the pending/on-disk text at the moment
 // it runs, not from a receipt. If an earlier stamp attempt crashed after
@@ -813,7 +819,8 @@ test("a future artifact.fetched is refused, and nothing is written", () => {
   const beforeData = read(root, "data/units.yaml");
   assert.throws(
     () => stampUnit(root, artifact, { today: "2026-09-28" }),
-    (err) => err instanceof RefreshError && err.rule === "refresh-date-in-future",
+    (err) =>
+      err instanceof RefreshError && err.rule === "refresh-date-in-future",
   );
   assert.equal(read(root, "guides/alpha/one.md"), beforePage);
   assert.equal(read(root, "data/units.yaml"), beforeData);
@@ -826,7 +833,8 @@ test("a future record read date is refused, and nothing is written", () => {
   const beforeData = read(root, "data/units.yaml");
   assert.throws(
     () => stampUnit(root, artifact, { today: "2026-09-28" }),
-    (err) => err instanceof RefreshError && err.rule === "refresh-date-in-future",
+    (err) =>
+      err instanceof RefreshError && err.rule === "refresh-date-in-future",
   );
   assert.equal(read(root, "guides/alpha/one.md"), beforePage);
   assert.equal(read(root, "data/units.yaml"), beforeData);
@@ -970,7 +978,11 @@ test("a revert refuses on drift and writes nothing", () => {
   // Someone else moved fix.shared.one on afterwards.
   fs.writeFileSync(
     nodePath.join(root, "data/units.yaml"),
-    setRecordVerified(read(root, "data/units.yaml"), "fix.shared.one", "2026-10-05").text,
+    setRecordVerified(
+      read(root, "data/units.yaml"),
+      "fix.shared.one",
+      "2026-10-05",
+    ).text,
   );
   const before = read(root, "data/units.yaml");
   const beforePage = read(root, "guides/alpha/one.md");
@@ -1005,4 +1017,332 @@ test("a revert refuses on page drift and writes nothing", () => {
     (err) => err instanceof RefreshError && err.rule === "refresh-revert-drift",
   );
   assert.deepEqual(snapshot(root), before);
+});
+
+const ARCHIVE_YAML = `# top comment that must survive
+records:
+  - key: a.one
+    value: "1"
+    volatility: high
+    source: https://example.com/a
+    verified: "2026-01-01"
+    notes: |
+      a nested line that only looks like a field:
+      source_archived: https://wrong.example/nested
+      verified: "1999-01-01"
+    tags: [t]
+  - key: a.two
+    value: "2"
+    volatility: low
+    source: https://example.com/b
+    source_archived: https://archive.example/old
+    verified: "2026-01-01"
+    tags: [t]
+`;
+
+test("setRecordArchived inserts the field when absent, at the field indent", () => {
+  const out = setRecordArchived(
+    ARCHIVE_YAML,
+    "a.one",
+    "https://archive.example/new",
+  ).text;
+  assert.match(out, /^ {4}source_archived: https:\/\/archive\.example\/new$/m);
+  const block = out.slice(out.indexOf("key: a.one"), out.indexOf("key: a.two"));
+  assert.equal((block.match(/^ {4}source_archived:/gm) ?? []).length, 1);
+});
+
+// Review Focus 4: a second line must never be inserted when one exists.
+test("setRecordArchived replaces an existing field rather than duplicating it", () => {
+  const out = setRecordArchived(
+    ARCHIVE_YAML,
+    "a.two",
+    "https://archive.example/new",
+  ).text;
+  const block = out.slice(out.indexOf("key: a.two"));
+  assert.equal((block.match(/^ {4}source_archived:/gm) ?? []).length, 1);
+  assert.match(block, /source_archived: https:\/\/archive\.example\/new/);
+  assert.ok(!block.includes("archive.example/old"));
+});
+
+// Review Focus 5: a deeper nested look-alike line is never rewritten.
+test("setRecordArchived ignores a nested source_archived inside a block scalar", () => {
+  const out = setRecordArchived(
+    ARCHIVE_YAML,
+    "a.one",
+    "https://archive.example/new",
+  ).text;
+  assert.ok(out.includes("source_archived: https://wrong.example/nested"));
+  assert.match(out, /^ {6}verified: "1999-01-01"$/m);
+});
+
+test("setRecordArchived preserves file comments and every other line", () => {
+  const out = setRecordArchived(
+    ARCHIVE_YAML,
+    "a.one",
+    "https://archive.example/new",
+  ).text;
+  assert.ok(out.startsWith("# top comment that must survive"));
+  assert.equal(
+    out.split("\n").length,
+    ARCHIVE_YAML.split("\n").length + 1,
+    "an insert adds exactly one line",
+  );
+});
+
+test("clearRecordArchived removes an inserted field and is a no-op when absent", () => {
+  const added = setRecordArchived(
+    ARCHIVE_YAML,
+    "a.one",
+    "https://archive.example/new",
+  ).text;
+  assert.equal(clearRecordArchived(added, "a.one"), ARCHIVE_YAML);
+  assert.equal(clearRecordArchived(ARCHIVE_YAML, "a.one"), ARCHIVE_YAML);
+});
+
+test("setRecordArchived throws for a key the file does not hold", () => {
+  assert.throws(() =>
+    setRecordArchived(ARCHIVE_YAML, "nope.key", "https://a.example/x"),
+  );
+});
+
+// Task 10. Built on this file's own sandbox()/prepared()/read()/rewriteOnDisk
+// shape, not on a new fixture wrapper: the record file is data/units.yaml and
+// the stampable artifact comes from prepared().
+const withArchive = (root, artifact, fields) =>
+  rewriteOnDisk(root, {
+    ...artifact,
+    records: artifact.records.map((r, i) =>
+      i === 0 ? { ...r, ...fields } : r,
+    ),
+  });
+
+test("stampUnit writes source_archived when the entry says captured", () => {
+  const root = sandbox();
+  const artifact = withArchive(root, prepared(root), {
+    archived: "https://archive.example/s1",
+    archive_outcome: "captured",
+  });
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  assert.match(
+    read(root, "data/units.yaml"),
+    /source_archived: https:\/\/archive\.example\/s1/,
+  );
+});
+
+// Both fields are set, not just the outcome: that pins the OUTCOME as the gate.
+// Setting only archive_outcome would pass even if the real gate were "archived
+// is present", which is the mistake that would record a transient 429 as a
+// durable capture.
+test("stampUnit does not write source_archived for refused or failed", () => {
+  for (const outcome of ["refused", "failed"]) {
+    const root = sandbox();
+    const artifact = withArchive(root, prepared(root), {
+      archived: "https://archive.example/s1",
+      archive_outcome: outcome,
+    });
+    stampUnit(root, artifact, { today: "2026-09-28" });
+    assert.ok(
+      !read(root, "data/units.yaml").includes("source_archived"),
+      `outcome ${outcome}`,
+    );
+  }
+});
+
+// The insert must happen in the same in-memory pass as setRecordVerified. A
+// page snapshot that no longer matches disk fails in the PAGES loop, which runs
+// after every record body has been computed -- so if the archive insert escaped
+// the transaction, data/units.yaml would carry it with nothing else written.
+test("stampUnit writes nothing at all when a later transform fails", () => {
+  const root = sandbox();
+  const base = prepared(root);
+  const artifact = rewriteOnDisk(root, {
+    ...withArchive(root, base, {
+      archived: "https://archive.example/s1",
+      archive_outcome: "captured",
+    }),
+    unit_was: Object.fromEntries(
+      Object.keys(base.unit_was).map((k) => [k, "1999-01-01"]),
+    ),
+  });
+  const before = read(root, "data/units.yaml");
+  assert.throws(() => stampUnit(root, artifact, { today: "2026-09-28" }), {
+    rule: "refresh-page-drifted",
+  });
+  assert.equal(read(root, "data/units.yaml"), before, "all-or-nothing holds");
+});
+
+test("revertUnit removes a source_archived the stamp wrote", () => {
+  const root = sandbox();
+  const before = read(root, "data/units.yaml");
+  const artifact = withArchive(root, prepared(root), {
+    archived: "https://archive.example/s1",
+    archive_outcome: "captured",
+  });
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  assert.match(read(root, "data/units.yaml"), /source_archived/);
+  const stamped = parseArtifact(read(root, artifact.path)).data;
+  revertUnit(root, stamped, { today: "2026-09-29" });
+  assert.equal(read(root, "data/units.yaml"), before);
+});
+
+// A snapshot an EARLIER refresh captured is not this receipt's to remove.
+test("revertUnit leaves a source_archived the stamp did not write", () => {
+  const root = sandbox();
+  const file = nodePath.join(root, "data/units.yaml");
+  const artifact = prepared(root);
+  fs.writeFileSync(
+    file,
+    setRecordArchived(
+      fs.readFileSync(file, "utf8"),
+      artifact.records[0].key,
+      "https://archive.example/pre",
+    ).text,
+  );
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  const stamped = parseArtifact(read(root, artifact.path)).data;
+  revertUnit(root, stamped, { today: "2026-09-29" });
+  assert.match(
+    read(root, "data/units.yaml"),
+    /source_archived: https:\/\/archive\.example\/pre/,
+  );
+});
+
+// C2 (final review): the receipt could not tell an INSERTED source_archived
+// from a REPLACED one -- setRecordArchived returned a bare string, so stampUnit
+// set archived_written: true either way and revertUnit always DELETED. On the
+// second refresh of any unit archived the first time, --revert destroyed the
+// earlier snapshot, recoverable only from git. CLAUDE.md promises the opposite:
+// "never one an earlier refresh captured".
+test("revertUnit restores a source_archived this run replaced, byte-exactly", () => {
+  const root = sandbox();
+  const file = nodePath.join(root, "data/units.yaml");
+  const base = prepared(root);
+  fs.writeFileSync(
+    file,
+    setRecordArchived(
+      fs.readFileSync(file, "utf8"),
+      base.records[0].key,
+      "https://archive.example/OLD-from-earlier-refresh",
+    ).text,
+  );
+  const before = read(root, "data/units.yaml");
+
+  const artifact = withArchive(root, base, {
+    archived: "https://archive.example/NEW",
+    archive_outcome: "captured",
+  });
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  assert.match(read(root, "data/units.yaml"), /archive\.example\/NEW/);
+
+  const stamped = parseArtifact(read(root, artifact.path)).data;
+  revertUnit(root, stamped, { today: "2026-09-29" });
+  assert.equal(
+    read(root, "data/units.yaml"),
+    before,
+    "the earlier refresh's snapshot must come back, not be deleted",
+  );
+});
+
+test("a replaced source_archived is recorded on the receipt as previous_archived", () => {
+  const root = sandbox();
+  const file = nodePath.join(root, "data/units.yaml");
+  const base = prepared(root);
+  fs.writeFileSync(
+    file,
+    setRecordArchived(
+      fs.readFileSync(file, "utf8"),
+      base.records[0].key,
+      "https://archive.example/OLD-from-earlier-refresh",
+    ).text,
+  );
+  const artifact = withArchive(root, base, {
+    archived: "https://archive.example/NEW",
+    archive_outcome: "captured",
+  });
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  const rec = parseArtifact(read(root, artifact.path)).data.stamped.records.find(
+    (r) => r.key === base.records[0].key,
+  );
+  assert.equal(rec.archived_written, false);
+  assert.equal(
+    rec.previous_archived,
+    "https://archive.example/OLD-from-earlier-refresh",
+  );
+});
+
+test("assertReceiptShape rejects a non-URL previous_archived", () => {
+  const root = sandbox();
+  const base = prepared(root);
+  const artifact = withArchive(root, base, {
+    archived: "https://archive.example/NEW",
+    archive_outcome: "captured",
+  });
+  stampUnit(root, artifact, { today: "2026-09-28" });
+  const stamped = parseArtifact(read(root, artifact.path)).data;
+  stamped.stamped.records[0].previous_archived = "./not-a-url";
+  assert.throws(() => revertUnit(root, stamped, { today: "2026-09-29" }), {
+    rule: "refresh-receipt-shape",
+  });
+});
+
+// I1 (final review, re-graded Critical by effect): recordArchivedPattern requires
+// a bare value to EOL, so a trailing comment or an apostrophe in the URL did not
+// match and fell through to the INSERT branch, producing two source_archived keys
+// in one mapping. js-yaml rejects that outright, so loadRecords throws and render,
+// lint, verify, ledger, site and every refresh mode crash until a human finds it.
+// setRecordVerified fails CLOSED on an unmatched line; this failed OPEN, into
+// corruption.
+const archYaml = (line) =>
+  `# top
+records:
+  - key: a.one
+    value: "1"
+    volatility: high
+    source: https://example.com/a
+${line}
+    verified: "2026-01-01"
+    tags: [t]
+`;
+
+test("setRecordArchived never writes a second source_archived key", () => {
+  for (const line of [
+    "    source_archived: https://archive.example/old",
+    '    source_archived: "https://archive.example/old"',
+  ]) {
+    const out = setRecordArchived(
+      archYaml(line),
+      "a.one",
+      "https://archive.example/NEW",
+    ).text;
+    assert.equal(
+      (out.match(/^ {4}source_archived:/gm) ?? []).length,
+      1,
+      `duplicated the key for: ${line}`,
+    );
+  }
+});
+
+test("setRecordArchived fails closed when the field is present but unparseable", () => {
+  for (const line of [
+    "    source_archived: https://archive.example/old # captured 2026-10-01",
+    "    source_archived: https://web.archive.org/web/2026/https://x.test/a'b",
+  ]) {
+    assert.throws(
+      () =>
+        setRecordArchived(
+          archYaml(line),
+          "a.one",
+          "https://archive.example/NEW",
+        ),
+      { rule: "refresh-record-archived-unparseable" },
+      `should have failed closed for: ${line}`,
+    );
+  }
+});
+
+test("clearRecordArchived removes the field even with a trailing comment", () => {
+  const line =
+    "    source_archived: https://archive.example/old # captured 2026-10-01";
+  const out = clearRecordArchived(archYaml(line), "a.one");
+  assert.equal((out.match(/^ {4}source_archived:/gm) ?? []).length, 0);
 });

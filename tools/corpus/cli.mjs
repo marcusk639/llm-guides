@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import yaml from "js-yaml";
 import { parseFrontmatter } from "./frontmatter.mjs";
+import { guidePaths } from "./paths.mjs";
 import { loadRecords, literalIndexForTopic, checkDataFiles } from "./data.mjs";
 import {
   validateFrontmatter,
@@ -49,21 +50,10 @@ import {
 } from "./refresh-artifact.mjs";
 import { stampUnit, revertUnit } from "./refresh-stamp.mjs";
 import { siteCorpus } from "./site.mjs";
-
-function guidePaths(root) {
-  const dir = path.join(root, "guides");
-  if (!fs.existsSync(dir)) return [];
-  const out = [];
-  const walk = (d) => {
-    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-      const p = path.join(d, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (e.name.endsWith(".md")) out.push(p);
-    }
-  };
-  walk(dir);
-  return out.sort();
-}
+import { collectCitations } from "./citations.mjs";
+import { auditCitations } from "./sources.mjs";
+import { summarise, formatText, formatJson } from "./sources-report.mjs";
+import { archiveArtifact } from "./archive.mjs";
 
 function loadTopics(root) {
   const file = path.join(root, "meta", "taxonomy.yaml");
@@ -460,14 +450,45 @@ export function refreshCorpus(
   }
 }
 
-function main(argv) {
+// Every flag any subcommand accepts. `rest.includes(...)` silently ignores an
+// unknown flag, which would make a mistyped mutating flag (e.g. --achive for
+// --archive) run a read-only path and exit 0, indistinguishable from success.
+// Enumerated from cli.mjs on 2026-10-09, not guessed:
+//   grep -oE "\-\-[a-z-]+=?" tools/corpus/cli.mjs | sort -u
+// --force and --stats are real and must stay accepted; there is no --base.
+const KNOWN_FLAGS = Object.freeze([
+  "--write",
+  "--check",
+  "--json",
+  "--archive",
+  "--order",
+  "--skeleton",
+  "--stamp",
+  "--revert",
+  "--force",
+  "--stats",
+  "--page",
+  "--key",
+]);
+const KNOWN_FLAG_PREFIXES = Object.freeze(["--page=", "--artifact=", "--key="]);
+
+function unknownFlags(rest) {
+  return rest.filter(
+    (a) =>
+      a.startsWith("--") &&
+      !KNOWN_FLAGS.includes(a) &&
+      !KNOWN_FLAG_PREFIXES.some((p) => a.startsWith(p)),
+  );
+}
+
+async function main(argv) {
   const [command, ...rest] = argv;
   const write = rest.includes("--write");
   const check = rest.includes("--check");
   const root = rest.find((a) => !a.startsWith("--")) ?? process.cwd();
   const usage = () => {
     console.error(
-      "usage: corpus <render|lint|verify|ledger|refresh|site> [--write] [dir]",
+      "usage: corpus <render|lint|verify|ledger|refresh|site|sources> [--write] [dir]",
     );
     console.error("       corpus render --check [dir]");
     console.error(
@@ -475,6 +496,10 @@ function main(argv) {
     );
     process.exit(2);
   };
+  for (const flag of unknownFlags(rest)) {
+    console.error(`corpus: unknown flag ${flag}`);
+    process.exit(2);
+  }
   if (check && (command !== "render" || write)) usage();
   if (command === "lint") {
     const issues = lintCorpus(root);
@@ -537,6 +562,47 @@ function main(argv) {
         : `site: ${issues.length} issue(s)`,
     );
     process.exit(issues.length === 0 ? 0 : 1);
+  } else if (command === "sources") {
+    const json = rest.includes("--json");
+    if (rest.includes("--archive")) {
+      const artifactRel = (
+        rest.find((a) => a.startsWith("--artifact=")) ?? ""
+      ).slice("--artifact=".length);
+      if (!artifactRel) {
+        console.error(
+          "corpus: sources --archive requires --artifact=<research/...>",
+        );
+        process.exit(2);
+      }
+      // Every guard lives in archiveArtifact so it is testable offline; this
+      // branch only maps its outcome onto exit codes. A failed write is a fact
+      // about this machine (exit 1); every other refusal is a usage error (2).
+      try {
+        await archiveArtifact(root, artifactRel, {
+          onProgress: (key, c) =>
+            console.error(
+              `${key}: ${c.archive_outcome}${c.error ? ` (${c.error})` : ""}`,
+            ),
+        });
+      } catch (e) {
+        if (!(e instanceof RefreshError)) throw e;
+        console.error(`corpus: ${artifactRel} [${e.rule}] ${e.message}`);
+        process.exit(e.rule === "refresh-artifact-write-failed" ? 1 : 2);
+      }
+      console.log(`archived: ${artifactRel}`);
+      process.exit(0);
+    }
+    // Decision 1: no finding produces a nonzero exit. There is deliberately no
+    // exit code to gate liveness on. Exit 1 is reserved for a failed write,
+    // which only --archive can attempt; exit 2 is a usage error.
+    const { citations, issues } = collectCitations(root);
+    const results = await auditCitations(citations);
+    const summary = summarise(results, issues);
+    console.log(json ? formatJson(summary) : formatText(summary));
+    // Not process.exit(0): stdout is async on a pipe, and the --json report for
+    // ~64 citations is several KB, so exiting here can truncate it.
+    process.exitCode = 0;
+    return;
   } else if (command === "refresh") {
     const { code, out, err: errs } = refreshCorpus(root, rest);
     // A usage error prints its reason ABOVE the usage block, not instead of it:
