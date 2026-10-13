@@ -26,6 +26,18 @@ F2's workaround promoted to a rule, and it exists for cadence: page cadence is
 the maximum volatility of any record the page references, so one model price on
 a concept page puts that page on a 30-day clock permanently.
 
+**Provider facts and provider practice are different pages.** A vendor's facts
+page under `guides/providers/` references high-volatility model rows, so it sits
+on the 30-day clock permanently. How a reader should work differently against
+that vendor belongs on a separate practice page beside it, which carries **no `data/` records**
+and states no figures: it links the facts page, and the facts page links back.
+This is the quarantine principle applied to cadence rather than to values — a
+practice section inside the facts page would inherit that cadence and be
+re-verified twelve times a year to confirm that advice which has not changed
+still has not changed. The two look like one subject and have opposite
+maintenance profiles. One model id on a practice page moves it onto the 30-day
+clock and costs roughly twelve times its projected maintenance.
+
 The hazard every rule below exists for: the corpus documents systems whose model ids,
 prices, limits and defaults change on a timescale of weeks, and a wrong-but-plausible
 number is worse than no number. Never write a value from memory.

@@ -63,3 +63,17 @@ test("CLAUDE.md's spelled topic count matches the list", () => {
 test("security is a taxonomy topic", () => {
   assert.ok(loadTopics(root).includes("security"));
 });
+
+// Decision 2 of the scope-expansion spec. The rule has no mechanical
+// enforcement and no page obeys it yet, so the contract's wording is the
+// only thing carrying it; this pins that the wording still exists.
+test("CLAUDE.md states the provider facts/practice split", () => {
+  assert.ok(
+    contract.includes("Provider facts and provider practice are different pages"),
+    "the facts/practice rule is missing from CLAUDE.md",
+  );
+  assert.ok(
+    /practice page[^.]*no `data\/` records/.test(contract),
+    "the contract must say a practice page carries no data/ records",
+  );
+});
