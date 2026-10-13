@@ -55,10 +55,14 @@ This supersedes the previous convention of root-level topic directories
 - `local/` — **gitignored.** Harvest output and anything derived from session
   transcripts. Nothing here may enter a committed document.
 
-The fifteen topics, from `meta/taxonomy.yaml`: foundations, prompting, context, agents,
-claude-code, cowork, harness, models, tools, building, domains, providers, evals, multimodal, orchestration. `claude-code` is
+The sixteen topics, from `meta/taxonomy.yaml`: foundations, prompting, context, agents,
+claude-code, cowork, harness, models, tools, building, domains, providers, evals, multimodal, orchestration, security. `claude-code` is
 intentionally the largest. `harness` carries guardrails, long-running automation, trust,
-and observability. `domains` ships with one exemplar playbook plus the generation recipe
+and observability; `security` carries the adversarial half — prompt injection, tool-use
+blast radius, sandboxing — because operating an agent you already trust over time and
+defending one against hostile input are different problems with different readers. Where a
+subject could sit in either, one topic owns it and the other links rather than restates.
+`domains` ships with one exemplar playbook plus the generation recipe
 (see "Domain playbook shape") rather than many thin pages.
 
 Seed guides to copy from, one per archetype:
