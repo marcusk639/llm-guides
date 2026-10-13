@@ -55,15 +55,16 @@ import { auditCitations } from "./sources.mjs";
 import { summarise, formatText, formatJson } from "./sources-report.mjs";
 import { archiveArtifact } from "./archive.mjs";
 
+// Fails closed on a malformed taxonomy. Returning a non-array `topics` left
+// `topics.includes(data.topic)` doing a substring match, so a `topics:` written
+// as a string quietly accepted any topic name contained in it.
 function loadTopics(root) {
   const file = path.join(root, "meta", "taxonomy.yaml");
   if (!fs.existsSync(file)) return [];
-  return (
-    (
-      yaml.load(fs.readFileSync(file, "utf8"), { schema: yaml.JSON_SCHEMA }) ??
-      {}
-    ).topics ?? []
-  );
+  const doc = yaml.load(fs.readFileSync(file, "utf8"), {
+    schema: yaml.JSON_SCHEMA,
+  });
+  return Array.isArray(doc?.topics) ? doc.topics : [];
 }
 
 export function lintCorpus(
