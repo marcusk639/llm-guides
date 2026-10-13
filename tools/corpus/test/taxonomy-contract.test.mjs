@@ -13,11 +13,19 @@ const root = path.dirname(
 const contract = fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8");
 
 // Matching a topic name anywhere in CLAUDE.md is useless as a guard:
-// "tools" appears 27 times in this file, "context" 17, "models" 15, none
-// of them in the topic list. So parse the one sentence that IS the list.
-// It runs from the colon after the taxonomy filename to the next period,
-// and no topic name contains a period.
-const LIST = /topics, from `meta\/taxonomy\.yaml`:\s*([^.]+)\./;
+// "tools" occurs 27 times in this file, "context" 17, "models" 15, none of
+// them in the topic list. So parse the one sentence that IS the list.
+//
+// Two things make that parse honest, and both were added after a review
+// found the guard going green on a stale contract:
+//   - the regex is global and the match count is asserted. With a
+//     non-global regex String.match returns only the FIRST hit, so a
+//     correct duplicate sentence earlier in the file masked a stale
+//     canonical one and all five tests passed.
+//   - the spelled count is captured from the SAME match as the list. An
+//     `includes("The sixteen topics")` anywhere in the file is satisfied
+//     by an unrelated sentence while the real one carries no count at all.
+const LIST = /The (\w+) topics, from `meta\/taxonomy\.yaml`:\s*([^.]+)\./g;
 
 const NUMBER_WORDS = {
   13: "thirteen",
@@ -28,13 +36,21 @@ const NUMBER_WORDS = {
   18: "eighteen",
 };
 
-function listedTopics() {
-  const m = contract.match(LIST);
-  assert.ok(m, "CLAUDE.md no longer contains a parseable topic-list sentence");
-  return m[1]
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+function topicSentence() {
+  const all = [...contract.matchAll(LIST)];
+  assert.equal(
+    all.length,
+    1,
+    `expected exactly one topic-list sentence in CLAUDE.md, found ${all.length}`,
+  );
+  const [, count, list] = all[0];
+  return {
+    count,
+    topics: list
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  };
 }
 
 test("CLAUDE.md's topic list is exactly meta/taxonomy.yaml", () => {
@@ -43,20 +59,21 @@ test("CLAUDE.md's topic list is exactly meta/taxonomy.yaml", () => {
   // Set equality catches BOTH directions: a topic added to the taxonomy and
   // never documented, and a topic deleted from the taxonomy but left in the
   // prose, which would promise a topic that no longer validates.
-  assert.deepEqual([...listedTopics()].sort(), [...declared].sort());
+  assert.deepEqual([...topicSentence().topics].sort(), [...declared].sort());
 });
 
 test("CLAUDE.md's topic list is in taxonomy order", () => {
-  assert.deepEqual(listedTopics(), loadTopics(root));
+  assert.deepEqual(topicSentence().topics, loadTopics(root));
 });
 
 test("CLAUDE.md's spelled topic count matches the list", () => {
   const n = loadTopics(root).length;
   const word = NUMBER_WORDS[n];
   assert.ok(word, `no spelled form on file for ${n} topics; extend NUMBER_WORDS`);
-  assert.ok(
-    contract.includes(`The ${word} topics`),
-    `CLAUDE.md should read "The ${word} topics" for ${n} topics`,
+  assert.equal(
+    topicSentence().count,
+    word,
+    `the topic-list sentence should open "The ${word} topics" for ${n} topics`,
   );
 });
 
@@ -64,9 +81,20 @@ test("security is a taxonomy topic", () => {
   assert.ok(loadTopics(root).includes("security"));
 });
 
-// Decision 2 of the scope-expansion spec. The rule has no mechanical
-// enforcement and no page obeys it yet, so the contract's wording is the
-// only thing carrying it; this pins that the wording still exists.
+// Decision 1 of the scope-expansion spec states a record posture for the
+// security topic, as Decision 2 does for practice pages. Both are unenforced
+// by any tool, so the contract's wording is the only thing carrying them.
+test("CLAUDE.md states the security topic's record posture", () => {
+  assert.ok(
+    /`security` carries[^.]*no `data\/` records/.test(contract),
+    "the contract must say security pages carry no data/ records",
+  );
+});
+
+// Decision 2 of the scope-expansion spec. This pins the exact clause; if a
+// reword is intentional, update the regex rather than loosening it into two
+// separate `includes` checks, which would pass on text torn apart across
+// sections.
 test("CLAUDE.md states the provider facts/practice split", () => {
   assert.ok(
     contract.includes("Provider facts and provider practice are different pages"),

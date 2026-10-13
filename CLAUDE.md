@@ -30,7 +30,9 @@ a concept page puts that page on a 30-day clock permanently.
 page under `guides/providers/` references high-volatility model rows, so it sits
 on the 30-day clock permanently. How a reader should work differently against
 that vendor belongs on a separate practice page beside it, which carries **no `data/` records**
-and states no figures: it links the facts page, and the facts page links back.
+and states no figure a `data/` record would own: it links the facts page, and the facts
+page links back. A dated study's measured figure is cited as the borderline-kinds table
+directs — it carries no record, so it adds no cadence and is not what this rule excludes.
 This is the quarantine principle applied to cadence rather than to values — a
 practice section inside the facts page would inherit that cadence and be
 re-verified twelve times a year to confirm that advice which has not changed
@@ -70,10 +72,13 @@ This supersedes the previous convention of root-level topic directories
 The sixteen topics, from `meta/taxonomy.yaml`: foundations, prompting, context, agents,
 claude-code, cowork, harness, models, tools, building, domains, providers, evals, multimodal, orchestration, security. `claude-code` is
 intentionally the largest. `harness` carries guardrails, long-running automation, trust,
-and observability; `security` carries the adversarial half — prompt injection, tool-use
-blast radius, sandboxing — because operating an agent you already trust over time and
-defending one against hostile input are different problems with different readers. Where a
-subject could sit in either, one topic owns it and the other links rather than restates.
+and observability; `security` carries the adversarial half — prompt injection and
+tool-use blast radius — and, being concept pages only, carries **no `data/` records**.
+The split is not cosmetic: operating an agent you already trust over time and defending
+one against hostile input are different problems with different readers. Sandboxing and
+permissions can be read as either, and `claude-code` already owns a sandbox default, so
+where a subject could sit in more than one topic, one owns it and the others link rather
+than restate.
 `domains` ships with one exemplar playbook plus the generation recipe
 (see "Domain playbook shape") rather than many thin pages.
 
