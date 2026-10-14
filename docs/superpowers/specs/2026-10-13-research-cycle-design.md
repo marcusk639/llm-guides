@@ -1,7 +1,8 @@
 ---
 title: The Research Cycle — Design
 date: 2026-10-13
-status: draft
+status: approved
+revised: 2026-10-13
 ---
 
 # The Research Cycle — Design
@@ -11,9 +12,8 @@ scope-expansion spec names is gated by `research-required`, and nothing in the
 repository can produce what that gate asks for. This spec designs the missing
 half: how a page that does not exist yet earns its grounding.
 
-It designs the mechanism. It does not write any page, and it does not decide
-which page goes first — that is a scheduling question for whoever runs the first
-cycle.
+It designs the mechanism and names the page the first cycle runs on. It writes
+no page: that is the cycle's output, not this spec's.
 
 ## The problem, stated precisely
 
@@ -113,25 +113,50 @@ the artifact records a tier per claim, and a page whose claims are mostly tier 3
 says so in section 6, where a reader deciding how much weight to place on it will
 look.
 
-## Open questions
+## Decision 5: a subagent gathers, the owner accepts
 
-These change the work and are the owner's to answer.
+Research is performed by a subagent with web access, which produces the
+claim-to-source table. It does not ground a page on its own: the owner accepts
+the artifact first, and acceptance is what lets a page name it in `research:`.
 
-1. **Who performs the research?** A subagent with web access, the owner by hand,
-   or a subagent that gathers and a human that accepts. This decides whether the
-   artifact is machine-written and validated like the refresh artifact, or prose
-   written by a person. Everything about the artifact's strictness follows from
-   it, which is why it is first.
-2. **Does `security` get its page split decided now, or by the research?** The
-   scope spec says "~3 pages" without naming them. Deciding now risks three pages
-   shaped by a guess; deciding later means the first cycle's scope is open.
-3. **Which page goes first?** The cheapest useful test of the mechanism is a page
-   whose sources are tier 1 and uncontested. The most valuable is one of the
-   practice pages, which is also the hardest to source. These are not the same
-   choice.
-4. **Does `guides/providers/open-weight.md` get re-grounded in this cycle?** It is
-   the one page already failing the spirit of the gate, and fixing it is the
-   precondition for ever strengthening the gate to "grounds this page."
+This follows from what the corpus is for. The stated hazard is a
+wrong-but-plausible value, and a model that has just read ten pages about a
+subject is exactly the thing most likely to produce one with a confident
+citation attached. Machine-checkable structure catches a malformed artifact; it
+cannot catch a real URL cited for a claim it does not make. Only a reader can,
+and the cost is one review per page rather than one per claim.
+
+Two consequences. The artifact is validated like the refresh artifact rather
+than written as prose, because a machine wrote it and the checks are cheap. And
+acceptance is recorded in the artifact — an `accepted` field carrying the date —
+so "has a human looked at this" is answerable without reading a pull request
+thread.
+
+## Resolved questions
+
+All four were open in the first draft and were decided by the owner on
+2026-10-13. Recorded so the reasoning survives.
+
+1. **Who performs the research?** A subagent gathers, the owner accepts. See
+   Decision 5. The fully-automated option was declined because nothing in it
+   catches a confidently-cited bad source, which is the corpus's whole hazard;
+   research by hand was declined as the option most likely to stall seven pages.
+2. **Does `security` get its page split decided now?** No — the first cycle's
+   output for `security` is the split itself. The scope spec says "~3 pages"
+   without naming them, and naming them here would assert a structure nobody has
+   researched. The accepted cost is that the first cycle has open scope.
+3. **Which page goes first?** A `security` concept page. Prompt injection and
+   tool-use blast radius are documented at tier 1 and tier 2, so the mechanism is
+   tested against sources that mostly exist. A practice page is the more
+   valuable material and the harder sourcing problem at once, and starting there
+   would make a failure impossible to attribute to either the cycle or the
+   subject.
+4. **Is the gate strengthened?** Yes, to "resolves on disk" only. See Decision 3,
+   including why the check worth wanting is not this one.
+
+`guides/providers/open-weight.md` is therefore **not** re-grounded in the first
+cycle, and the gate stays unable to tell grounding from a pointer to the wrong
+file until it is. That is the first thing the second cycle should fix.
 
 ## Deliberately absent
 
@@ -162,3 +187,8 @@ These change the work and are the owner's to answer.
   from inference. Nothing currently makes that outcome easy to record.
 - **Decision 3 looks like it fixes the gate.** It does not, and the sentence
   saying so is load-bearing.
+- **Acceptance becomes a rubber stamp.** Decision 5 puts a human between the
+  research and the page, and the failure mode of such a step is that it degrades
+  into approving whatever arrives. The artifact's claim-to-source table is what
+  makes acceptance checkable in minutes rather than hours; if it stops being
+  skimmable, acceptance stops being real.
