@@ -99,3 +99,42 @@ test("the verify agent rubric states what it is and is not shown", () => {
   assert.match(rubric, /--revert/);
   assert.match(rubric, /draft/i);
 });
+
+// plan-to-tasks.md is the most fact-dense prompt in the library: it hardcodes
+// the gate invocations and the exact tokens a clean run prints. refresh.md and
+// verify-agent.md are both pinned against the code's constants; this one shipped
+// unguarded, so a renamed command or a reworded success token would be found by
+// whoever next ran it rather than by the suite.
+const planToTasks = fs.readFileSync(
+  new URL("../../../meta/prompts/plan-to-tasks.md", import.meta.url),
+  "utf8",
+);
+const contract = fs.readFileSync(
+  new URL("../../../CLAUDE.md", import.meta.url),
+  "utf8",
+);
+
+test("plan-to-tasks.md names the four gates exactly as CLAUDE.md does", () => {
+  for (const gate of [
+    "render --check .",
+    "lint .",
+    "verify .",
+    "npm test",
+  ]) {
+    assert.ok(planToTasks.includes(gate), `prompt omits the gate: ${gate}`);
+    assert.ok(contract.includes(gate), `CLAUDE.md omits the gate: ${gate}`);
+  }
+});
+
+test("plan-to-tasks.md quotes the success tokens the CLI actually prints", () => {
+  for (const token of ["lint: clean", "verify: clean", "would render:", "# fail 0"]) {
+    assert.ok(planToTasks.includes(token), `prompt omits the token: ${token}`);
+  }
+});
+
+test("CLAUDE.md's prompt library names plan-to-tasks.md", () => {
+  assert.ok(
+    contract.includes("meta/prompts/plan-to-tasks.md"),
+    "the contract enumerates the prompt library by name; a third member that is not listed is one a future session will not find",
+  );
+});

@@ -749,7 +749,9 @@ the receipt moved to `reverted:`, because what was checked and what was found is
 exactly what the next attempt needs. The pull request then opens as a **draft**,
 labelled, findings in the body: never silently skipped, never auto-merged.
 
-**Prompts live in `meta/prompts/`.** `meta/prompts/refresh.md` carries the fetching
+**Prompts live in `meta/prompts/`.** `meta/prompts/plan-to-tasks.md` turns an
+implementation plan into self-contained task briefs plus a dispatch manifest,
+computing which tasks may run concurrently; `meta/prompts/refresh.md` carries the fetching
 and verdict procedure; `meta/prompts/verify-agent.md` carries the adversarial rubric
 and the blocking semantics. The agent's review packet is the branch diff over
 `guides` and `data` only — `research/` is excluded, because a reviewer shown the
