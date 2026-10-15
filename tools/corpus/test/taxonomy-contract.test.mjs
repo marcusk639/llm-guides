@@ -93,7 +93,8 @@ test("security is a taxonomy topic", () => {
 test("CLAUDE.md states the security topic's record posture", () => {
   assert.ok(
     /`security` carries[^.]*no\s+`data\/`\s+records/.test(contract),
-    "the contract must say security pages carry no `data/` records; this test\n      pins the exact clause, so update the regex if the reword was intentional",
+    "the contract must say security pages carry no `data/` records; this test " +
+      "pins the exact clause, so update the regex if the reword was intentional",
   );
 });
 
@@ -108,7 +109,8 @@ test("CLAUDE.md states the provider facts/practice split", () => {
   );
   assert.ok(
     /practice page[^.]*no\s+`data\/`\s+records/.test(contract),
-    "the contract must say a practice page carries no `data/` records; this test\n      pins the exact clause, so update the regex if the reword was intentional",
+    "the contract must say a practice page carries no `data/` records; this test " +
+      "pins the exact clause, so update the regex if the reword was intentional",
   );
 });
 
@@ -140,12 +142,20 @@ test("a malformed topics: list rejects every topic rather than substring-matchin
     path.join(dir, "meta", "taxonomy.yaml"),
     "topics: security-and-harness\n",
   );
-  fs.writeFileSync(
-    path.join(dir, "guides", "t", "p.md"),
-    "---\ntitle: P\nsummary: s\ntopic: sec\nverified: '2026-01-01'\napplies_to: [x]\nsources: []\nrelated: []\n---\n\nbody\n",
-  );
-  const fired = lintCorpus(dir, "2026-10-13").some(
-    (i) => i.rule === "frontmatter-topic",
-  );
-  assert.equal(fired, true, "'sec' is a substring of the malformed value");
+  const page = (topic) =>
+    `---\ntitle: P\nsummary: s\ntopic: ${topic}\nverified: '2026-01-01'\napplies_to: [x]\nsources: []\nrelated: []\n---\n\nbody\n`;
+  // "sec" is only a substring; "security" is a substring AND a real taxonomy
+  // topic. Failing closed has to reject both, or the check is still partly
+  // driven by what the malformed string happens to contain.
+  fs.writeFileSync(path.join(dir, "guides", "t", "p.md"), page("sec"));
+  fs.writeFileSync(path.join(dir, "guides", "t", "q.md"), page("security"));
+  try {
+    const fired = lintCorpus(dir, "2026-10-13").filter(
+      (i) => i.rule === "frontmatter-topic",
+    );
+    assert.equal(fired.length, 2, "both pages must be reported");
+  } finally {
+    // M3: these accumulated in $TMPDIR on every run.
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

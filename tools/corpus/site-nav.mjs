@@ -1,7 +1,7 @@
 // tools/corpus/site-nav.mjs
-import fs from "node:fs";
-import path from "node:path";
-import yaml from "js-yaml";
+import { loadTopics } from "./taxonomy.mjs";
+
+export { loadTopics };
 
 // Casing a slug cannot imply. Kept deliberately small: meta/taxonomy.yaml is
 // contract-governed and presentation metadata is not worth changing it for.
@@ -15,15 +15,6 @@ export function topicLabel(slug) {
     .split("-")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
-}
-
-export function loadTopics(root) {
-  const file = path.join(root, "meta", "taxonomy.yaml");
-  if (!fs.existsSync(file)) return [];
-  const doc = yaml.load(fs.readFileSync(file, "utf8"), {
-    schema: yaml.JSON_SCHEMA,
-  });
-  return Array.isArray(doc?.topics) ? doc.topics : [];
 }
 
 // Only populated topics, in taxonomy order. An empty topic is omitted
