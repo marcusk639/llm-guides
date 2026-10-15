@@ -54,11 +54,29 @@ defect here: subagents read out of order, or alone.
 
 ## Parallel groups, and how you compute them
 
+`superpowers:subagent-driven-development` says "Never dispatch multiple
+implementation subagents in parallel (conflicts)." The owner authorised parallel
+dispatch for this repository on 2026-10-15, so that line is superseded here and
+the conflicts it names become yours to prevent. The rest of this section is how.
+
 A parallel group is a set of tasks that may run concurrently. Two tasks belong
 to the same group only when **every file one writes is absent from the other's
 write set**, and neither depends on the other. Derive each task's write set from
 its own steps, not from the plan's "Files:" block, which sometimes lists a file
 a task only reads.
+
+**Groups are totally ordered, not merely dependency-ordered.** Group B starts
+only when every task in group A has landed — not when B's own dependencies
+have. Disjointness is established *within* a group, so a B task that collides
+with an A task it does not depend on would otherwise be free to start beside it,
+which is the corruption this section exists to prevent.
+
+**Concurrent tasks need one worktree each.** Disjoint write sets say nothing
+about `.git/index`: two agents running `git add` in one worktree race on
+`.git/index.lock` and can stage each other's files into the wrong commit, however
+disjoint their files are. Either give each concurrent task its own worktree, or
+have the dispatcher serialise the commit step. Say in the manifest which one the
+plan assumes, because an executor cannot infer it.
 
 `CLAUDE.md` is a serialization point. It is one large file edited by exact-string
 replacement, two tasks editing it cannot be auto-merged the way disjoint `data/`
@@ -66,9 +84,28 @@ record edits can, and in practice most plans touch it more than once — the
 scope-expansion plan's two tasks both did. Put every task that writes `CLAUDE.md`
 in its own group, ordered.
 
-`meta/ledger.yaml` is never a write target. It is regenerated only on `master`
-after a merge, never on a branch, because it is the one file with a single
-writer. A task that writes it is a decomposition error, not a task.
+**A `data/` record edit writes more than `data/`.** The authoring loop requires
+`render --write .` after one, and that rewrites the marker blocks of every guide
+referencing the record — so such a task's true write set is itself plus every
+page that renders it, which is not derivable from its own steps. Resolve it with
+`corpus:data`/`corpus:table` references before grouping, or put the task in a
+group of its own.
+
+**Two tasks editing different records in one `data/*.yaml` may share a group,
+but only if both edits are single-line surgical replacements.** That is the
+condition under which the contract says the hunks are disjoint and git
+auto-merges them. A task that rewrites a record block, reorders a file, or round
+trips the YAML does not qualify, and shares a group with nobody touching that
+file.
+
+`meta/ledger.yaml` is never a write target **on a refresh branch**. The contract scopes that
+prohibition precisely — the ledger is regenerated on `master` after a merge, and
+`ledger --write` "stays for hand edits and for the post-merge regeneration on
+`master`; it is never run on a refresh branch." So a refresh task that writes it
+is a decomposition error, while a plan that adds, removes or deprecates a page
+is required to regenerate it. Read the contract rather than this paragraph when
+the two disagree; the point here is that the rule has a scope, not that the file
+is untouchable.
 
 When you cannot establish that two tasks' write sets are disjoint, put them in
 different groups. A wrongly serialized plan is slow; a wrongly parallelized one
@@ -104,8 +141,11 @@ apply to that task's work:
   dropping its tests, which has happened here. Measure the baseline by running
   `npm test` against the tree the work starts from, rather than copying the
   number out of the plan: plans are written before other work lands, and a plan
-  that said 559 was five tests stale within a day. State the measured number,
-  the date you measured it, and the total each task should reach.
+  that said 559 was five tests stale within a day.
+  State each task's expectation as a **delta** — "+2 over the total measured at
+  this task's start" — never as an absolute. Two tasks in one group that both add
+  tests cannot both assert an absolute total: whichever lands second sees the
+  other's tests, and the assertion either fails or passes for the wrong reason.
 - **`meta/ledger.yaml` stays untouched**, verified with `git status --porcelain
   meta/ledger.yaml` after the work.
 - **Never write a volatile value from memory** — model ids, prices, limits,
@@ -113,7 +153,8 @@ apply to that task's work:
   `source` and a `verified` date.
 - **Stage by filename.** Not `git add -A`, `git add .`, or `git add -f`, because
   creating a directory here can leave a stray `.claude/` folder a wildcard would
-  sweep in.
+  sweep in. A task that creates a directory — a new `guides/<topic>/` or
+  `research/<topic>/` — deletes that folder before staging, as its own step.
 - **Mutation backups go to the session scratchpad**, not `/tmp`. A mutation step
   that copies a tracked file aside and restores it must name where, because an
   unrestored mutation is a corrupted tracked file and the restore is the half
@@ -140,6 +181,16 @@ or the plan quoted the text wrong. Which one it is decides whether the right
 output is a task, no task, or a repair — and that is the plan author's call, not
 yours. Name the anchor, the file, the count you measured, and stop.
 
+Count anchors with a command, not by reading. The contract warns that a local
+token-optimizer hook folds fenced bodies into placeholders and deletes prose
+mid-paragraph, marking neither, and that `TOKEN_OPTIMIZER_MODE=off` does not
+suppress it — so an anchor transcribed from a read, or a count taken from one,
+can be wrong in a way you cannot see. Use
+`python3 -c "print(open('FILE').read().count('''ANCHOR'''))"` and quote the
+anchor from that same extraction. For the same reason, re-read `CLAUDE.md` from
+disk rather than trusting a copy already in context: a stale preloaded contract
+is a contract you will follow wrongly.
+
 Line and range references such as `CLAUDE.md:58-62` are advisory and go stale as
 files grow; the paragraph that plan pointed at had moved to line 72 within a day.
 Locate by anchor text, carry the line number only as a hint, and never let a step
@@ -157,6 +208,12 @@ what restoring looks like, because an unrestored mutation is a corrupted file.
 Each step that runs a command states what the output should be. A step with no
 expected output cannot be checked, and an agent that cannot check a step will
 report it done.
+
+Say what the executor does when the output does not match, because a subagent
+holding one task section has no plan to fall back on: the code is wrong and gets
+debugged to root cause, or the task is wrong and the executor stops and reports
+rather than editing the step until it passes. Never the third thing — adjusting
+the expectation to match what happened.
 
 ## Before you hand it back
 
