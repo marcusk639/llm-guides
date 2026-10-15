@@ -9,6 +9,7 @@ import path from "node:path";
 import yaml from "js-yaml";
 import { parseFrontmatter } from "./frontmatter.mjs";
 import { referencedRecordKeys } from "./verify-pages.mjs";
+import { loadTopics } from "./taxonomy.mjs";
 
 export class RefreshError extends Error {
   constructor(rule, message) {
@@ -135,20 +136,9 @@ export function unitTopic(unit) {
 // `research:` pointer that cannot resolve. Checked here, inside the one
 // function that builds the path, so it cannot be bypassed by a caller that
 // skips a separate validation step.
-function loadTaxonomyTopics(root) {
-  const file = path.join(root, "meta", "taxonomy.yaml");
-  if (!fs.existsSync(file)) return [];
-  return (
-    (
-      yaml.load(fs.readFileSync(file, "utf8"), { schema: yaml.JSON_SCHEMA }) ??
-      {}
-    ).topics ?? []
-  );
-}
-
 export function artifactPathFor(unit, fetched, root) {
   const topic = unitTopic(unit);
-  const topics = loadTaxonomyTopics(root);
+  const topics = loadTopics(root);
   if (!topics.includes(topic))
     throw new RefreshError(
       "refresh-topic-not-in-taxonomy",

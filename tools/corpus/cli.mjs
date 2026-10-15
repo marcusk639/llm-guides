@@ -54,17 +54,7 @@ import { collectCitations } from "./citations.mjs";
 import { auditCitations } from "./sources.mjs";
 import { summarise, formatText, formatJson } from "./sources-report.mjs";
 import { archiveArtifact } from "./archive.mjs";
-
-function loadTopics(root) {
-  const file = path.join(root, "meta", "taxonomy.yaml");
-  if (!fs.existsSync(file)) return [];
-  return (
-    (
-      yaml.load(fs.readFileSync(file, "utf8"), { schema: yaml.JSON_SCHEMA }) ??
-      {}
-    ).topics ?? []
-  );
-}
+import { loadTopics } from "./taxonomy.mjs";
 
 export function lintCorpus(
   root,

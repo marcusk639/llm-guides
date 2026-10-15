@@ -3,6 +3,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import fs from "node:fs";
+import os from "node:os";
 import { loadRecords } from "../data.mjs";
 import { RefreshError, pageFacts, resolveUnit } from "../refresh-units.mjs";
 
@@ -230,4 +232,42 @@ test("artifactPathFor rejects a topic not listed in the taxonomy", () => {
       err instanceof RefreshError &&
       err.rule === "refresh-topic-not-in-taxonomy",
   );
+});
+
+// The traversal guard above is only as strong as the topic list it checks
+// against. loadTaxonomyTopics returned `.topics ?? []`, so a `topics:` written
+// as a string was handed through and `topics.includes(topic)` became a
+// SUBSTRING test -- a taxonomy merely CONTAINING the traversal string let the
+// guard pass, and the comment on that guard says it cannot be bypassed.
+test("artifactPathFor's traversal guard holds when topics: is malformed", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tax-traversal-"));
+  try {
+    fs.mkdirSync(path.join(dir, "meta"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "meta", "taxonomy.yaml"),
+      'topics: "foundations, ../../../tmp/evil, security"\n',
+    );
+    const unit = {
+      entry: "guides/x/y.md",
+      pages: [
+        {
+          path: "guides/x/y.md",
+          topic: "../../../tmp/evil",
+          status: null,
+          keys: [],
+        },
+      ],
+      keys: [],
+      topics: ["../../../tmp/evil"],
+      dataFiles: [],
+    };
+    assert.throws(
+      () => artifactPathFor(unit, "2026-10-15", dir),
+      (err) =>
+        err instanceof RefreshError &&
+        err.rule === "refresh-topic-not-in-taxonomy",
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
